@@ -1,5 +1,6 @@
 package org.example.velora.service.impl;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.velora.client.LmStudioClient;
 import org.example.velora.client.ChromaDbClient;
@@ -29,24 +30,24 @@ public class AiServiceImpl implements AiService {
 
     @Override
     public NoteResponse.AiResult improveNote(String content, String title,
-                                              NoteRequest.AiImprove.AiAction action) {
+                                             NoteRequest.AiImprove.AiAction action) {
         NoteResponse.AiResult.AiResultBuilder b = NoteResponse.AiResult.builder().action(action.name());
         try {
             switch (action) {
                 case SUMMARIZE -> b.summary(lmStudioClient.complete(
-                    getPrompt("note.summarize") + "\n\n" + content));
+                        getPrompt("note.summarize") + "\n\n" + content));
                 case STRUCTURE -> b.improvedContent(lmStudioClient.complete(
-                    getPrompt("note.structure") + "\n\n" + content));
+                        getPrompt("note.structure") + "\n\n" + content));
                 case SUGGEST_TITLE -> {
                     String raw = lmStudioClient.complete(getPrompt("note.suggest_title") + "\n\n" + content);
                     List<String> titles = parseJsonArray(raw);
                     b.suggestedTitle(titles.isEmpty() ? "Ghi chú mới" : titles.get(0)).keyPoints(titles);
                 }
                 case CREATE_CHECKLIST -> b.checklist(parseJsonArray(
-                    lmStudioClient.complete(getPrompt("note.checklist") + "\n\n" + content)));
+                        lmStudioClient.complete(getPrompt("note.checklist") + "\n\n" + content)));
                 case IMPROVE_ALL -> b
-                    .summary(lmStudioClient.complete(getPrompt("note.summarize") + "\n\n" + content))
-                    .improvedContent(lmStudioClient.complete(getPrompt("note.structure") + "\n\n" + content));
+                        .summary(lmStudioClient.complete(getPrompt("note.summarize") + "\n\n" + content))
+                        .improvedContent(lmStudioClient.complete(getPrompt("note.structure") + "\n\n" + content));
             }
         } catch (Exception e) {
             log.error("improveNote error: {}", e.getMessage());
@@ -62,23 +63,34 @@ public class AiServiceImpl implements AiService {
         if (StringUtils.hasText(instruction)) prompt = instruction + "\n\n" + prompt;
         try {
             String raw = lmStudioClient.complete(prompt + "\n\n" + truncated);
-            Map<?, ?> parsed = objectMapper.readValue(cleanJson(raw, '{'), Map.class);
+
+            // Sửa đổi: Sử dụng TypeReference để định nghĩa chính xác kiểu dữ liệu Map<String, Object>
+            Map<String, Object> parsed = objectMapper.readValue(
+                    cleanJson(raw, '{'),
+                    new TypeReference<Map<String, Object>>() {}
+            );
+
+            @SuppressWarnings("unchecked")
+            List<String> keyPoints = (List<String>) parsed.getOrDefault("keyPoints", List.of());
+            @SuppressWarnings("unchecked")
+            List<String> keywords = (List<String>) parsed.getOrDefault("keywords", List.of());
+
             return DocumentResponse.AnalysisResult.builder()
-                .summary((String) parsed.get("summary"))
-                .keyPoints((List<String>) parsed.getOrDefault("keyPoints", List.of()))
-                .keywords((List<String>) parsed.getOrDefault("keywords", List.of()))
-                .build();
+                    .summary((String) parsed.get("summary"))
+                    .keyPoints(keyPoints)
+                    .keywords(keywords)
+                    .build();
         } catch (Exception e) {
             log.error("analyzeDocument error: {}", e.getMessage());
             return DocumentResponse.AnalysisResult.builder()
-                .summary("Không thể phân tích tài liệu lúc này").build();
+                    .summary("Không thể phân tích tài liệu lúc này").build();
         }
     }
 
     @Override
     public String chatWithContext(String question, List<String> contextChunks) {
         String context = contextChunks.isEmpty() ? "Không có ngữ cảnh liên quan."
-            : String.join("\n---\n", contextChunks);
+                : String.join("\n---\n", contextChunks);
         String userMsg = "Ngữ cảnh:\n" + context + "\n\nCâu hỏi: " + question;
         return lmStudioClient.chatComplete(getPrompt("chat.rag"), userMsg);
     }
@@ -87,10 +99,16 @@ public class AiServiceImpl implements AiService {
     public ScheduleResponse.ExtractResult extractSchedules(String content) {
         try {
             String raw = lmStudioClient.complete(getPrompt("schedule.extract") + "\n\n" + content);
-            List<?> items = objectMapper.readValue(cleanJson(raw, '['), List.class);
+
+            // Sửa đổi: Đọc danh sách dưới dạng List của các Map<String, Object> để tránh lỗi Wildcard
+            List<Map<String, Object>> items = objectMapper.readValue(
+                    cleanJson(raw, '['),
+                    new TypeReference<List<Map<String, Object>>>() {}
+            );
+
             List<ScheduleResponse.Item> extracted = new ArrayList<>();
-            for (Object item : items) {
-                if (!(item instanceof Map<?, ?> m)) continue;
+            for (Map<String, Object> m : items) {
+                if (m == null) continue;
                 String taskName = (String) m.get("task");
                 if (!StringUtils.hasText(taskName)) continue;
                 String deadlineStr = (String) m.get("deadline");
@@ -101,10 +119,10 @@ public class AiServiceImpl implements AiService {
                 try { priority = Schedule.Priority.valueOf((String) m.getOrDefault("priority", "MEDIUM")); }
                 catch (Exception e) { priority = Schedule.Priority.MEDIUM; }
                 extracted.add(ScheduleResponse.Item.builder()
-                    .taskName(taskName).deadline(deadline).priority(priority).build());
+                        .taskName(taskName).deadline(deadline).priority(priority).build());
             }
             return ScheduleResponse.ExtractResult.builder()
-                .extracted(extracted).totalFound(extracted.size()).rawAiResponse(raw).build();
+                    .extracted(extracted).totalFound(extracted.size()).rawAiResponse(raw).build();
         } catch (Exception e) {
             log.error("extractSchedules error: {}", e.getMessage());
             return ScheduleResponse.ExtractResult.builder().extracted(List.of()).totalFound(0).build();
@@ -115,13 +133,19 @@ public class AiServiceImpl implements AiService {
     public KnowledgeGroupResponse.ClassifyResult classifyContent(String content) {
         try {
             String raw = lmStudioClient.complete(getPrompt("knowledge.classify") + "\n\n" + content);
-            Map<?, ?> parsed = objectMapper.readValue(cleanJson(raw, '{'), Map.class);
+
+            // Sửa đổi: Thay thế Map<?, ?> bằng Map<String, Object> tường minh
+            Map<String, Object> parsed = objectMapper.readValue(
+                    cleanJson(raw, '{'),
+                    new TypeReference<Map<String, Object>>() {}
+            );
+
             return KnowledgeGroupResponse.ClassifyResult.builder()
-                .suggestedGroupName((String) parsed.getOrDefault("groupName", "Chung"))
-                .reasoning((String) parsed.getOrDefault("reasoning", "")).build();
+                    .suggestedGroupName((String) parsed.getOrDefault("groupName", "Chung"))
+                    .reasoning((String) parsed.getOrDefault("reasoning", "")).build();
         } catch (Exception e) {
             return KnowledgeGroupResponse.ClassifyResult.builder()
-                .suggestedGroupName("Chung").reasoning("").build();
+                    .suggestedGroupName("Chung").reasoning("").build();
         }
     }
 
@@ -166,13 +190,17 @@ public class AiServiceImpl implements AiService {
     @Override
     public String getPrompt(String promptKey) {
         return systemPromptRepository.findByPromptKeyAndIsActiveTrue(promptKey)
-            .map(SystemPrompt::getPromptText)
-            .orElse("Hãy xử lý nội dung sau bằng tiếng Việt:");
+                .map(SystemPrompt::getPromptText)
+                .orElse("Hãy xử lý nội dung sau bằng tiếng Việt:");
     }
 
     private List<String> parseJsonArray(String raw) {
-        try { return objectMapper.readValue(cleanJson(raw, '['), List.class); }
-        catch (Exception e) { return List.of(raw.trim()); }
+        try {
+            // Sửa đổi: Định hình rõ cấu trúc kiểu dữ liệu List<String> khi nhận mảng từ JSON
+            return objectMapper.readValue(cleanJson(raw, '['), new TypeReference<List<String>>() {});
+        } catch (Exception e) {
+            return List.of(raw.trim());
+        }
     }
 
     private String cleanJson(String raw, char startChar) {

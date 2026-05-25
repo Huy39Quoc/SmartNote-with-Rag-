@@ -1,5 +1,6 @@
 package org.example.velora.util;
 
+import org.apache.pdfbox.Loader;
 import org.example.velora.entity.Document;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -27,7 +28,7 @@ public class FileExtractor {
     }
 
     private String extractPdf(String path) throws IOException {
-        try (PDDocument doc = PDDocument.load(new java.io.File(path))) {
+        try (PDDocument doc = Loader.loadPDF(new java.io.File(path))) {
             PDFTextStripper stripper = new PDFTextStripper();
             stripper.setLineSeparator("\n");
             return stripper.getText(doc);

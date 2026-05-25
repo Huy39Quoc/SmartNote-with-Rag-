@@ -41,7 +41,7 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     public ChatResponse.AskResult ask(UUID userId, UUID sessionId, ChatRequest.Ask req) {
-        ChatSession session = getSession(userId, sessionId);
+        ChatSession session = findSession(userId, sessionId);
 
         // Save user message
         ChatMessage userMsg = ChatMessage.builder()
@@ -82,22 +82,22 @@ public class ChatServiceImpl implements ChatService {
 
     @Override @Transactional(readOnly = true)
     public ChatResponse.SessionDetail getSession(UUID userId, UUID sessionId) {
-        return toDetail(getSession(userId, sessionId));
+        return toDetail(findSession(userId, sessionId));
     }
 
     @Override
     public ChatResponse.SessionDetail updateSession(UUID userId, UUID sessionId, ChatRequest.UpdateSession req) {
-        ChatSession session = getSession(userId, sessionId);
+        ChatSession session = findSession(userId, sessionId);
         if (req.getTitle() != null) session.setTitle(req.getTitle());
         return toDetail(sessionRepository.save(session));
     }
 
     @Override
     public void deleteSession(UUID userId, UUID sessionId) {
-        sessionRepository.delete(getSession(userId, sessionId));
+        sessionRepository.delete(findSession(userId, sessionId));
     }
 
-    private ChatSession getSession(UUID userId, UUID sessionId) {
+    private ChatSession findSession(UUID userId, UUID sessionId) {
         ChatSession s = sessionRepository.findById(sessionId)
             .orElseThrow(() -> new ResourceNotFoundException("Session không tồn tại"));
         if (!s.getUser().getId().equals(userId))

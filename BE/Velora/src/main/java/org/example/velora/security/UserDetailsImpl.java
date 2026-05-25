@@ -49,5 +49,15 @@ public class UserDetailsImpl implements UserDetailsService {
         @Override public String getUsername() { return email; }
         @Override public boolean isAccountNonLocked() { return active; }
         @Override public boolean isEnabled() { return active; }
+
+        @Override
+        public boolean isAccountNonExpired() {
+            return true;
+        }
+
+        @Override
+        public boolean isCredentialsNonExpired() {
+            return true;
+        }
     }
 }
