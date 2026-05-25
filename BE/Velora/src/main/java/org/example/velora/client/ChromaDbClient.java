@@ -3,7 +3,6 @@ package org.example.velora.client;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpMethod;
@@ -16,48 +15,60 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
-@Component @Slf4j @RequiredArgsConstructor
+@Component
+@Slf4j
+@RequiredArgsConstructor
 public class ChromaDbClient {
 
-    @Qualifier("chromaWebClient")
-    private final WebClient webClient;
+    // ĐÃ ĐỔI TÊN: Thành chromaWebClient để trùng khớp với tên @Bean trong WebClientConfig
+    private final WebClient chromaWebClient;
     private final ObjectMapper objectMapper;
 
-    @Value("${ai.chroma.collection-name}") private String collection;
+    @Value("${ai.chroma.collection-name}")
+    private String collection;
 
     public void embed(String id, String text, String userId, String type) {
         try {
-            webClient.post().uri("/embed")
-                .bodyValue(Map.of("id", id, "text", text,
-                    "userId", userId, "type", type, "collection", collection))
-                .retrieve().bodyToMono(String.class)
-                .timeout(Duration.ofSeconds(30)).block();
-        } catch (Exception e) { log.error("Chroma embed error id={}: {}", id, e.getMessage()); }
+            chromaWebClient.post().uri("/embed")
+                    .bodyValue(Map.of("id", id, "text", text,
+                            "userId", userId, "type", type, "collection", collection))
+                    .retrieve().bodyToMono(String.class)
+                    .timeout(Duration.ofSeconds(30)).block();
+        } catch (Exception e) {
+            log.error("Chroma embed error id={}: {}", id, e.getMessage());
+        }
     }
 
     public List<String> search(String query, String userId, String contextId) {
         try {
             Map<String, Object> body = contextId != null
-                ? Map.of("query", query, "userId", userId,
+                    ? Map.of("query", query, "userId", userId,
                     "contextId", contextId, "k", 5, "collection", collection)
-                : Map.of("query", query, "userId", userId, "k", 5, "collection", collection);
-            String raw = webClient.post().uri("/search").bodyValue(body)
-                .retrieve().bodyToMono(String.class)
-                .timeout(Duration.ofSeconds(15)).block();
+                    : Map.of("query", query, "userId", userId, "k", 5, "collection", collection);
+
+            String raw = chromaWebClient.post().uri("/search").bodyValue(body)
+                    .retrieve().bodyToMono(String.class)
+                    .timeout(Duration.ofSeconds(15)).block();
+
             if (raw == null) return List.of();
             Map<?, ?> resp = objectMapper.readValue(raw, Map.class);
             List<?> chunks = (List<?>) resp.get("chunks");
             return chunks == null ? List.of() : chunks.stream().map(Object::toString).toList();
-        } catch (Exception e) { log.error("Chroma search error: {}", e.getMessage()); return List.of(); }
+        } catch (Exception e) {
+            log.error("Chroma search error: {}", e.getMessage());
+            return List.of();
+        }
     }
 
     public void delete(String id) {
         try {
-            webClient.method(HttpMethod.DELETE)
-                .uri("/embed/{id}?collection={col}", id, collection)
-                .retrieve().bodyToMono(String.class)
-                .timeout(Duration.ofSeconds(10)).block();
-        } catch (Exception e) { log.error("Chroma delete error id={}: {}", id, e.getMessage()); }
+            chromaWebClient.method(HttpMethod.DELETE)
+                    .uri("/embed/{id}?collection={col}", id, collection)
+                    .retrieve().bodyToMono(String.class)
+                    .timeout(Duration.ofSeconds(10)).block();
+        } catch (Exception e) {
+            log.error("Chroma delete error id={}: {}", id, e.getMessage());
+        }
     }
 
     /**
@@ -69,13 +80,15 @@ public class ChromaDbClient {
             MultipartBodyBuilder builder = new MultipartBodyBuilder();
             builder.part("file", new FileSystemResource(filePath));
             builder.part("language", language != null ? language : "vi");
-            String raw = webClient.post()
-                .uri("/audio/transcribe")
-                .contentType(MediaType.MULTIPART_FORM_DATA)
-                .body(BodyInserters.fromMultipartData(builder.build()))
-                .retrieve().bodyToMono(String.class)
-                .timeout(Duration.ofMinutes(10))  // audio dài có thể mất vài phút
-                .block();
+
+            String raw = chromaWebClient.post()
+                    .uri("/audio/transcribe")
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(BodyInserters.fromMultipartData(builder.build()))
+                    .retrieve().bodyToMono(String.class)
+                    .timeout(Duration.ofMinutes(10))  // Audio dài có thể mất vài phút
+                    .block();
+
             if (raw == null) return "";
             Map<?, ?> resp = objectMapper.readValue(raw, Map.class);
             Object value = resp.get("transcript");
@@ -88,9 +101,11 @@ public class ChromaDbClient {
 
     public boolean isHealthy() {
         try {
-            webClient.get().uri("/health").retrieve()
-                .bodyToMono(String.class).timeout(Duration.ofSeconds(3)).block();
+            chromaWebClient.get().uri("/health").retrieve()
+                    .bodyToMono(String.class).timeout(Duration.ofSeconds(3)).block();
             return true;
-        } catch (Exception e) { return false; }
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

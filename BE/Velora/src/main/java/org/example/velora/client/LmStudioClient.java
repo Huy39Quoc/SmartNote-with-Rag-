@@ -4,7 +4,6 @@ import org.example.velora.client.dto.LmStudioRequest;
 import org.example.velora.client.dto.LmStudioResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.MediaType;
@@ -18,11 +17,13 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
-@Component @Slf4j @RequiredArgsConstructor
+@Component
+@Slf4j
+@RequiredArgsConstructor
 public class LmStudioClient {
 
-    @Qualifier("lmStudioWebClient")
-    private final WebClient webClient;
+    // ĐÃ ĐỔI TÊN: Thành lmStudioWebClient để tự động khớp với @Bean trong WebClientConfig (Bỏ @Qualifier)
+    private final WebClient lmStudioWebClient;
 
     @Value("${ai.lm-studio.model}")          private String model;
     @Value("${ai.lm-studio.max-tokens}")     private int maxTokens;
@@ -35,20 +36,21 @@ public class LmStudioClient {
 
     public String chatComplete(String systemMessage, String userMessage) {
         LmStudioRequest req = LmStudioRequest.builder()
-            .model(model)
-            .messages(List.of(
-                LmStudioRequest.Message.builder().role("system").content(systemMessage).build(),
-                LmStudioRequest.Message.builder().role("user").content(userMessage).build()
-            ))
-            .maxTokens(maxTokens).temperature(temperature).stream(false).build();
+                .model(model)
+                .messages(List.of(
+                        LmStudioRequest.Message.builder().role("system").content(systemMessage).build(),
+                        LmStudioRequest.Message.builder().role("user").content(userMessage).build()
+                ))
+                .maxTokens(maxTokens).temperature(temperature).stream(false).build();
         try {
-            LmStudioResponse resp = webClient.post()
-                .uri("/v1/chat/completions")
-                .bodyValue(req)
-                .retrieve()
-                .bodyToMono(LmStudioResponse.class)
-                .timeout(Duration.ofSeconds(timeout))
-                .block();
+            // Thay đổi sang lmStudioWebClient
+            LmStudioResponse resp = lmStudioWebClient.post()
+                    .uri("/v1/chat/completions")
+                    .bodyValue(req)
+                    .retrieve()
+                    .bodyToMono(LmStudioResponse.class)
+                    .timeout(Duration.ofSeconds(timeout))
+                    .block();
             if (resp != null && resp.getChoices() != null && !resp.getChoices().isEmpty()) {
                 String content = resp.getChoices().get(0).getMessage().getContent();
                 if (content != null && !content.isBlank()) return content.trim();
@@ -73,14 +75,15 @@ public class LmStudioClient {
             builder.part("language", "vi");  // tiếng Việt
             builder.part("response_format", "text");
 
-            String result = webClient.post()
-                .uri("/v1/audio/transcriptions")
-                .contentType(MediaType.MULTIPART_FORM_DATA)
-                .body(BodyInserters.fromMultipartData(builder.build()))
-                .retrieve()
-                .bodyToMono(String.class)
-                .timeout(Duration.ofMinutes(5))
-                .block();
+            // Thay đổi sang lmStudioWebClient
+            String result = lmStudioWebClient.post()
+                    .uri("/v1/audio/transcriptions")
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(BodyInserters.fromMultipartData(builder.build()))
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .timeout(Duration.ofMinutes(5))
+                    .block();
             return result != null ? result.trim() : "";
         } catch (Exception e) {
             log.error("Audio transcription failed: {}", e.getMessage());
@@ -90,14 +93,15 @@ public class LmStudioClient {
 
     public List<String> getLoadedModels() {
         try {
-            Map<?, ?> resp = webClient.get().uri("/v1/models")
-                .retrieve().bodyToMono(Map.class)
-                .timeout(Duration.ofSeconds(5)).block();
+            // Thay đổi sang lmStudioWebClient
+            Map<?, ?> resp = lmStudioWebClient.get().uri("/v1/models")
+                    .retrieve().bodyToMono(Map.class)
+                    .timeout(Duration.ofSeconds(5)).block();
             if (resp == null) return List.of();
             List<?> data = (List<?>) resp.get("data");
             if (data == null) return List.of();
             return data.stream().filter(m -> m instanceof Map)
-                .map(m -> (String) ((Map<?, ?>) m).get("id")).toList();
+                    .map(m -> (String) ((Map<?, ?>) m).get("id")).toList();
         } catch (Exception e) {
             log.warn("Cannot reach LM Studio: {}", e.getMessage());
             return List.of();
