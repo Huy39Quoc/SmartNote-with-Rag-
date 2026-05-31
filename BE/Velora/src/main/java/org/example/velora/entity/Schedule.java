@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -20,28 +19,28 @@ public class Schedule {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(columnDefinition = "VARCHAR(36)")
+    @Column(name = "id", columnDefinition = "UNIQUEIDENTIFIER", updatable = false, nullable = false)
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "user_id", columnDefinition = "UNIQUEIDENTIFIER", nullable = false)
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "note_id")
+    @JoinColumn(name = "note_id", columnDefinition = "UNIQUEIDENTIFIER")
     private Note note;
 
     @Column(name = "task_name", nullable = false, length = 255)
     private String taskName;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "NVARCHAR(MAX)")
     private String description;
 
-    @Column(name = "deadline")
     private LocalDate deadline;
 
+    // CHỈNH SỬA: Đổi từ Integer sang Enum Priority và cấu hình lưu String xuống DB
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 10)
+    @Column(name = "priority", length = 10, nullable = false)
     @Builder.Default
     private Priority priority = Priority.MEDIUM;
 
@@ -61,7 +60,9 @@ public class Schedule {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    // ĐÃ THÊM ENUM NÀY ĐỂ ĐÁP ỨNG BIẾN "Priority" KHÔNG TÌM THẤY
+    // Trong file Schedule.java
     public enum Priority {
-        LOW, MEDIUM, HIGH, URGENT
+        URGENT, HIGH, MEDIUM, LOW  // <-- THÊM "URGENT" VÀO ĐÂY
     }
 }

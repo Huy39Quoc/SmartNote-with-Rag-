@@ -11,8 +11,8 @@ import java.util.UUID;
 
 @Entity
 @Table(
-    name = "tags",
-    uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "name"})
+        name = "tags",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "name"})
 )
 @Getter
 @Setter
@@ -23,11 +23,11 @@ public class Tag {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(columnDefinition = "VARCHAR(36)")
+    @Column(name = "id", columnDefinition = "UNIQUEIDENTIFIER", updatable = false, nullable = false)
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "user_id", columnDefinition = "UNIQUEIDENTIFIER", nullable = false)
     private User user;
 
     @Column(nullable = false, length = 50)

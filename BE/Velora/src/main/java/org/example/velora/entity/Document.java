@@ -12,12 +12,13 @@ import java.util.UUID;
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class Document {
 
-    @Id @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(columnDefinition = "VARCHAR(36)")
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "id", columnDefinition = "UNIQUEIDENTIFIER", updatable = false, nullable = false)
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "user_id", columnDefinition = "UNIQUEIDENTIFIER", nullable = false)
     private User user;
 
     @Column(name = "file_name", nullable = false, length = 255)
@@ -37,14 +38,14 @@ public class Document {
     private Long fileSize;
 
     /** Nội dung text trích xuất từ PDF/DOCX/TXT — hỗ trợ tiếng Việt */
-    @Column(name = "extracted_text", columnDefinition = "LONGTEXT")
+    @Column(name = "extracted_text", columnDefinition = "NVARCHAR(MAX)")
     private String extractedText;
 
-    @Column(name = "ai_summary", columnDefinition = "TEXT")
+    @Column(name = "ai_summary", columnDefinition = "NVARCHAR(MAX)")
     private String aiSummary;
 
     /** Transcript âm thanh sau khi AI phân tích — tiếng Việt */
-    @Column(name = "audio_transcript", columnDefinition = "LONGTEXT")
+    @Column(name = "audio_transcript", columnDefinition = "NVARCHAR(MAX)")
     private String audioTranscript;
 
     /** Độ dài âm thanh (giây) */
@@ -69,12 +70,14 @@ public class Document {
     private LocalDateTime updatedAt;
 
     public enum FileType {
-        PDF, DOCX, TXT,
-        /** Âm thanh: mp3, wav, m4a, webm, ogg */
-        AUDIO
+        PDF, DOCX, TXT, AUDIO
     }
 
     public enum Status {
-        PENDING, PROCESSING, DONE, FAILED
+        PENDING,
+        PROCESSING,
+        SUCCESS,
+        FAILED,
+        DONE
     }
 }

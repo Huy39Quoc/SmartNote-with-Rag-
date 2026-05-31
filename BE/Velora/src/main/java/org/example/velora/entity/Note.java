@@ -21,17 +21,17 @@ public class Note {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(columnDefinition = "VARCHAR(36)")
+    @Column(name = "id", columnDefinition = "UNIQUEIDENTIFIER", updatable = false, nullable = false)
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "user_id", columnDefinition = "UNIQUEIDENTIFIER", nullable = false)
     private User user;
 
     @Column(nullable = false, length = 255)
     private String title;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "NVARCHAR(MAX)")
     private String content;
 
     @Column(name = "is_bookmarked", nullable = false)
@@ -53,9 +53,9 @@ public class Note {
     // Relationships
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
-        name = "note_tags",
-        joinColumns = @JoinColumn(name = "note_id"),
-        inverseJoinColumns = @JoinColumn(name = "tag_id")
+            name = "note_tags",
+            joinColumns = @JoinColumn(name = "note_id", columnDefinition = "UNIQUEIDENTIFIER"),
+            inverseJoinColumns = @JoinColumn(name = "tag_id", columnDefinition = "UNIQUEIDENTIFIER")
     )
     @Builder.Default
     private List<Tag> tags = new ArrayList<>();
@@ -63,8 +63,4 @@ public class Note {
     @OneToMany(mappedBy = "note", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<Schedule> schedules = new ArrayList<>();
-
-    @ManyToMany(mappedBy = "notes")
-    @Builder.Default
-    private List<KnowledgeGroup> knowledgeGroups = new ArrayList<>();
 }

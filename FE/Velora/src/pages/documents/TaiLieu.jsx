@@ -4,6 +4,7 @@ import {
   IconSparkles, IconMessages, IconLoader2, IconFile
 } from '@tabler/icons-react'
 import documentApi from '../../lib/api/documentApi'
+import scheduleApi from '../../lib/api/scheduleApi'
 import UploadZone from '../../components/documents/UploadZone'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
@@ -25,6 +26,8 @@ export default function TaiLieu() {
   const [dangXuLyAi, setDangXuLyAi] = useState(false)
   const [cauHoi, setCauHoi] = useState('')
   const [phanHoiChat, setPhanHoiChat] = useState(null)
+  const [lichGoiY, setLichGoiY] = useState(false)
+  const [dangTrichLich, setDangTrichLich] = useState(false)
 
   const tai = async () => {
     setDangTai(true)
@@ -71,6 +74,28 @@ export default function TaiLieu() {
       setKetQuaAi(data.data)
     } catch { toast.error('AI không phản hồi') }
     setDangXuLyAi(false)
+  }
+
+  const coTheTrichLich = (text) => {
+    if (!text) return false
+    return /\b(?:\d{1,2}[:.][0-5]\d|[0-2]?\d\s*giờ|ngày\s*\d{1,2}|thứ\s*(?:hai|ba|tư|năm|sáu|bảy)|deadline|hẹn)\b/i.test(text)
+  }
+
+  useEffect(() => {
+    const text = ketQuaAi?.summary || phanHoiChat?.answer || ''
+    setLichGoiY(coTheTrichLich(text))
+  }, [ketQuaAi, phanHoiChat])
+
+  const trichXuatLich = async () => {
+    const text = ketQuaAi?.summary || phanHoiChat?.answer || ''
+    if (!text.trim()) return
+    setDangTrichLich(true)
+    try {
+      const { data } = await scheduleApi.trichXuatTuGhiChu({ content: text })
+      toast.success(`AI đã tìm ${data.data.totalFound || 0} lịch / công việc`)
+      setLichGoiY(false)
+    } catch { toast.error('Không thể trích xuất lịch từ nội dung tài liệu') }
+    setDangTrichLich(false)
   }
 
   const phanTichAmThanh = async () => {
@@ -224,6 +249,24 @@ export default function TaiLieu() {
                   </div>
                 )}
 
+                {lichGoiY && (
+                  <div style={styles.schedulePrompt}>
+                    <div style={{ fontSize: 12, marginBottom: 8 }}>
+                      AI phát hiện thông tin lịch / thời gian trong nội dung. Bạn có muốn tạo công việc / lịch từ nội dung này?
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button className="btn-primary" onClick={trichXuatLich} disabled={dangTrichLich}
+                        style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}>
+                        {dangTrichLich ? 'Đang xử lý...' : 'Tạo lịch'}
+                      </button>
+                      <button className="btn-ghost" onClick={() => setLichGoiY(false)}
+                        style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}>
+                        Không cần
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Hỏi đáp với tài liệu */}
                 {chon.status === 'DONE' && !ketQuaAi && (
                   <div style={{ color: 'var(--text-faint)', fontSize: 12, textAlign: 'center', padding: '20px 0' }}>
@@ -267,5 +310,6 @@ const styles = {
   aiResult:  { background: 'var(--bg-elevated)', border: '.5px solid var(--border)', borderRadius: 8, padding: 14, fontSize: 13 },
   aiLabel:   { display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--accent-blue-dim)', marginBottom: 10, fontWeight: 500 },
   subLabel:  { fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 5 },
+  schedulePrompt: { background: 'var(--bg-surface)', border: '.5px solid var(--border)', borderRadius: 10, padding: 14, marginBottom: 14 },
   chatInput: { display: 'flex', gap: 8, padding: '10px 16px', borderTop: '.5px solid var(--border)', background: 'var(--bg-surface)' },
 }

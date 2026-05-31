@@ -64,7 +64,7 @@ public class AdminServiceImpl implements AdminService {
     @Override @Transactional(readOnly = true)
     public Object getSystemStats() {
         long totalUsers     = userRepository.count();
-        long activeUsers    = userRepository.countActiveUsers();
+        long activeUsers    = userRepository.countByIsActive(true);
         long totalNotes     = noteRepository.count();
         long totalDocuments = documentRepository.count();
         long doneDocuments  = documentRepository.countByStatus(Document.Status.DONE);

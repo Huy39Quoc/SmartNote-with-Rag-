@@ -37,6 +37,10 @@ export default function AiPanel({ noteId, content, title, onApply, onDong }) {
   return (
     <div style={styles.panel}>
       <div style={styles.header}>
+  
+  const boQua = () => {
+    setKetQua(null)
+  }
         <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <IconSparkles size={13} style={{ color: 'var(--accent-blue-dim)' }} />
           <span style={{ fontSize: 12, fontWeight: 500 }}>Trợ lý AI</span>
@@ -97,6 +101,18 @@ export default function AiPanel({ noteId, content, title, onApply, onDong }) {
               style={{ width: '100%', justifyContent: 'center', fontSize: 12 }}>
               <IconCheck size={12} /> Áp dụng
             </button>
+            {ketQua.improvedContent && (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button className="btn-primary" onClick={apDung}
+                  style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}>
+                  <IconCheck size={12} /> Chấp nhận AI
+                </button>
+                <button className="btn-ghost" onClick={boQua}
+                  style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}>
+                  Giữ nguyên
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -18,21 +18,21 @@ public class ChatMessage {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(columnDefinition = "VARCHAR(36)")
+    @Column(name = "id", columnDefinition = "UNIQUEIDENTIFIER", updatable = false, nullable = false)
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "session_id", nullable = false)
+    @JoinColumn(name = "session_id", columnDefinition = "UNIQUEIDENTIFIER", nullable = false)
     private ChatSession session;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
     private Role role;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
+    @Column(nullable = false, columnDefinition = "NVARCHAR(MAX)")
     private String content;
 
-    @Column(name = "source_chunks", columnDefinition = "TEXT")
+    @Column(name = "source_chunks", columnDefinition = "NVARCHAR(MAX)")
     private String sourceChunks;
 
     @Column(name = "token_count")

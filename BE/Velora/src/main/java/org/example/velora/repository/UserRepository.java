@@ -9,10 +9,14 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface UserRepository extends JpaRepository<User, UUID> {
+
     Optional<User> findByEmail(String email);
+
     boolean existsByEmail(String email);
-    @Query("SELECT COUNT(u) FROM User u WHERE u.isActive = true")
-    long countActiveUsers();
+
+    /** Dùng countByIsActive thay vì @Query để tránh lỗi boolean literal với SQL Server */
+    long countByIsActive(Boolean isActive);
+
     Page<User> findByEmailContainingIgnoreCaseOrFullNameContainingIgnoreCase(
-        String email, String fullName, Pageable pageable);
+            String email, String fullName, Pageable pageable);
 }

@@ -5,6 +5,7 @@ import {
   IconTrash, IconSparkles, IconTag, IconX, IconCheck, IconMicrophone
 } from '@tabler/icons-react'
 import noteApi from '../../lib/api/noteApi'
+import scheduleApi from '../../lib/api/scheduleApi'
 import tagApi from '../../lib/api/tagApi'
 import NoteCard from '../../components/notes/NoteCard'
 import AiPanel from '../../components/notes/AiPanel'
@@ -23,6 +24,8 @@ export default function GhiChu() {
   const [dangLuu, setDangLuu]       = useState(false)
   const [hienAi, setHienAi]         = useState(false)
   const [hienTag, setHienTag]       = useState(false)
+  const [hienLichGoiY, setHienLichGoiY] = useState(false)
+  const [dangTrichLich, setDangTrichLich] = useState(false)
   const [locTag, setLocTag]         = useState(null)
 
   // Tải danh sách ghi chú
@@ -110,6 +113,27 @@ export default function GhiChu() {
       content: noiDung || p.content,
       title: tieuDe || p.title,
     }))
+  }
+
+  const coTheTrichLich = (text) => {
+    if (!text) return false
+    return /\b(?:\d{1,2}[:.][0-5]\d|[0-2]?\d\s*giờ|ngày\s*\d{1,2}|thứ\s*(?:hai|ba|tư|năm|sáu|bảy)|deadline|hẹn)\b/i.test(text)
+  }
+
+  useEffect(() => {
+    if (!ghiChuHienTai) return
+    setHienLichGoiY(coTheTrichLich(ghiChuHienTai.content))
+  }, [ghiChuHienTai?.content])
+
+  const trichXuatLich = async () => {
+    if (!ghiChuHienTai?.content?.trim()) return
+    setDangTrichLich(true)
+    try {
+      const { data } = await scheduleApi.trichXuatTuGhiChu({ content: ghiChuHienTai.content })
+      toast.success(`AI đã tìm ${data.data.totalFound || 0} công việc / lịch`)
+      setHienLichGoiY(false)
+    } catch { toast.error('Không thể trích xuất lịch từ ghi chú') }
+    setDangTrichLich(false)
   }
 
   // Auto-save mỗi 3 giây
@@ -208,6 +232,23 @@ export default function GhiChu() {
                   placeholder="Bắt đầu ghi chú... (hỗ trợ Markdown)"
                   style={styles.textarea}
                 />
+                {hienLichGoiY && (
+                  <div style={styles.schedulePrompt}>
+                    <div style={{ fontSize: 12, marginBottom: 8 }}>
+                      <strong>AI phát hiện thông tin thời gian.</strong> Bạn có muốn trích xuất lịch / công việc từ ghi chú này?
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button className="btn-primary" onClick={trichXuatLich} disabled={dangTrichLich}
+                        style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}>
+                        {dangTrichLich ? 'Đang xử lý...' : 'Có, tạo lịch'}
+                      </button>
+                      <button className="btn-ghost" onClick={() => setHienLichGoiY(false)}
+                        style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}>
+                        Không, để sau
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {/* AI Panel */}
                 {hienAi && (
                   <AiPanel
@@ -239,4 +280,5 @@ const styles = {
   tieuDe:      { flex: 1, background: 'transparent', border: 'none', fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', padding: 0, outline: 'none', width: 'auto' },
   toolbarRight:{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 },
   textarea:    { flex: 1, background: 'transparent', border: 'none', padding: '16px 20px', resize: 'none', fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.7, outline: 'none', fontFamily: 'var(--font)', overflow: 'auto' },
+  schedulePrompt: { width: 320, flexShrink: 0, background: 'var(--bg-elevated)', border: '.5px solid var(--border)', borderRadius: 10, padding: 14, marginLeft: 12, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' },
 }

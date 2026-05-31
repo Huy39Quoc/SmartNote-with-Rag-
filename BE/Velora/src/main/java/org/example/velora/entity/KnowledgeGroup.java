@@ -21,11 +21,11 @@ public class KnowledgeGroup {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(columnDefinition = "VARCHAR(36)")
+    @Column(name = "id", columnDefinition = "UNIQUEIDENTIFIER", updatable = false, nullable = false)
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "user_id", columnDefinition = "UNIQUEIDENTIFIER", nullable = false)
     private User user;
 
     @Column(name = "group_name", nullable = false, length = 100)
@@ -35,7 +35,7 @@ public class KnowledgeGroup {
     @Builder.Default
     private Boolean suggestedByAi = false;
 
-    @Column(name = "ai_reasoning", columnDefinition = "TEXT")
+    @Column(name = "ai_reasoning", columnDefinition = "NVARCHAR(MAX)")
     private String aiReasoning;
 
     @CreationTimestamp
@@ -49,9 +49,9 @@ public class KnowledgeGroup {
     // Relationships
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
-        name = "knowledge_group_notes",
-        joinColumns = @JoinColumn(name = "group_id"),
-        inverseJoinColumns = @JoinColumn(name = "note_id")
+            name = "knowledge_group_notes",
+            joinColumns = @JoinColumn(name = "group_id", columnDefinition = "UNIQUEIDENTIFIER"),
+            inverseJoinColumns = @JoinColumn(name = "note_id", columnDefinition = "UNIQUEIDENTIFIER")
     )
     @Builder.Default
     private List<Note> notes = new ArrayList<>();

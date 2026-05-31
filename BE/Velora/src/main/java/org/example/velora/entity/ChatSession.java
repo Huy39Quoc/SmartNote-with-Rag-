@@ -21,11 +21,11 @@ public class ChatSession {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(columnDefinition = "VARCHAR(36)")
+    @Column(name = "id", columnDefinition = "UNIQUEIDENTIFIER", updatable = false, nullable = false)
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "user_id", columnDefinition = "UNIQUEIDENTIFIER", nullable = false)
     private User user;
 
     @Column(length = 255)
@@ -36,7 +36,7 @@ public class ChatSession {
     @Builder.Default
     private ContextType contextType = ContextType.NOTES;
 
-    @Column(name = "context_id", columnDefinition = "VARCHAR(36)")
+    @Column(name = "context_id", columnDefinition = "UNIQUEIDENTIFIER")
     private UUID contextId;
 
     @CreationTimestamp

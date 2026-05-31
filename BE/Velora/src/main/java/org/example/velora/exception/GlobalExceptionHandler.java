@@ -1,10 +1,12 @@
 package org.example.velora.exception;
 
+import lombok.extern.slf4j.Slf4j;
 import org.example.velora.dto.response.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -14,6 +16,7 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.stream.Collectors;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -53,6 +56,12 @@ public class GlobalExceptionHandler {
             .body(ApiResponse.fail("Tài khoản đã bị khoá", "ACCOUNT_LOCKED"));
     }
 
+    @ExceptionHandler(DisabledException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDisabled(DisabledException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+            .body(ApiResponse.fail("Tài khoản chưa được kích hoạt", "ACCOUNT_DISABLED"));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> handleValidation(MethodArgumentNotValidException ex) {
         String msg = ex.getBindingResult().getFieldErrors().stream()
@@ -62,16 +71,18 @@ public class GlobalExceptionHandler {
             .body(ApiResponse.fail(msg, "VALIDATION_ERROR"));
     }
 
-    /** Xử lý khi upload file vượt quá 100MB */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiResponse<Void>> handleMaxUpload(MaxUploadSizeExceededException ex) {
         return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
             .body(ApiResponse.fail("File quá lớn. Giới hạn tối đa là 100MB", "FILE_TOO_LARGE"));
     }
 
+    /** Catch-all: log đầy đủ ra IntelliJ console để debug */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGeneral(Exception ex) {
+        log.error("[500] {} - {}", ex.getClass().getSimpleName(), ex.getMessage(), ex);
+        String msg = ex.getMessage() != null ? ex.getMessage() : "Lỗi không xác định";
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-            .body(ApiResponse.fail("Đã xảy ra lỗi hệ thống: " + ex.getMessage(), "INTERNAL_ERROR"));
+            .body(ApiResponse.fail("Lỗi hệ thống: " + msg, "INTERNAL_ERROR"));
     }
 }
