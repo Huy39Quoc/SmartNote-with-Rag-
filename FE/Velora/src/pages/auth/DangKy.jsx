@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { IconEye, IconEyeOff } from '@tabler/icons-react'
-import useAuthStore from '../../store/authStore'
+import useAuthStore from '../../service/authStore'
 import logo from '../../assets/logo.svg'
 
 export default function DangKy() {

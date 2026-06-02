@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 
-import useAuthStore from './store/authStore'
+import useAuthStore from './service/authStore'
 import MainLayout from './components/layout/MainLayout'
 import { ProtectedRoute, AdminRoute, PublicOnlyRoute } from './components/layout/ProtectedRoute'
 
@@ -16,6 +16,9 @@ import TaiLieu    from './pages/documents/TaiLieu'
 import Lich       from './pages/schedule/Lich'
 import KienThuc   from './pages/knowledge/KienThuc'
 import QuanTri    from './pages/admin/QuanTri'
+import TaiKhoan   from './pages/profile/TaiKhoan'
+import ThongBao   from './pages/notifications/ThongBao'
+
 
 export default function App() {
   const { daXacThuc, layThongTin } = useAuthStore()
@@ -41,6 +44,8 @@ export default function App() {
         <Route path="/lich"       element={<Lich />} />
         <Route path="/kien-thuc"  element={<KienThuc />} />
         <Route path="/quan-tri"   element={<AdminRoute><QuanTri /></AdminRoute>} />
+          <Route path="/tai-khoan" element={<TaiKhoan />} />
+          <Route path="/thong-bao" element={<ThongBao />} />
       </Route>
 
       {/* Fallback */}

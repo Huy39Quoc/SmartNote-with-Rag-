@@ -1,5 +1,5 @@
 import { Navigate } from 'react-router-dom'
-import useAuthStore from '../../store/authStore'
+import useAuthStore from '../../service/authStore'
 
 export function ProtectedRoute({ children }) {
   const { daXacThuc } = useAuthStore()

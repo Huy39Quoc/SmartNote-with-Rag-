@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { IconFileText, IconUpload, IconCalendar, IconSitemap, IconPlus, IconAlertTriangle } from '@tabler/icons-react'
-import useAuthStore from '../store/authStore'
+import useAuthStore from '../service/authStore'
 import noteApi from '../lib/api/noteApi'
 import scheduleApi from '../lib/api/scheduleApi'
 import Spinner from '../components/ui/Spinner'
