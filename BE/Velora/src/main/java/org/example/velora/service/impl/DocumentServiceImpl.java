@@ -26,7 +26,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.List;
@@ -57,24 +58,50 @@ public class DocumentServiceImpl implements DocumentService {
         Document.FileType fileType = resolveFileType(originalName);
         String storedName = UUID.randomUUID() + "_" + originalName;
         Path storePath = Paths.get(uploadDir, userId.toString());
+
         try {
             Files.createDirectories(storePath);
-            Files.copy(file.getInputStream(), storePath.resolve(storedName),
-                StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(
+                    file.getInputStream(),
+                    storePath.resolve(storedName),
+                    StandardCopyOption.REPLACE_EXISTING
+            );
         } catch (IOException e) {
             throw new BadRequestException("Không thể lưu file: " + e.getMessage());
         }
+
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
+                .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
+
         Document doc = Document.builder()
-            .user(user).fileName(storedName).originalName(originalName)
-            .fileType(fileType).storagePath(storePath.resolve(storedName).toString())
-            .fileSize(file.getSize()).status(Document.Status.PENDING).build();
+                .user(user)
+                .fileName(storedName)
+                .originalName(originalName)
+                .fileType(fileType)
+                .storagePath(storePath.resolve(storedName).toString())
+                .fileSize(file.getSize())
+                .status(Document.Status.PENDING)
+                .build();
+
         doc = documentRepository.save(doc);
 
         UUID docId = doc.getId();
-        // Xử lý bất đồng bộ qua Spring proxy
-        applicationContext.getBean(DocumentServiceImpl.class).processAsync(docId);
+
+        log.info("Document uploaded and saved: id={}, name={}, type={}",
+                docId, originalName, fileType);
+
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    log.info("Upload transaction committed. Start async processing document: {}", docId);
+                    applicationContext.getBean(DocumentServiceImpl.class).processAsync(docId);
+                }
+            });
+        } else {
+            applicationContext.getBean(DocumentServiceImpl.class).processAsync(docId);
+        }
+
         return toSummary(doc);
     }
 
@@ -82,7 +109,10 @@ public class DocumentServiceImpl implements DocumentService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void processAsync(UUID docId) {
         Document doc = documentRepository.findById(docId).orElse(null);
-        if (doc == null) return;
+        if (doc == null) {
+            log.error("Async processing failed: document not found after commit. id={}", docId);
+            return;
+        }
 
         doc.setStatus(Document.Status.PROCESSING);
         documentRepository.save(doc);

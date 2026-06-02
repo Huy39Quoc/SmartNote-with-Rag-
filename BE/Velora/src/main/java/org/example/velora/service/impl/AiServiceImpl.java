@@ -89,10 +89,39 @@ public class AiServiceImpl implements AiService {
 
     @Override
     public String chatWithContext(String question, List<String> contextChunks) {
-        String context = contextChunks.isEmpty() ? "Không có ngữ cảnh liên quan."
-                : String.join("\n---\n", contextChunks);
-        String userMsg = "Ngữ cảnh:\n" + context + "\n\nCâu hỏi: " + question;
-        return lmStudioClient.chatComplete(getPrompt("chat.rag"), userMsg);
+        if (contextChunks == null || contextChunks.isEmpty()) {
+            return "Mình chưa tìm thấy nội dung liên quan trong tài liệu đã upload.";
+        }
+
+        List<String> limitedChunks = contextChunks.stream()
+                .filter(Objects::nonNull)
+                .filter(s -> !s.isBlank())
+                .limit(3)
+                .toList();
+
+        String context = String.join("\n---\n", limitedChunks);
+
+        String systemPrompt =
+                "Bạn là trợ lý RAG. Chỉ trả lời dựa trên ngữ cảnh được cung cấp. " +
+                        "Trả lời bằng tiếng Việt, ngắn gọn, trực tiếp. " +
+                        "Không suy luận dài. Không dùng markdown phức tạp.";
+
+        String userMsg =
+                "Dựa vào ngữ cảnh sau, hãy trả lời câu hỏi.\n\n" +
+                        "Ngữ cảnh:\n" + context + "\n\n" +
+                        "Câu hỏi: " + question + "\n\n" +
+                        "Yêu cầu: trả lời trong tối đa 5 câu.";
+
+        String answer = lmStudioClient.chatComplete(systemPrompt, userMsg);
+
+        if (answer == null || answer.isBlank()
+                || answer.contains("Không thể kết nối AI")
+                || answer.contains("AI chưa trả về nội dung")) {
+            return "Mình đã tìm thấy nội dung liên quan trong tài liệu, nhưng model AI trả lời quá lâu. " +
+                    "Nội dung tìm được là:\n\n" + context;
+        }
+
+        return answer;
     }
 
     @Override
