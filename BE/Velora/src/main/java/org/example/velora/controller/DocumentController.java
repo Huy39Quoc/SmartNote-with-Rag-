@@ -73,8 +73,13 @@ public class DocumentController {
             @AuthenticationPrincipal UserDetailsImpl.UserDetailsWithId u,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(ApiResponse.ok(documentService.getAll(u.getUserId(),
-            PageRequest.of(page, size, Sort.by("uploadedAt").descending()))));
+
+        return ResponseEntity.ok(ApiResponse.ok(
+                documentService.getAll(
+                        u.getUserId(),
+                        PageRequest.of(page, size)
+                )
+        ));
     }
 
     @GetMapping("/{id}")

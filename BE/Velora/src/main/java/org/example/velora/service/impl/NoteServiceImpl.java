@@ -21,7 +21,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-
+import org.example.velora.client.ChromaDbClient;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -36,40 +36,85 @@ public class NoteServiceImpl implements NoteService {
     private final UserRepository userRepository;
     private final AiService aiService;
     private final NoteMapper noteMapper;
-
+    private final ChromaDbClient chromaDbClient;
     @Override
     public NoteResponse.Detail create(UUID userId, NoteRequest.Create req) {
         User user = getUser(userId);
+
         Note note = Note.builder()
-            .user(user)
-            .title(req.getTitle())
-            .content(req.getContent())
-            .build();
+                .user(user)
+                .title(req.getTitle())
+                .content(req.getContent())
+                .build();
+
         if (req.getTagIds() != null && !req.getTagIds().isEmpty()) {
             List<Tag> tags = tagRepository.findAllById(req.getTagIds());
             note.setTags(tags);
         }
+
+        note = noteRepository.save(note);
+
+        embedNoteSafely(note);
+
         return noteMapper.toDetail(noteRepository.save(note));
     }
 
     @Override
     public NoteResponse.Detail update(UUID userId, UUID noteId, NoteRequest.Update req) {
         Note note = getNote(userId, noteId);
-        if (StringUtils.hasText(req.getTitle())) note.setTitle(req.getTitle());
+
+        if (StringUtils.hasText(req.getTitle())) {
+            note.setTitle(req.getTitle());
+        }
+
         if (req.getContent() != null) {
             note.setContent(req.getContent());
             note.setIsEmbedded(false);
         }
+
         if (req.getTagIds() != null) {
             note.setTags(tagRepository.findAllById(req.getTagIds()));
         }
+
+        note = noteRepository.save(note);
+
+        embedNoteSafely(note);
+
         return noteMapper.toDetail(noteRepository.save(note));
     }
 
     @Override
     public void delete(UUID userId, UUID noteId) {
         Note note = getNote(userId, noteId);
+        chromaDbClient.delete(note.getId().toString());
         noteRepository.delete(note);
+    }
+
+    private void embedNoteSafely(Note note) {
+        try {
+            String content = buildNoteEmbeddingText(note);
+            if (!StringUtils.hasText(content)) {
+                note.setIsEmbedded(false);
+                return;
+            }
+
+            boolean ok = chromaDbClient.embed(
+                    note.getId().toString(),
+                    content,
+                    note.getUser().getId().toString(),
+                    "note"
+            );
+
+            note.setIsEmbedded(ok);
+        } catch (Exception e) {
+            note.setIsEmbedded(false);
+        }
+    }
+
+    private String buildNoteEmbeddingText(Note note) {
+        String title = note.getTitle() != null ? note.getTitle() : "";
+        String content = note.getContent() != null ? note.getContent() : "";
+        return "# " + title + "\n\n" + content;
     }
 
     @Override
@@ -81,9 +126,13 @@ public class NoteServiceImpl implements NoteService {
     @Override
     @Transactional(readOnly = true)
     public NoteResponse.Page getAll(UUID userId, NoteRequest.Search search) {
-        Pageable pageable = PageRequest.of(search.getPage(), search.getSize(),
-            Sort.by(Sort.Direction.fromString(search.getSortDir()), search.getSortBy()));
+        Pageable pageable = PageRequest.of(
+                search.getPage(),
+                search.getSize()
+        );
+
         Page<Note> page;
+
         if (StringUtils.hasText(search.getKeyword())) {
             page = noteRepository.searchByKeyword(userId, search.getKeyword(), pageable);
         } else if (search.getTagIds() != null && !search.getTagIds().isEmpty()) {
@@ -93,12 +142,19 @@ public class NoteServiceImpl implements NoteService {
         } else {
             page = noteRepository.findByUserIdOrderByUpdatedAtDesc(userId, pageable);
         }
+
         List<NoteResponse.Summary> content = page.getContent().stream()
-            .map(noteMapper::toSummary).toList();
+                .map(noteMapper::toSummary)
+                .toList();
+
         return NoteResponse.Page.builder()
-            .content(content).pageNumber(page.getNumber())
-            .pageSize(page.getSize()).totalElements(page.getTotalElements())
-            .totalPages(page.getTotalPages()).last(page.isLast()).build();
+                .content(content)
+                .pageNumber(page.getNumber())
+                .pageSize(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .last(page.isLast())
+                .build();
     }
 
     @Override

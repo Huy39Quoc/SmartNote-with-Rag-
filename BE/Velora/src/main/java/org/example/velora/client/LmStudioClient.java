@@ -31,7 +31,12 @@ public class LmStudioClient {
     @Value("${ai.lm-studio.timeout-seconds:60}") private long timeout;
 
     public String complete(String userMessage) {
-        return chatComplete("Bạn là trợ lý AI hỗ trợ học tập và làm việc. Luôn trả lời bằng tiếng Việt.", userMessage);
+        return chatComplete(
+                "Bạn là trợ lý AI hỗ trợ học tập và làm việc. " +
+                        "Luôn trả lời bằng tiếng Việt. " +
+                        "Trả lời trực tiếp, ngắn gọn, không suy luận dài, không để trống nội dung.",
+                userMessage
+        );
     }
 
     public String chatComplete(String systemMessage, String userMessage) {
@@ -60,7 +65,7 @@ public class LmStudioClient {
         } catch (Exception e) {
             log.error("LM Studio error: {}", e.getMessage());
         }
-        return "Không thể kết nối AI. Vui lòng đảm bảo LM Studio đang chạy tại localhost:1234.";
+        return "AI chưa trả về nội dung. Hãy kiểm tra LM Studio: model có thể đang bật Reasoning hoặc phản hồi quá lâu.";
     }
 
     /**

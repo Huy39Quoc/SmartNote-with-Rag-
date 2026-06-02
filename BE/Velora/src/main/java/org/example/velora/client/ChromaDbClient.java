@@ -20,22 +20,32 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ChromaDbClient {
 
-    // ĐÃ ĐỔI TÊN: Thành chromaWebClient để trùng khớp với tên @Bean trong WebClientConfig
+
     private final WebClient chromaWebClient;
     private final ObjectMapper objectMapper;
 
     @Value("${ai.chroma.collection-name}")
     private String collection;
 
-    public void embed(String id, String text, String userId, String type) {
+    public boolean embed(String id, String text, String userId, String type) {
         try {
             chromaWebClient.post().uri("/embed")
-                    .bodyValue(Map.of("id", id, "text", text,
-                            "userId", userId, "type", type, "collection", collection))
-                    .retrieve().bodyToMono(String.class)
-                    .timeout(Duration.ofSeconds(30)).block();
+                    .bodyValue(Map.of(
+                            "id", id,
+                            "text", text,
+                            "userId", userId,
+                            "type", type,
+                            "collection", collection
+                    ))
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .timeout(Duration.ofSeconds(60))
+                    .block();
+
+            return true;
         } catch (Exception e) {
             log.error("Chroma embed error id={}: {}", id, e.getMessage());
+            return false;
         }
     }
 
@@ -86,7 +96,7 @@ public class ChromaDbClient {
                     .contentType(MediaType.MULTIPART_FORM_DATA)
                     .body(BodyInserters.fromMultipartData(builder.build()))
                     .retrieve().bodyToMono(String.class)
-                    .timeout(Duration.ofMinutes(10))  // Audio dài có thể mất vài phút
+                    .timeout(Duration.ofMinutes(30))  // Audio dài có thể mất vài phút
                     .block();
 
             if (raw == null) return "";

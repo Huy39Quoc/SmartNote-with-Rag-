@@ -83,30 +83,60 @@ public class DocumentServiceImpl implements DocumentService {
     public void processAsync(UUID docId) {
         Document doc = documentRepository.findById(docId).orElse(null);
         if (doc == null) return;
+
         doc.setStatus(Document.Status.PROCESSING);
         documentRepository.save(doc);
+
+        log.info("Start processing document: id={}, name={}, type={}",
+                doc.getId(), doc.getOriginalName(), doc.getFileType());
+
         try {
+            boolean embedded = false;
+
             if (doc.getFileType() == Document.FileType.AUDIO) {
-                // Audio: gọi LM Studio để transcribe
+                log.info("Transcribing audio document: {}", docId);
+
                 String transcript = aiService.transcribeAudioFile(doc.getStoragePath());
                 doc.setAudioTranscript(transcript);
-                // Embed transcript vào ChromaDB để hỏi đáp
-                chromaDbClient.embed(docId.toString(), transcript,
-                    doc.getUser().getId().toString(), "audio");
+
+                log.info("Audio transcribed. Start embedding document: {}", docId);
+
+                embedded = chromaDbClient.embed(
+                        docId.toString(),
+                        transcript,
+                        doc.getUser().getId().toString(),
+                        "audio"
+                );
             } else {
-                // PDF/DOCX/TXT: extract text
+                log.info("Extracting text document: {}", docId);
+
                 String text = fileExtractor.extract(doc.getStoragePath(), doc.getFileType());
                 doc.setExtractedText(text);
-                chromaDbClient.embed(docId.toString(), text,
-                    doc.getUser().getId().toString(), "document");
+
+                log.info("Text extracted. Length={}, Start embedding document: {}",
+                        text == null ? 0 : text.length(), docId);
+
+                embedded = chromaDbClient.embed(
+                        docId.toString(),
+                        text,
+                        doc.getUser().getId().toString(),
+                        "document"
+                );
             }
-            doc.setIsEmbedded(true);
-            doc.setStatus(Document.Status.DONE);
-            log.info("Document {} processed OK (type={})", docId, doc.getFileType());
+
+            doc.setIsEmbedded(embedded);
+            doc.setStatus(embedded ? Document.Status.DONE : Document.Status.FAILED);
+
+            log.info("Document processed finished: id={}, status={}, embedded={}",
+                    docId, doc.getStatus(), embedded);
+
         } catch (Exception e) {
             doc.setStatus(Document.Status.FAILED);
-            log.error("Document {} processing failed: {}", docId, e.getMessage());
+            doc.setIsEmbedded(false);
+
+            log.error("Document {} processing failed", docId, e);
         }
+
         documentRepository.save(doc);
     }
 
@@ -159,13 +189,25 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Override
     public DocumentResponse.AskResult ask(UUID userId, UUID docId, DocumentRequest.Ask req) {
-        getDoc(userId, docId);
+        Document doc = getDoc(userId, docId);
+
+        if (doc.getStatus() != Document.Status.DONE || !Boolean.TRUE.equals(doc.getIsEmbedded())) {
+            throw new BadRequestException("Tài liệu chưa xử lý xong hoặc chưa được embedding");
+        }
+
         List<String> chunks = chromaDbClient.search(
-            req.getQuestion(), userId.toString(), docId.toString());
+                req.getQuestion(),
+                userId.toString(),
+                docId.toString()
+        );
+
         String answer = aiService.chatWithContext(req.getQuestion(), chunks);
+
         return DocumentResponse.AskResult.builder()
-            .answer(answer).sourceParagraphs(chunks)
-            .confidence(chunks.isEmpty() ? 0.3 : 0.85).build();
+                .answer(answer)
+                .sourceParagraphs(chunks)
+                .confidence(chunks.isEmpty() ? 0.3 : 0.85)
+                .build();
     }
 
     @Override @Transactional(readOnly = true)
