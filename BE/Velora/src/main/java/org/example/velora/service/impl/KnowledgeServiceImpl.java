@@ -70,23 +70,50 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
     @Override
     public List<KnowledgeGroupResponse.Summary> reclassifyAll(UUID userId) {
-        List<Note> notes = noteRepository.findTop5ByUserIdOrderByUpdatedAtDesc(userId);
-        notes.forEach(note -> {
-            if (note.getContent() == null) return;
-            KnowledgeGroupResponse.ClassifyResult result = aiService.classifyContent(note.getContent());
-            groupRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
-                .filter(g -> g.getGroupName().equalsIgnoreCase(result.getSuggestedGroupName()))
-                .findFirst().ifPresentOrElse(
-                    g -> { if (!g.getNotes().contains(note)) { g.getNotes().add(note); groupRepository.save(g); }},
-                    () -> {
+        List<Note> notes = noteRepository.findByUserIdOrderByUpdatedAtDesc(userId);
+
+        List<KnowledgeGroup> existingGroups = groupRepository.findByUserIdOrderByCreatedAtDesc(userId);
+
+        for (Note note : notes) {
+            if (note.getContent() == null || note.getContent().isBlank()) {
+                continue;
+            }
+
+            KnowledgeGroupResponse.ClassifyResult result = aiService.classifyContent(
+                    "# " + note.getTitle() + "\n\n" + note.getContent()
+            );
+
+            String groupName = result.getSuggestedGroupName();
+
+            if (groupName == null || groupName.isBlank()) {
+                groupName = "Chung";
+            }
+
+            final String finalGroupName = groupName;
+
+            KnowledgeGroup group = existingGroups.stream()
+                    .filter(g -> g.getGroupName().equalsIgnoreCase(finalGroupName))
+                    .findFirst()
+                    .orElseGet(() -> {
                         KnowledgeGroup ng = KnowledgeGroup.builder()
-                            .user(note.getUser()).groupName(result.getSuggestedGroupName())
-                            .suggestedByAi(true).aiReasoning(result.getReasoning())
-                            .notes(List.of(note)).build();
-                        groupRepository.save(ng);
-                    }
-                );
-        });
+                                .user(note.getUser())
+                                .groupName(finalGroupName)
+                                .suggestedByAi(true)
+                                .aiReasoning(result.getReasoning())
+                                .notes(new java.util.ArrayList<>())
+                                .build();
+
+                        KnowledgeGroup saved = groupRepository.save(ng);
+                        existingGroups.add(saved);
+                        return saved;
+                    });
+
+            if (!group.getNotes().contains(note)) {
+                group.getNotes().add(note);
+                groupRepository.save(group);
+            }
+        }
+
         return getAll(userId);
     }
 

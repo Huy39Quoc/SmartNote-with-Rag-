@@ -24,4 +24,5 @@ public interface NoteRepository extends JpaRepository<Note, UUID> {
     List<Note> findTop5ByUserIdOrderByUpdatedAtDesc(UUID userId);
 
     long countByUserId(UUID userId);
+    List<Note> findByUserIdOrderByUpdatedAtDesc(UUID userId);
 }
