@@ -12,4 +12,5 @@ public interface ScheduleService {
     List<ScheduleResponse.Item> getAll(UUID userId);
     ScheduleResponse.PriorityList getPrioritized(UUID userId);
     ScheduleResponse.ExtractResult extractFromNote(UUID userId, ScheduleRequest.ExtractFromNote req);
+
 }

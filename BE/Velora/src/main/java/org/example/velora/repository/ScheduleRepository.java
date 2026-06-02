@@ -30,4 +30,18 @@ public interface ScheduleRepository extends JpaRepository<Schedule, UUID> {
             @Param("done")  Boolean done);
 
     long countByUserIdAndIsDoneFalse(UUID userId);
+    List<Schedule> findByIsDoneFalseAndDeadlineBetweenOrderByDeadlineAsc(
+            LocalDate from,
+            LocalDate to
+    );
+
+    List<Schedule> findByIsDoneFalseAndDeadlineBeforeOrderByDeadlineAsc(
+            LocalDate today
+    );
+    boolean existsByUserIdAndNoteIdAndTaskNameAndDeadline(
+            UUID userId,
+            UUID noteId,
+            String taskName,
+            LocalDate deadline
+    );
 }

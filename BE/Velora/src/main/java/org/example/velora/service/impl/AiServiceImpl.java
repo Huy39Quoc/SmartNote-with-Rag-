@@ -14,7 +14,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
-
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.io.File;
 import java.nio.file.Files;
 import java.time.LocalDate;
@@ -127,36 +128,299 @@ public class AiServiceImpl implements AiService {
     @Override
     public ScheduleResponse.ExtractResult extractSchedules(String content) {
         try {
-            String raw = lmStudioClient.complete(getPrompt("schedule.extract") + "\n\n" + content);
+            String prompt = """
+                Bạn là công cụ trích xuất lịch/deadline từ ghi chú tiếng Việt.
 
-            // Sửa đổi: Đọc danh sách dưới dạng List của các Map<String, Object> để tránh lỗi Wildcard
+                Nhiệm vụ:
+                - Chỉ trả về JSON array hợp lệ.
+                - Không giải thích.
+                - Không markdown.
+                - Không thêm chữ ngoài JSON.
+                - Nếu không tìm thấy lịch/deadline, trả về [].
+
+                Format bắt buộc:
+                [
+                  {
+                    "task": "Tên công việc",
+                    "deadline": "yyyy-MM-dd",
+                    "priority": "LOW|MEDIUM|HIGH|URGENT"
+                  }
+                ]
+
+                Quy tắc:
+                - Câu có từ: deadline, hạn nộp, nộp bài, kiểm tra, thi, thuyết trình, họp, lịch, học, hẹn
+                  thì được xem là công việc/lịch.
+                - Nếu thấy ngày dạng dd/MM/yyyy thì đổi sang yyyy-MM-dd.
+                - Nếu chỉ có ngày/tháng mà không có năm thì dùng năm hiện tại.
+                - priority mặc định là MEDIUM.
+                - Nếu có "hạn nộp", "deadline", "thi", "kiểm tra" thì priority là HIGH.
+                - Nếu có "gấp", "khẩn", "hôm nay", "quá hạn" thì priority là URGENT.
+
+                Nội dung ghi chú:
+                """ + "\n" + content;
+
+            String raw = lmStudioClient.complete(prompt);
+
+            List<ScheduleResponse.Item> extracted = parseScheduleItems(raw, content);
+
+            return ScheduleResponse.ExtractResult.builder()
+                    .extracted(extracted)
+                    .totalFound(extracted.size())
+                    .rawAiResponse(raw)
+                    .build();
+
+        } catch (Exception e) {
+            log.error("extractSchedules error: {}", e.getMessage());
+
+            List<ScheduleResponse.Item> fallback = fallbackExtractSchedules(content);
+
+            return ScheduleResponse.ExtractResult.builder()
+                    .extracted(fallback)
+                    .totalFound(fallback.size())
+                    .rawAiResponse("Fallback regex used because AI response was not valid JSON")
+                    .build();
+        }
+    }
+
+    private List<ScheduleResponse.Item> parseScheduleItems(String raw, String originalContent) {
+        try {
+            String json = extractJsonArray(raw);
+
             List<Map<String, Object>> items = objectMapper.readValue(
-                    cleanJson(raw, '['),
+                    json,
                     new TypeReference<List<Map<String, Object>>>() {}
             );
 
             List<ScheduleResponse.Item> extracted = new ArrayList<>();
+
             for (Map<String, Object> m : items) {
                 if (m == null) continue;
-                String taskName = (String) m.get("task");
+
+                String taskName = asText(m.get("task"));
+                if (!StringUtils.hasText(taskName)) {
+                    taskName = asText(m.get("taskName"));
+                }
+
+                String deadlineStr = asText(m.get("deadline"));
+                LocalDate deadline = parseFlexibleDate(deadlineStr);
+
+                if (!StringUtils.hasText(taskName) && deadline != null) {
+                    taskName = buildTaskNameAroundDate(originalContent, deadlineStr);
+                }
+
                 if (!StringUtils.hasText(taskName)) continue;
-                String deadlineStr = (String) m.get("deadline");
-                LocalDate deadline = null;
-                try { if (StringUtils.hasText(deadlineStr)) deadline = LocalDate.parse(deadlineStr); }
-                catch (Exception ignored) {}
-                Schedule.Priority priority;
-                try { priority = Schedule.Priority.valueOf((String) m.getOrDefault("priority", "MEDIUM")); }
-                catch (Exception e) { priority = Schedule.Priority.MEDIUM; }
+
+                Schedule.Priority priority = parsePriority(asText(m.get("priority")), taskName);
+
                 extracted.add(ScheduleResponse.Item.builder()
-                        .taskName(taskName).deadline(deadline).priority(priority).build());
+                        .taskName(taskName)
+                        .deadline(deadline)
+                        .priority(priority)
+                        .build());
             }
-            return ScheduleResponse.ExtractResult.builder()
-                    .extracted(extracted).totalFound(extracted.size()).rawAiResponse(raw).build();
+
+            if (!extracted.isEmpty()) {
+                return extracted;
+            }
+
+            return fallbackExtractSchedules(originalContent);
+
         } catch (Exception e) {
-            log.error("extractSchedules error: {}", e.getMessage());
-            return ScheduleResponse.ExtractResult.builder().extracted(List.of()).totalFound(0).build();
+            log.warn("AI schedule JSON invalid, using regex fallback. raw={}", raw);
+            return fallbackExtractSchedules(originalContent);
         }
     }
+
+    private String extractJsonArray(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "[]";
+        }
+
+        String cleaned = raw.trim();
+
+        if (cleaned.startsWith("```")) {
+            cleaned = cleaned
+                    .replace("```json", "")
+                    .replace("```", "")
+                    .trim();
+        }
+
+        int start = cleaned.indexOf('[');
+        int end = cleaned.lastIndexOf(']');
+
+        if (start >= 0 && end > start) {
+            return cleaned.substring(start, end + 1);
+        }
+
+        return "[]";
+    }
+
+    private List<ScheduleResponse.Item> fallbackExtractSchedules(String content) {
+        if (!StringUtils.hasText(content)) {
+            return List.of();
+        }
+
+        List<ScheduleResponse.Item> result = new ArrayList<>();
+
+        Pattern datePattern = Pattern.compile(
+                "\\b(\\d{1,2})[/-](\\d{1,2})(?:[/-](\\d{2,4}))?\\b"
+        );
+
+        Matcher matcher = datePattern.matcher(content);
+
+        while (matcher.find()) {
+            int day = Integer.parseInt(matcher.group(1));
+            int month = Integer.parseInt(matcher.group(2));
+
+            int year;
+            if (matcher.group(3) != null) {
+                year = Integer.parseInt(matcher.group(3));
+                if (year < 100) year += 2000;
+            } else {
+                year = LocalDate.now().getYear();
+            }
+
+            LocalDate deadline;
+            try {
+                deadline = LocalDate.of(year, month, day);
+            } catch (Exception e) {
+                continue;
+            }
+
+            String matchedDate = matcher.group(0);
+            String taskName = buildTaskNameAroundDate(content, matchedDate);
+
+            if (!StringUtils.hasText(taskName)) {
+                taskName = "Công việc ngày " + matchedDate;
+            }
+
+            Schedule.Priority priority = parsePriority(null, taskName + " " + content);
+
+            result.add(ScheduleResponse.Item.builder()
+                    .taskName(taskName)
+                    .deadline(deadline)
+                    .priority(priority)
+                    .build());
+        }
+
+        return result;
+    }
+
+    private String buildTaskNameAroundDate(String content, String dateText) {
+        if (!StringUtils.hasText(content)) {
+            return "Công việc";
+        }
+
+        String[] sentences = content.split("[.!?\\n]+");
+
+        for (String sentence : sentences) {
+            if (dateText != null && sentence.contains(dateText)) {
+                return cleanupTaskName(sentence);
+            }
+        }
+
+        for (String sentence : sentences) {
+            String lower = sentence.toLowerCase();
+            if (lower.contains("deadline")
+                    || lower.contains("hạn")
+                    || lower.contains("nộp")
+                    || lower.contains("thi")
+                    || lower.contains("kiểm tra")
+                    || lower.contains("thuyết trình")
+                    || lower.contains("họp")
+                    || lower.contains("học")) {
+                return cleanupTaskName(sentence);
+            }
+        }
+
+        return cleanupTaskName(content);
+    }
+
+    private String cleanupTaskName(String text) {
+        if (text == null) return "Công việc";
+
+        String cleaned = text.trim();
+
+        cleaned = cleaned.replaceAll("(?i)\\bngày\\b", "");
+        cleaned = cleaned.replaceAll("\\b\\d{1,2}[/-]\\d{1,2}([/-]\\d{2,4})?\\b", "");
+        cleaned = cleaned.replaceAll("\\s+", " ").trim();
+
+        if (cleaned.length() > 180) {
+            cleaned = cleaned.substring(0, 180).trim();
+        }
+
+        return StringUtils.hasText(cleaned) ? cleaned : "Công việc";
+    }
+
+    private LocalDate parseFlexibleDate(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+
+        String v = value.trim();
+
+        try {
+            return LocalDate.parse(v);
+        } catch (Exception ignored) {
+        }
+
+        Matcher m = Pattern.compile("\\b(\\d{1,2})[/-](\\d{1,2})(?:[/-](\\d{2,4}))?\\b")
+                .matcher(v);
+
+        if (!m.find()) {
+            return null;
+        }
+
+        int day = Integer.parseInt(m.group(1));
+        int month = Integer.parseInt(m.group(2));
+
+        int year;
+        if (m.group(3) != null) {
+            year = Integer.parseInt(m.group(3));
+            if (year < 100) year += 2000;
+        } else {
+            year = LocalDate.now().getYear();
+        }
+
+        try {
+            return LocalDate.of(year, month, day);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private Schedule.Priority parsePriority(String raw, String text) {
+        if (StringUtils.hasText(raw)) {
+            try {
+                return Schedule.Priority.valueOf(raw.trim().toUpperCase());
+            } catch (Exception ignored) {
+            }
+        }
+
+        String lower = text == null ? "" : text.toLowerCase();
+
+        if (lower.contains("gấp")
+                || lower.contains("khẩn")
+                || lower.contains("hôm nay")
+                || lower.contains("quá hạn")) {
+            return Schedule.Priority.URGENT;
+        }
+
+        if (lower.contains("deadline")
+                || lower.contains("hạn")
+                || lower.contains("nộp")
+                || lower.contains("thi")
+                || lower.contains("kiểm tra")) {
+            return Schedule.Priority.HIGH;
+        }
+
+        return Schedule.Priority.MEDIUM;
+    }
+
+    private String asText(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
 
     @Override
     public KnowledgeGroupResponse.ClassifyResult classifyContent(String content) {

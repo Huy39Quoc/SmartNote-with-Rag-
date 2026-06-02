@@ -78,19 +78,49 @@ public class ScheduleServiceImpl implements ScheduleService {
     @Override
     public ScheduleResponse.ExtractResult extractFromNote(UUID userId, ScheduleRequest.ExtractFromNote req) {
         User user = getUser(userId);
-        ScheduleResponse.ExtractResult result = aiService.extractSchedules(req.getContent());
+
         Note note = req.getNoteId() != null
-            ? noteRepository.findById(req.getNoteId()).orElse(null) : null;
-        if (result.getExtracted() != null) {
-            result.getExtracted().forEach(item -> {
-                Schedule s = Schedule.builder()
-                    .user(user).note(note).taskName(item.getTaskName())
-                    .deadline(item.getDeadline()).priority(item.getPriority())
-                    .extractedByAi(true).build();
-                scheduleRepository.save(s);
-            });
+                ? noteRepository.findById(req.getNoteId()).orElse(null)
+                : null;
+
+        ScheduleResponse.ExtractResult result = aiService.extractSchedules(req.getContent());
+
+        if (result.getExtracted() == null || result.getExtracted().isEmpty()) {
+            return result;
         }
-        return result;
+
+        List<ScheduleResponse.Item> savedItems = result.getExtracted().stream()
+                .filter(item -> item.getTaskName() != null && !item.getTaskName().isBlank())
+                .filter(item -> item.getDeadline() != null)
+                .filter(item -> {
+                    if (note == null) return true;
+
+                    return !scheduleRepository.existsByUserIdAndNoteIdAndTaskNameAndDeadline(
+                            userId,
+                            note.getId(),
+                            item.getTaskName(),
+                            item.getDeadline()
+                    );
+                })
+                .map(item -> {
+                    Schedule s = Schedule.builder()
+                            .user(user)
+                            .note(note)
+                            .taskName(item.getTaskName())
+                            .deadline(item.getDeadline())
+                            .priority(item.getPriority() != null ? item.getPriority() : Schedule.Priority.MEDIUM)
+                            .extractedByAi(true)
+                            .build();
+
+                    return toItem(scheduleRepository.save(s));
+                })
+                .toList();
+
+        return ScheduleResponse.ExtractResult.builder()
+                .extracted(savedItems)
+                .totalFound(savedItems.size())
+                .rawAiResponse(result.getRawAiResponse())
+                .build();
     }
 
     private List<ScheduleResponse.Item> filter(List<Schedule> all, Schedule.Priority priority,

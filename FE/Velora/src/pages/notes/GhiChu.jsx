@@ -36,7 +36,7 @@ export default function GhiChu() {
     const [locTag, setLocTag] = useState(null)
     const [tenTagMoi, setTenTagMoi] = useState('')
     const [mauTagMoi, setMauTagMoi] = useState('#3B82F6')
-
+    const [noteDaTaoLichIds, setNoteDaTaoLichIds] = useState(new Set())
   // Tải danh sách ghi chú
   const taiDanhSach = useCallback(async () => {
     setDangTai(true)
@@ -211,21 +211,63 @@ export default function GhiChu() {
     return /\b(?:\d{1,2}[:.][0-5]\d|[0-2]?\d\s*giờ|ngày\s*\d{1,2}|thứ\s*(?:hai|ba|tư|năm|sáu|bảy)|deadline|hẹn)\b/i.test(text)
   }
 
-  useEffect(() => {
-    if (!ghiChuHienTai) return
-    setHienLichGoiY(coTheTrichLich(ghiChuHienTai.content))
-  }, [ghiChuHienTai?.content])
+    useEffect(() => {
+        if (!ghiChuHienTai) return
 
-  const trichXuatLich = async () => {
-    if (!ghiChuHienTai?.content?.trim()) return
-    setDangTrichLich(true)
-    try {
-      const { data } = await scheduleApi.trichXuatTuGhiChu({ content: ghiChuHienTai.content })
-      toast.success(`AI đã tìm ${data.data.totalFound || 0} công việc / lịch`)
-      setHienLichGoiY(false)
-    } catch { toast.error('Không thể trích xuất lịch từ ghi chú') }
-    setDangTrichLich(false)
-  }
+        const daTaoLich = noteDaTaoLichIds.has(ghiChuHienTai.id)
+
+        setHienLichGoiY(
+            !daTaoLich && coTheTrichLich(ghiChuHienTai.content)
+        )
+    }, [ghiChuHienTai?.id, ghiChuHienTai?.content, noteDaTaoLichIds])
+
+    useEffect(() => {
+        scheduleApi.layTatCa()
+            .then(r => {
+                const schedules = r.data.data || []
+                const ids = new Set(
+                    schedules
+                        .filter(s => s.noteId)
+                        .map(s => s.noteId)
+                )
+                setNoteDaTaoLichIds(ids)
+            })
+            .catch(() => {
+            })
+    }, [])
+
+    const trichXuatLich = async () => {
+        if (!ghiChuHienTai?.content?.trim()) return
+
+        setDangTrichLich(true)
+
+        try {
+            const {data} = await scheduleApi.trichXuatTuGhiChu({
+                content: ghiChuHienTai.content,
+                noteId: ghiChuHienTai.id,
+            })
+
+            const total = data.data?.totalFound || 0
+
+            if (total > 0) {
+                setNoteDaTaoLichIds(prev => {
+                    const next = new Set(prev)
+                    next.add(ghiChuHienTai.id)
+                    return next
+                })
+
+                setHienLichGoiY(false)
+                toast.success(`Đã tạo ${total} công việc / lịch`)
+            } else {
+                toast.error('AI chưa tìm thấy lịch/deadline hợp lệ trong ghi chú')
+            }
+        } catch (error) {
+            console.error(error)
+            toast.error('Không thể trích xuất lịch từ ghi chú')
+        } finally {
+            setDangTrichLich(false)
+        }
+    }
 
   // Auto-save mỗi 3 giây
   useEffect(() => {
