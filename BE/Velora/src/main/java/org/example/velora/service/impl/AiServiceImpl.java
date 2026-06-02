@@ -21,6 +21,8 @@ import java.nio.file.Files;
 import java.time.LocalDate;
 import java.util.*;
 
+import static org.apache.commons.lang3.CharSetUtils.containsAny;
+
 @Service @RequiredArgsConstructor @Slf4j
 public class AiServiceImpl implements AiService {
 
@@ -425,21 +427,171 @@ public class AiServiceImpl implements AiService {
     @Override
     public KnowledgeGroupResponse.ClassifyResult classifyContent(String content) {
         try {
-            String raw = lmStudioClient.complete(getPrompt("knowledge.classify") + "\n\n" + content);
+            String safeContent = content == null ? "" : content.trim();
 
-            // Sửa đổi: Thay thế Map<?, ?> bằng Map<String, Object> tường minh
+            if (!StringUtils.hasText(safeContent)) {
+                return fallbackClassifyContent("");
+            }
+
+            String truncated = safeContent.length() > 4000
+                    ? safeContent.substring(0, 4000)
+                    : safeContent;
+
+            String prompt = """
+                Bạn là công cụ phân loại ghi chú học tập.
+
+                Nhiệm vụ:
+                - Chỉ trả về JSON object hợp lệ.
+                - Không markdown.
+                - Không giải thích ngoài JSON.
+                - Không thêm chữ trước hoặc sau JSON.
+
+                Format bắt buộc:
+                {
+                  "groupName": "Tên nhóm kiến thức ngắn gọn",
+                  "reasoning": "Lý do phân loại ngắn gọn"
+                }
+
+                Gợi ý nhóm:
+                - Lập trình Java
+                - Cơ sở dữ liệu
+                - Trí tuệ nhân tạo
+                - Lịch học & Deadline
+                - Toán học
+                - Khởi nghiệp
+                - Tiếng Anh
+                - Chung
+
+                Nội dung ghi chú:
+                """ + "\n" + truncated;
+
+            String raw = lmStudioClient.complete(prompt);
+
             Map<String, Object> parsed = objectMapper.readValue(
-                    cleanJson(raw, '{'),
+                    extractJsonObject(raw),
                     new TypeReference<Map<String, Object>>() {}
             );
 
+            String groupName = asText(parsed.get("groupName"));
+            String reasoning = asText(parsed.get("reasoning"));
+
+            if (!StringUtils.hasText(groupName)) {
+                return fallbackClassifyContent(content);
+            }
+
             return KnowledgeGroupResponse.ClassifyResult.builder()
-                    .suggestedGroupName((String) parsed.getOrDefault("groupName", "Chung"))
-                    .reasoning((String) parsed.getOrDefault("reasoning", "")).build();
+                    .suggestedGroupName(groupName.trim())
+                    .reasoning(StringUtils.hasText(reasoning) ? reasoning.trim() : "AI phân loại theo nội dung ghi chú.")
+                    .build();
+
         } catch (Exception e) {
-            return KnowledgeGroupResponse.ClassifyResult.builder()
-                    .suggestedGroupName("Chung").reasoning("").build();
+            log.warn("classifyContent AI JSON invalid, using keyword fallback: {}", e.getMessage());
+            return fallbackClassifyContent(content);
         }
+    }
+
+    private String extractJsonObject(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "{}";
+        }
+
+        String cleaned = raw.trim();
+
+        if (cleaned.startsWith("```")) {
+            cleaned = cleaned
+                    .replace("```json", "")
+                    .replace("```", "")
+                    .trim();
+        }
+
+        int start = cleaned.indexOf('{');
+        int end = cleaned.lastIndexOf('}');
+
+        if (start >= 0 && end > start) {
+            return cleaned.substring(start, end + 1);
+        }
+
+        return "{}";
+    }
+
+    private KnowledgeGroupResponse.ClassifyResult fallbackClassifyContent(String content) {
+        String text = content == null ? "" : content.toLowerCase();
+
+        String groupName;
+        String reasoning;
+
+        if (containsAny(text,
+                "java", "oop", "class", "object", "interface", "abstract",
+                "spring", "spring boot", "jpa", "hibernate")) {
+
+            groupName = "Lập trình Java";
+            reasoning = "Nội dung có các từ khóa liên quan đến Java/OOP hoặc Spring Boot.";
+
+        } else if (containsAny(text,
+                "sql", "database", "cơ sở dữ liệu", "csdl", "table",
+                "query", "join", "primary key", "foreign key", "entity")) {
+
+            groupName = "Cơ sở dữ liệu";
+            reasoning = "Nội dung có các từ khóa liên quan đến database hoặc SQL.";
+
+        } else if (containsAny(text,
+                "ai", "rag", "llm", "embedding", "vector", "chromadb",
+                "machine learning", "deep learning", "model", "prompt")) {
+
+            groupName = "Trí tuệ nhân tạo";
+            reasoning = "Nội dung có các từ khóa liên quan đến AI, RAG hoặc mô hình ngôn ngữ.";
+
+        } else if (containsAny(text,
+                "deadline", "lịch", "học", "nộp bài", "bài tập",
+                "thi", "kiểm tra", "thuyết trình", "assignment")) {
+
+            groupName = "Lịch học & Deadline";
+            reasoning = "Nội dung có thông tin về lịch học, deadline hoặc bài tập.";
+
+        } else if (containsAny(text,
+                "toán", "phân số", "số học", "đại số", "hình học",
+                "cộng", "trừ", "nhân", "chia")) {
+
+            groupName = "Toán học";
+            reasoning = "Nội dung có các từ khóa liên quan đến toán học.";
+
+        } else if (containsAny(text,
+                "startup", "khởi nghiệp", "kinh doanh", "doanh thu",
+                "marketing", "khách hàng", "sản phẩm", "thị trường")) {
+
+            groupName = "Khởi nghiệp";
+            reasoning = "Nội dung có các từ khóa liên quan đến kinh doanh hoặc khởi nghiệp.";
+
+        } else if (containsAny(text,
+                "ielts", "english", "speaking", "writing", "reading",
+                "listening", "vocabulary", "grammar")) {
+
+            groupName = "Tiếng Anh";
+            reasoning = "Nội dung có các từ khóa liên quan đến học tiếng Anh.";
+
+        } else {
+            groupName = "Chung";
+            reasoning = "Không tìm thấy nhóm chuyên biệt rõ ràng nên đưa vào nhóm Chung.";
+        }
+
+        return KnowledgeGroupResponse.ClassifyResult.builder()
+                .suggestedGroupName(groupName)
+                .reasoning(reasoning)
+                .build();
+    }
+
+    private boolean containsAny(String text, String... keywords) {
+        if (text == null) {
+            return false;
+        }
+
+        for (String keyword : keywords) {
+            if (text.contains(keyword.toLowerCase())) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

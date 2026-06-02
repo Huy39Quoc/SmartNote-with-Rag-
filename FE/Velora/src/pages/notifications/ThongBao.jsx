@@ -43,6 +43,7 @@ export default function ThongBao() {
             const updated = data.data
 
             setItems(p => p.map(item => item.id === id ? updated : item))
+            window.dispatchEvent(new Event('velora:notifications-changed'))
             toast.success('Đã đánh dấu đã đọc')
         } catch (error) {
             console.error(error)
@@ -56,6 +57,7 @@ export default function ThongBao() {
         try {
             await notificationApi.danhDauTatCaDaDoc()
             setItems(p => p.map(item => ({ ...item, isRead: true })))
+            window.dispatchEvent(new Event('velora:notifications-changed'))
             toast.success('Đã đánh dấu tất cả là đã đọc')
         } catch (error) {
             console.error(error)
