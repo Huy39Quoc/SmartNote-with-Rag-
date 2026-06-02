@@ -25,22 +25,21 @@ export default function AiPanel({ noteId, content, title, onApply, onDong }) {
     setLoading(false)
   }
 
-  const apDung = () => {
-    if (!ketQua) return
-    const noi_dung = ketQua.improvedContent || ketQua.summary ||
-      ketQua.checklist?.map(c => `- ${c}`).join('\n') || ''
-    onApply?.(noi_dung, ketQua.suggestedTitle)
-    onDong()
-    toast.success('Đã áp dụng gợi ý AI')
-  }
+    const apDung = () => {
+        if (!ketQua) return
 
+        onApply?.(ketQua)
+        onDong?.()
+        toast.success('Đã áp dụng gợi ý AI')
+    }
+    const boQua = () => {
+        setKetQua(null)
+    }
   return (
     <div style={styles.panel}>
       <div style={styles.header}>
   
-  const boQua = () => {
-    setKetQua(null)
-  }
+
         <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           <IconSparkles size={13} style={{ color: 'var(--accent-blue-dim)' }} />
           <span style={{ fontSize: 12, fontWeight: 500 }}>Trợ lý AI</span>
