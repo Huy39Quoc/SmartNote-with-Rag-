@@ -1,0 +1,27 @@
+services:
+  frontend:
+    build:
+      context: ./FE/Velora
+    container_name: velora-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: ./BE/Velora
+    container_name: velora-backend
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    restart: unless-stopped
+
+  ai:
+    build:
+      context: ./AI
+    container_name: velora-ai
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
