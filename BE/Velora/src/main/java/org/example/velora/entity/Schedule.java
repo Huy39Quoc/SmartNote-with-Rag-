@@ -30,7 +30,7 @@ public class Schedule {
     @JoinColumn(name = "note_id", columnDefinition = "UNIQUEIDENTIFIER")
     private Note note;
 
-    @Column(name = "task_name", nullable = false, length = 255)
+    @Column(name = "task_name", nullable = false, length = 255, columnDefinition = "NVARCHAR(255)")
     private String taskName;
 
     @Column(columnDefinition = "NVARCHAR(MAX)")

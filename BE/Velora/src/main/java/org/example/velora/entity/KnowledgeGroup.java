@@ -28,7 +28,7 @@ public class KnowledgeGroup {
     @JoinColumn(name = "user_id", columnDefinition = "UNIQUEIDENTIFIER", nullable = false)
     private User user;
 
-    @Column(name = "group_name", nullable = false, length = 100)
+    @Column(name = "group_name", nullable = false, length = 100, columnDefinition = "NVARCHAR(100)")
     private String groupName;
 
     @Column(name = "suggested_by_ai", nullable = false)

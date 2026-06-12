@@ -24,7 +24,7 @@ public class Notification {
     @JoinColumn(name="user_id", columnDefinition = "UNIQUEIDENTIFIER")
     private User user;
 
-    @Column(nullable=false, length=255)
+    @Column(nullable=false, length=255, columnDefinition = "NVARCHAR(255)")
     private String title;
 
     @Column(nullable=false, columnDefinition="NVARCHAR(MAX)")

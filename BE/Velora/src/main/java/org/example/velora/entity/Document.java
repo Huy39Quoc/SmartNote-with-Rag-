@@ -21,17 +21,17 @@ public class Document {
     @JoinColumn(name = "user_id", columnDefinition = "UNIQUEIDENTIFIER", nullable = false)
     private User user;
 
-    @Column(name = "file_name", nullable = false, length = 255)
+    @Column(name = "file_name", nullable = false, length = 255, columnDefinition = "NVARCHAR(255)")
     private String fileName;
 
-    @Column(name = "original_name", nullable = false, length = 255)
+    @Column(name = "original_name", nullable = false, length = 255, columnDefinition = "NVARCHAR(255)")
     private String originalName;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "file_type", nullable = false, length = 10)
+    @Column(name = "file_type", nullable = false, length = 10, columnDefinition = "NVARCHAR(10)")
     private FileType fileType;
 
-    @Column(name = "storage_path", nullable = false, length = 500)
+    @Column(name = "storage_path", nullable = false, length = 500, columnDefinition = "NVARCHAR(500)")
     private String storagePath;
 
     @Column(name = "file_size")

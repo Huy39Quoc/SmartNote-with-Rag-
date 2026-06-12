@@ -22,13 +22,13 @@ public class SystemPrompt {
     @Column(name = "id", columnDefinition = "UNIQUEIDENTIFIER", updatable = false, nullable = false)
     private UUID id;
 
-    @Column(name = "prompt_key", nullable = false, unique = true, length = 100)
+    @Column(name = "prompt_key", nullable = false, unique = true, length = 100, columnDefinition = "NVARCHAR(100)")
     private String promptKey;
 
     @Column(name = "prompt_text", nullable = false, columnDefinition = "NVARCHAR(MAX)")
     private String promptText;
 
-    @Column(length = 255)
+    @Column(length = 255, columnDefinition = "NVARCHAR(255)")
     private String description;
 
     @Column(name = "is_active", nullable = false)

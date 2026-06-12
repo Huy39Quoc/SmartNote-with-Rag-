@@ -28,11 +28,11 @@ public class ChatSession {
     @JoinColumn(name = "user_id", columnDefinition = "UNIQUEIDENTIFIER", nullable = false)
     private User user;
 
-    @Column(length = 255)
+    @Column(length = 255, columnDefinition = "NVARCHAR(255)")
     private String title;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "context_type", length = 20)
+    @Column(name = "context_type", length = 20, columnDefinition = "NVARCHAR(20)")
     @Builder.Default
     private ContextType contextType = ContextType.NOTES;
 

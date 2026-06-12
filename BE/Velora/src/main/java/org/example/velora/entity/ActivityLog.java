@@ -24,10 +24,10 @@ public class ActivityLog {
     @JoinColumn(name="user_id", columnDefinition = "UNIQUEIDENTIFIER")
     private User user;
 
-    @Column(nullable=false, length=100)
+    @Column(nullable=false, length=100, columnDefinition = "NVARCHAR(100)")
     private String action;
 
-    @Column(name="entity_type", length=50)
+    @Column(name="entity_type", length=50, columnDefinition = "NVARCHAR(50)")
     private String entityType;
 
     @Column(name="entity_id", columnDefinition = "UNIQUEIDENTIFIER")
@@ -36,7 +36,7 @@ public class ActivityLog {
     @Column(columnDefinition="NVARCHAR(MAX)")
     private String detail;
 
-    @Column(name="ip_address", length=45)
+    @Column(name="ip_address", length=45, columnDefinition = "NVARCHAR(45)")
     private String ipAddress;
 
     @CreationTimestamp

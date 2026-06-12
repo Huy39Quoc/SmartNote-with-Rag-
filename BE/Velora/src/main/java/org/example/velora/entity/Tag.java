@@ -30,10 +30,10 @@ public class Tag {
     @JoinColumn(name = "user_id", columnDefinition = "UNIQUEIDENTIFIER", nullable = false)
     private User user;
 
-    @Column(nullable = false, length = 50)
+    @Column(nullable = false, length = 50, columnDefinition = "NVARCHAR(50)")
     private String name;
 
-    @Column(length = 7)
+    @Column(length = 7, columnDefinition = "NVARCHAR(7)")
     private String color;
 
     @CreationTimestamp

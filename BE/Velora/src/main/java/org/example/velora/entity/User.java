@@ -24,13 +24,13 @@ public class User {
     @Column(name = "id", columnDefinition = "UNIQUEIDENTIFIER", updatable = false, nullable = false)
     private UUID id;
 
-    @Column(nullable = false, unique = true, length = 255)
+    @Column(nullable = false, unique = true, length = 255, columnDefinition = "NVARCHAR(255)")
     private String email;
 
-    @Column(name = "password_hash", nullable = false, length = 255)
+    @Column(name = "password_hash", nullable = false, length = 255, columnDefinition = "NVARCHAR(255)")
     private String passwordHash;
 
-    @Column(name = "full_name", length = 100)
+    @Column(name = "full_name", length = 100, columnDefinition = "NVARCHAR(100)")
     private String fullName;
 
     @Enumerated(EnumType.STRING)
