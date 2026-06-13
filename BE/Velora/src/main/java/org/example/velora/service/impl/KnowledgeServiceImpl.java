@@ -14,6 +14,7 @@ import org.example.velora.repository.UserRepository;
 import org.example.velora.service.AiService;
 import org.example.velora.service.KnowledgeService;
 import lombok.RequiredArgsConstructor;
+import org.example.velora.service.PackageValidationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,10 +29,13 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     private final UserRepository userRepository;
     private final AiService aiService;
     private final NoteMapper noteMapper;
+    private final PackageValidationService packageValidationService;
 
     @Override
     public KnowledgeGroupResponse.Detail create(UUID userId, KnowledgeGroupRequest.Create req) {
-        User user = getUser(userId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
+        packageValidationService.validateFeatureAccess(user, "GROUP_MANAGEMENT");
         List<Note> notes = req.getNoteIds() != null
             ? noteRepository.findAllById(req.getNoteIds()) : List.of();
         KnowledgeGroup group = KnowledgeGroup.builder()

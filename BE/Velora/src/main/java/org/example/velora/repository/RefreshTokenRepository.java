@@ -1,6 +1,7 @@
 package org.example.velora.repository;
 
 import org.example.velora.entity.RefreshToken;
+import org.example.velora.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -19,4 +20,6 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
     @Modifying
     @Query("DELETE FROM RefreshToken r WHERE r.expiredAt < CURRENT_TIMESTAMP")
     void deleteExpired();
+
+    long countByUser(User user);
 }

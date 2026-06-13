@@ -1,5 +1,6 @@
 package org.example.velora.service.impl;
 
+import org.example.velora.dto.request.PackageServiceRequest;
 import org.example.velora.dto.request.UserRequest;
 import org.example.velora.dto.response.UserResponse;
 import org.example.velora.entity.*;
@@ -29,6 +30,7 @@ public class AdminServiceImpl implements AdminService {
     private final SystemPromptRepository systemPromptRepository;
     private final NotificationRepository notificationRepository;
     private final ActivityLogRepository activityLogRepository;
+    private  final PackageServiceRepository packageServiceRepository;
 
     @Override @Transactional(readOnly = true)
     public UserResponse.Page getUsers(String keyword, Pageable pageable) {
@@ -105,6 +107,83 @@ public class AdminServiceImpl implements AdminService {
         return Map.of("message", "AI usage stats — implement with ActivityLog");
     }
 
+    // Bổ sung hoặc ghi đè vào AdminServiceImpl.java
+    @Override
+    public PackageService createOrUpdatePackage(PackageServiceRequest request) {
+        PackageService pkg = packageServiceRepository.findByName(request.getName())
+                .orElse(new PackageService());
+
+        pkg.setName(request.getName());
+        pkg.setPriceMonthly(request.getPriceMonthly());
+        pkg.setPriceYearly(request.getPriceYearly());
+        pkg.setDescription(request.getDescription());
+        pkg.setMaxNotes(request.getMaxNotes());
+        pkg.setMaxAiFormatsPerMonth(request.getMaxAiFormatsPerMonth());
+        pkg.setStorageGb(request.getStorageGb());
+
+        // Chuyển List thành chuỗi phân tách bằng dấu phẩy để lưu DB đơn giản
+        if (request.getFeatures() != null) {
+            pkg.setFeatures(String.join(",", request.getFeatures()));
+        }
+
+        return packageServiceRepository.save(pkg);
+    }
+
+    @Override
+    public List<PackageService> getAllPackages() {
+        return packageServiceRepository.findAll();
+    }
+
+    @Override
+    public PackageService createPackage(PackageServiceRequest request) {
+        if (packageServiceRepository.findByName(request.getName()).isPresent()) {
+            throw new BadRequestException("Tên gói dịch vụ này đã tồn tại!");
+        }
+        PackageService pkg = new PackageService();
+        mapRequestToEntity(request, pkg);
+        return packageServiceRepository.save(pkg);
+    }
+
+    @Override
+    public PackageService updatePackage(UUID id, PackageServiceRequest request) {
+        PackageService pkg = packageServiceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy gói dịch vụ yêu cầu."));
+
+        // Kiểm tra trùng tên với gói khác nếu đổi tên
+        packageServiceRepository.findByName(request.getName()).ifPresent(existing -> {
+            if (!existing.getId().equals(id)) {
+                throw new BadRequestException("Tên gói dịch vụ này đã bị trùng với gói khác!");
+            }
+        });
+
+        mapRequestToEntity(request, pkg);
+        return packageServiceRepository.save(pkg);
+    }
+
+    @Override
+    public void deletePackage(UUID id) {
+        PackageService pkg = packageServiceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy gói dịch vụ để xóa."));
+        packageServiceRepository.delete(pkg);
+    }
+
+    private void mapRequestToEntity(PackageServiceRequest request, PackageService pkg) {
+        pkg.setName(request.getName());
+        pkg.setPriceMonthly(request.getPriceMonthly());
+        pkg.setPriceYearly(request.getPriceYearly());
+        pkg.setDescription(request.getDescription());
+        pkg.setMaxNotes(request.getMaxNotes());
+        pkg.setMaxAiFormatsPerMonth(request.getMaxAiFormatsPerMonth());
+        pkg.setStorageGb(request.getStorageGb());
+        pkg.setMaxDevices(request.getMaxDevices());
+
+        if (request.getFeatures() != null) {
+            pkg.setFeatures(String.join(",", request.getFeatures()));
+        } else {
+            pkg.setFeatures("");
+        }
+    }
+
     private UserResponse.AdminView toAdminView(User u) {
         return UserResponse.AdminView.builder()
             .id(u.getId()).email(u.getEmail()).fullName(u.getFullName())
@@ -113,4 +192,5 @@ public class AdminServiceImpl implements AdminService {
             .documentCount((int) documentRepository.countByUserId(u.getId()))
             .createdAt(u.getCreatedAt()).updatedAt(u.getUpdatedAt()).build();
     }
+
 }

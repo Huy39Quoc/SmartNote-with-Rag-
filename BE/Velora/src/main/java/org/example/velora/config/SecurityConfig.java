@@ -39,6 +39,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/demo/**").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/api/packages/vnpay-callback").permitAll()
+                        .requestMatchers("/api/packages/active").permitAll()
 
                         // CHÈN VÀO ĐÂY: Cho phép truy cập công khai vào toàn bộ tài nguyên của Swagger UI & OpenAPI
                         .requestMatchers(

@@ -8,6 +8,7 @@ import org.example.velora.exception.BadRequestException;
 import org.example.velora.exception.ResourceNotFoundException;
 import org.example.velora.repository.TagRepository;
 import org.example.velora.repository.UserRepository;
+import org.example.velora.service.PackageValidationService;
 import org.example.velora.service.TagService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,13 +22,16 @@ public class TagServiceImpl implements TagService {
 
     private final TagRepository tagRepository;
     private final UserRepository userRepository;
+    private final PackageValidationService packageValidationService;
 
     @Override
     public TagResponse.Detail create(UUID userId, TagRequest.Create req) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
+
+        packageValidationService.validateFeatureAccess(user, "TAG_MANAGEMENT");
         if (tagRepository.existsByUserIdAndName(userId, req.getName()))
             throw new BadRequestException("Tag '" + req.getName() + "' đã tồn tại");
-        User user = userRepository.findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
         Tag tag = Tag.builder().user(user).name(req.getName()).color(req.getColor()).build();
         return toDetail(tagRepository.save(tag));
     }

@@ -75,6 +75,20 @@ public class User {
     @Builder.Default
     private List<KnowledgeGroup> knowledgeGroups = new ArrayList<>();
 
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "package_id")
+    private PackageService currentPackage;
+
+    @Column(name = "package_expiry_date")
+    private LocalDateTime packageExpiryDate;
+
+    @Column(name = "ai_used_this_month")
+    @Builder.Default
+    private Integer aiUsedThisMonth = 0;
+
+    @Column(name = "last_ai_usage_date")
+    private LocalDateTime lastAiUsageDate;
+
     public enum Role {
         USER, ADMIN
     }

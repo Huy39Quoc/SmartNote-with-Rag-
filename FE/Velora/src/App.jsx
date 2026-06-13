@@ -18,38 +18,44 @@ import KienThuc   from './pages/knowledge/KienThuc'
 import QuanTri    from './pages/admin/QuanTri'
 import TaiKhoan   from './pages/profile/TaiKhoan'
 import ThongBao   from './pages/notifications/ThongBao'
+import GoiDichVu  from './pages/packages/GoiDichVu'
+import QuanLyGoi  from './pages/admin/QuanLyGoi'
 
 
 export default function App() {
-  const { daXacThuc, layThongTin } = useAuthStore()
+    const { daXacThuc, layThongTin } = useAuthStore()
 
-  useEffect(() => {
-    if (daXacThuc) layThongTin()
-  }, [daXacThuc])
+    useEffect(() => {
+        if (daXacThuc) layThongTin()
+    }, [daXacThuc])
 
-  return (
-    <Routes>
-      {/* Public */}
-      <Route path="/"          element={<Landing />} />
-      <Route path="/dang-nhap" element={<PublicOnlyRoute><DangNhap /></PublicOnlyRoute>} />
-      <Route path="/dang-ky"   element={<PublicOnlyRoute><DangKy /></PublicOnlyRoute>} />
+    return (
+        <Routes>
+            {/* Public */}
+            <Route path="/"          element={<Landing />} />
+            <Route path="/dang-nhap" element={<PublicOnlyRoute><DangNhap /></PublicOnlyRoute>} />
+            <Route path="/dang-ky"   element={<PublicOnlyRoute><DangKy /></PublicOnlyRoute>} />
 
-      {/* Protected - có sidebar */}
-      <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
-        <Route path="/tong-quan"  element={<TongQuan />} />
-        <Route path="/ghi-chu"    element={<GhiChu />} />
-        <Route path="/ghi-chu/:id" element={<GhiChu />} />
-        <Route path="/chat"       element={<Chat />} />
-        <Route path="/tai-lieu"   element={<TaiLieu />} />
-        <Route path="/lich"       element={<Lich />} />
-        <Route path="/kien-thuc"  element={<KienThuc />} />
-        <Route path="/quan-tri"   element={<AdminRoute><QuanTri /></AdminRoute>} />
-          <Route path="/tai-khoan" element={<TaiKhoan />} />
-          <Route path="/thong-bao" element={<ThongBao />} />
-      </Route>
+            {/* Protected - Đăng nhập mới xem được và hiển thị có kèm sidebar */}
+            <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
+                <Route path="/tong-quan"           element={<TongQuan />} />
+                <Route path="/ghi-chu"             element={<GhiChu />} />
+                <Route path="/ghi-chu/:id"         element={<GhiChu />} />
+                <Route path="/chat"                element={<Chat />} />
+                <Route path="/tai-lieu"            element={<TaiLieu />} />
+                <Route path="/lich"                element={<Lich />} />
+                <Route path="/kien-thuc"           element={<KienThuc />} />
+                <Route path="/tai-khoan"           element={<TaiKhoan />} />
+                <Route path="/thong-bao"           element={<ThongBao />} />
+                <Route path="/goi-dich-vu"         element={<GoiDichVu />} />
 
-      {/* Fallback */}
-      <Route path="*" element={<Navigate to={daXacThuc ? '/ghi-chu' : '/'} replace />} />
-    </Routes>
-  )
+                {/* CHÈN VÀO ĐÂY: Quản lý và phân quyền Admin chỉ dành riêng cho Admin */}
+                <Route path="/quan-tri"            element={<AdminRoute><QuanTri /></AdminRoute>} />
+                <Route path="/quan-tri/goi-dich-vu" element={<AdminRoute><QuanLyGoi /></AdminRoute>} />
+            </Route>
+
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to={daXacThuc ? '/ghi-chu' : '/'} replace />} />
+        </Routes>
+    )
 }

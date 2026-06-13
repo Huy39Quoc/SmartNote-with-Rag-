@@ -13,6 +13,7 @@ import org.example.velora.repository.NoteRepository;
 import org.example.velora.repository.UserRepository;
 import org.example.velora.service.AiService;
 import org.example.velora.service.DocumentService;
+import org.example.velora.service.PackageValidationService;
 import org.example.velora.util.FileExtractor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +31,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.io.IOException;
 import java.nio.file.*;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -43,6 +45,7 @@ public class DocumentServiceImpl implements DocumentService {
     private final AiService aiService;
     private final ChromaDbClient chromaDbClient;
     private final FileExtractor fileExtractor;
+    private final PackageValidationService packageValidationService;
     @Autowired private ApplicationContext applicationContext;
 
     @Value("${upload.dir}") private String uploadDir;
@@ -72,6 +75,8 @@ public class DocumentServiceImpl implements DocumentService {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
+
+        packageValidationService.validateStorageLimit(user, file.getSize());
 
         Document doc = Document.builder()
                 .user(user)
@@ -173,6 +178,10 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     public DocumentResponse.AudioResult transcribeAudio(UUID userId, UUID docId,
                                                         DocumentRequest.TranscribeAudio req) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
+        packageValidationService.validateAiUsage(user, "AI_AUDIO");
+
         Document doc = getDoc(userId, docId);
         if (doc.getFileType() != Document.FileType.AUDIO)
             throw new BadRequestException("File này không phải audio");
@@ -189,8 +198,6 @@ public class DocumentServiceImpl implements DocumentService {
 
         UUID createdNoteId = null;
         if (Boolean.TRUE.equals(req.getCreateNote())) {
-            User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
             Note note = Note.builder().user(user).title(title).content(structured).build();
             note = noteRepository.save(note);
             createdNoteId = note.getId();
@@ -198,6 +205,8 @@ public class DocumentServiceImpl implements DocumentService {
             chromaDbClient.embed(note.getId().toString(), structured,
                 userId.toString(), "note");
         }
+
+        packageValidationService.incrementAiUsage(user);
 
         return DocumentResponse.AudioResult.builder()
             .documentId(docId).rawTranscript(raw)
@@ -208,17 +217,30 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     public DocumentResponse.AnalysisResult analyze(UUID userId, UUID docId,
                                                     DocumentRequest.Analyze req) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
+        packageValidationService.validateAiUsage(user, "AI_ANALYZE");
+
         Document doc = getDoc(userId, docId);
         if (doc.getStatus() != Document.Status.DONE)
             throw new BadRequestException("Tài liệu chưa xử lý xong");
         String content = doc.getFileType() == Document.FileType.AUDIO
             ? doc.getAudioTranscript() : doc.getExtractedText();
         if (content == null) throw new BadRequestException("Không có nội dung để phân tích");
+
+        DocumentResponse.AnalysisResult result = aiService.analyzeDocument(content, req.getInstruction());
+
+        // 2. Đánh dấu đã dùng 1 lượt AI sau khi xử lý xong
+        packageValidationService.incrementAiUsage(user);
         return aiService.analyzeDocument(content, req.getInstruction());
     }
 
     @Override
     public DocumentResponse.AskResult ask(UUID userId, UUID docId, DocumentRequest.Ask req) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
+
+        packageValidationService.validateAiUsage(user, "AI_CHAT");
         Document doc = getDoc(userId, docId);
 
         if (doc.getStatus() != Document.Status.DONE || !Boolean.TRUE.equals(doc.getIsEmbedded())) {
@@ -232,6 +254,10 @@ public class DocumentServiceImpl implements DocumentService {
         );
 
         String answer = aiService.chatWithContext(req.getQuestion(), chunks);
+
+        user.setAiUsedThisMonth(user.getAiUsedThisMonth() + 1);
+        user.setLastAiUsageDate(LocalDateTime.now());
+        userRepository.save(user);
 
         return DocumentResponse.AskResult.builder()
                 .answer(answer)

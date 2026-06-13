@@ -19,6 +19,7 @@ import notificationApi from '../../lib/api/notificationApi'
 
 const menu = [
     { to: '/tong-quan', label: 'Tổng quan', icon: IconLayoutDashboard },
+    { to: '/goi-dich-vu', label: 'Gói Premium', icon: IconNotes },
     { to: '/ghi-chu', label: 'Ghi chú', icon: IconNotes },
     { to: '/chat', label: 'Hỏi đáp AI', icon: IconMessages },
     { to: '/tai-lieu', label: 'Tài liệu', icon: IconFileText },
@@ -105,14 +106,16 @@ export default function Sidebar() {
                 })}
 
                 {laAdmin() && (
-                    <NavLink
-                        to="/quan-tri"
-                        style={navStyle}
-                        className={({ isActive }) => isActive ? 'active' : ''}
-                    >
-                        <IconShield size={15} />
-                        <span>Quản trị</span>
-                    </NavLink>
+                    <>
+                        <NavLink to="/quan-tri" style={navStyle} className={({ isActive }) => isActive ? 'active' : ''}>
+                            <IconShield size={15} />
+                            <span>Quản trị</span>
+                        </NavLink>
+                        <NavLink to="/quan-tri/goi-dich-vu" style={navStyle} className={({ isActive }) => isActive ? 'active' : ''}>
+                            <IconShield size={15} />
+                            <span>Quản lý Gói</span>
+                        </NavLink>
+                    </>
                 )}
             </nav>
 

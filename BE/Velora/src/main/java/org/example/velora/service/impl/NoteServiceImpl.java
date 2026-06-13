@@ -14,6 +14,7 @@ import org.example.velora.repository.UserRepository;
 import org.example.velora.service.AiService;
 import org.example.velora.service.NoteService;
 import lombok.RequiredArgsConstructor;
+import org.example.velora.service.PackageValidationService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -37,9 +38,13 @@ public class NoteServiceImpl implements NoteService {
     private final AiService aiService;
     private final NoteMapper noteMapper;
     private final ChromaDbClient chromaDbClient;
+    private final PackageValidationService packageValidationService;
     @Override
     public NoteResponse.Detail create(UUID userId, NoteRequest.Create req) {
-        User user = getUser(userId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
+
+        packageValidationService.validateMaxNotes(user);
 
         Note note = Note.builder()
                 .user(user)
@@ -166,8 +171,16 @@ public class NoteServiceImpl implements NoteService {
 
     @Override
     public NoteResponse.AiResult improveWithAi(UUID userId, UUID noteId, NoteRequest.AiImprove req) {
+        User user = getUser(userId);
+        if (req.getAction() == NoteRequest.AiImprove.AiAction.CREATE_CHECKLIST) {
+            packageValidationService.validateFeatureAccess(user, "AI_CHECKLIST");
+        }
+        packageValidationService.validateAiUsage(user, "AI_NOTE_FORMAT");
         getNote(userId, noteId);
-        return aiService.improveNote(req.getContent(), req.getTitle(), req.getAction());
+        NoteResponse.AiResult result = aiService.improveNote(req.getContent(), req.getTitle(), req.getAction());
+        packageValidationService.incrementAiUsage(user);
+
+        return result;
     }
 
     private Note getNote(UUID userId, UUID noteId) {

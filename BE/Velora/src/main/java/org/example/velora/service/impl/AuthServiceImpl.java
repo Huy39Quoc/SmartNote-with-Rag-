@@ -12,6 +12,7 @@ import org.example.velora.repository.UserRepository;
 import org.example.velora.security.JwtTokenProvider;
 import org.example.velora.service.AuthService;
 import lombok.RequiredArgsConstructor;
+import org.example.velora.service.PackageValidationService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -31,6 +32,7 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthenticationManager authenticationManager;
+    private final PackageValidationService packageValidationService;
 
     @Value("${jwt.refresh-token-expiry}") private long refreshExpiry;
     @Value("${jwt.access-token-expiry}") private long accessExpiry;
@@ -56,6 +58,7 @@ public class AuthServiceImpl implements AuthService {
         );
         User user = userRepository.findByEmail(req.getEmail())
             .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        packageValidationService.validateMaxDevices(user);
         return buildTokenPair(user);
     }
 
