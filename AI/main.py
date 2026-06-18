@@ -15,7 +15,7 @@ from sentence_transformers import SentenceTransformer
 CHROMA_DIR = os.getenv("CHROMA_DIR", "./chroma_data")
 EMBEDDING_MODEL_NAME = os.getenv(
     "EMBEDDING_MODEL_NAME",
-    "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    "intfloat/multilingual-e5-base"
 )
 WHISPER_MODEL_NAME = os.getenv("WHISPER_MODEL_NAME", "base")
 
@@ -64,27 +64,53 @@ def get_collection(name: str):
     )
 
 
-def chunk_text(text: str, chunk_size: int = 900, overlap: int = 150) -> List[str]:
+def chunk_text(text: str, chunk_size: int = 1200, overlap: int = 250) -> List[str]:
     text = (text or "").strip()
     if not text:
         return []
 
     paragraphs = [p.strip() for p in text.splitlines() if p.strip()]
-    joined = "\n".join(paragraphs)
 
     chunks: List[str] = []
-    start = 0
-    while start < len(joined):
-        end = min(start + chunk_size, len(joined))
-        chunk = joined[start:end].strip()
-        if chunk:
-            chunks.append(chunk)
-        if end >= len(joined):
-            break
-        start = max(0, end - overlap)
+    current = ""
 
-    return chunks
+    for paragraph in paragraphs:
+        if len(current) + len(paragraph) + 2 <= chunk_size:
+            current = (current + "\n\n" + paragraph).strip()
+            continue
 
+        if current:
+            chunks.append(current)
+
+        if len(paragraph) <= chunk_size:
+            current = paragraph
+        else:
+            start = 0
+            while start < len(paragraph):
+                end = min(start + chunk_size, len(paragraph))
+                piece = paragraph[start:end].strip()
+                if piece:
+                    chunks.append(piece)
+                if end >= len(paragraph):
+                    break
+                start = max(0, end - overlap)
+            current = ""
+
+    if current:
+        chunks.append(current)
+
+    # Thêm overlap mềm giữa các chunk liền kề
+    merged: List[str] = []
+
+    for i, chunk in enumerate(chunks):
+        if i == 0:
+            merged.append(chunk)
+            continue
+
+        prev_tail = chunks[i - 1][-overlap:].strip()
+        merged.append((prev_tail + "\n\n" + chunk).strip())
+
+    return merged
 
 @app.get("/health")
 def health() -> Dict[str, Any]:

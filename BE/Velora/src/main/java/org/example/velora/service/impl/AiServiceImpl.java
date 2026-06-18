@@ -99,29 +99,52 @@ public class AiServiceImpl implements AiService {
         List<String> limitedChunks = contextChunks.stream()
                 .filter(Objects::nonNull)
                 .filter(s -> !s.isBlank())
-                .limit(3)
+                .limit(5)
                 .toList();
 
-        String context = String.join("\n---\n", limitedChunks);
+        StringBuilder contextBuilder = new StringBuilder();
 
-        String systemPrompt =
-                "Bạn là trợ lý RAG. Chỉ trả lời dựa trên ngữ cảnh được cung cấp. " +
-                        "Trả lời bằng tiếng Việt, ngắn gọn, trực tiếp. " +
-                        "Không suy luận dài. Không dùng markdown phức tạp.";
+        for (int i = 0; i < limitedChunks.size(); i++) {
+            contextBuilder
+                    .append("[Nguồn ")
+                    .append(i + 1)
+                    .append("]\n")
+                    .append(limitedChunks.get(i))
+                    .append("\n\n");
+        }
 
-        String userMsg =
-                "Dựa vào ngữ cảnh sau, hãy trả lời câu hỏi.\n\n" +
-                        "Ngữ cảnh:\n" + context + "\n\n" +
-                        "Câu hỏi: " + question + "\n\n" +
-                        "Yêu cầu: trả lời trong tối đa 5 câu.";
+        String context = contextBuilder.toString();
+
+        String systemPrompt = """
+            Bạn là trợ lý học tập RAG của ứng dụng Velora.
+
+            Quy tắc bắt buộc:
+            - Chỉ trả lời dựa trên NGỮ CẢNH được cung cấp.
+            - Nếu ngữ cảnh không đủ thông tin, hãy nói rõ: "Tài liệu chưa có đủ thông tin để trả lời chính xác."
+            - Không bịa thêm kiến thức ngoài tài liệu.
+            - Trả lời bằng tiếng Việt.
+            - Ưu tiên trả lời rõ ràng, có gạch đầu dòng nếu phù hợp.
+            - Khi có thể, hãy nhắc nguồn theo dạng [Nguồn 1], [Nguồn 2].
+            - Không dùng markdown quá phức tạp.
+            """;
+
+        String userMsg = """
+            NGỮ CẢNH TỪ TÀI LIỆU:
+            %s
+
+            CÂU HỎI:
+            %s
+
+            Hãy trả lời dựa trên ngữ cảnh trên.
+            """.formatted(context, question);
 
         String answer = lmStudioClient.chatComplete(systemPrompt, userMsg);
 
         if (answer == null || answer.isBlank()
                 || answer.contains("Không thể kết nối AI")
                 || answer.contains("AI chưa trả về nội dung")) {
-            return "Mình đã tìm thấy nội dung liên quan trong tài liệu, nhưng model AI trả lời quá lâu. " +
-                    "Nội dung tìm được là:\n\n" + context;
+            return "Mình đã tìm thấy nội dung liên quan trong tài liệu, nhưng model AI trả lời chưa ổn. " +
+                    "Bạn có thể xem các đoạn liên quan dưới đây:\n\n" + context;
         }
 
         return answer;

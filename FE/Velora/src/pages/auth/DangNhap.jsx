@@ -1,11 +1,16 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { IconEye, IconEyeOff } from '@tabler/icons-react'
 import useAuthStore from '../../service/authStore'
 import logo from '../../assets/logo.svg'
 
 export default function DangNhap() {
-  const [form, setForm] = useState({ email: '', matKhau: '' })
+    const location = useLocation()
+
+    const [form, setForm] = useState({
+        email: location.state?.email || '',
+        matKhau: '',
+    })
   const [hienMatKhau, setHienMatKhau] = useState(false)
   const [loi, setLoi] = useState({})
   const { dangNhap, dangTai } = useAuthStore()
@@ -55,9 +60,11 @@ export default function DangNhap() {
       <div style={styles.right}>
         <div style={styles.form}>
           <h2 style={{ marginBottom: 6 }}>Đăng nhập</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 24 }}>
-            Chào mừng trở lại
-          </p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 24 }}>
+                {location.state?.registered
+                    ? 'Đăng ký thành công. Hãy đăng nhập để tiếp tục.'
+                    : 'Chào mừng trở lại'}
+            </p>
 
           <form onSubmit={xuLyDangNhap} noValidate>
             <div style={styles.field}>

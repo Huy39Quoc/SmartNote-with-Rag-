@@ -23,21 +23,33 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
-  dangKy: async (email, matKhau, hoTen) => {
-    set({ dangTai: true })
-    try {
-      const { data } = await authApi.dangKy({ email, password: matKhau, fullName: hoTen })
-      const { accessToken, refreshToken, user } = data.data
-      localStorage.setItem('velora_token', accessToken)
-      localStorage.setItem('velora_refresh', refreshToken)
-      set({ nguoiDung: user, daXacThuc: true, dangTai: false })
-      return true
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Đăng ký thất bại')
-      set({ dangTai: false })
-      return false
-    }
-  },
+    dangKy: async (email, matKhau, hoTen) => {
+        set({ dangTai: true })
+
+        try {
+            await authApi.dangKy({
+                email,
+                password: matKhau,
+                fullName: hoTen,
+            })
+
+            localStorage.removeItem('velora_token')
+            localStorage.removeItem('velora_refresh')
+
+            set({
+                nguoiDung: null,
+                daXacThuc: false,
+                dangTai: false,
+            })
+
+            toast.success('Đăng ký thành công. Vui lòng đăng nhập để tiếp tục.')
+            return true
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Đăng ký thất bại')
+            set({ dangTai: false })
+            return false
+        }
+    },
 
   dangXuat: async () => {
     try {

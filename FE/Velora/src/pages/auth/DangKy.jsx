@@ -23,13 +23,24 @@ export default function DangKy() {
   }
 
   const xuLyDangKy = async e => {
-    e.preventDefault()
-    const err = validate()
-    if (Object.keys(err).length) { setLoi(err); return }
-    const ok = await dangKy(form.email, form.matKhau, form.hoTen)
-    if (ok) navigate('/ghi-chu')
-  }
+      e.preventDefault()
+      const err = validate()
+      if (Object.keys(err).length) {
+          setLoi(err);
+          return
+      }
+      const ok = await dangKy(form.email, form.matKhau, form.hoTen)
 
+      if (ok) {
+          navigate('/dang-nhap', {
+              replace: true,
+              state: {
+                  email: form.email,
+                  registered: true,
+              },
+          })
+      }
+  }
   return (
     <div style={styles.wrap}>
       <div style={styles.left}>

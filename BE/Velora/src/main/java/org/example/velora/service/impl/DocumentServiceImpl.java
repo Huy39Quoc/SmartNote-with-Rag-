@@ -230,9 +230,9 @@ public class DocumentServiceImpl implements DocumentService {
 
         DocumentResponse.AnalysisResult result = aiService.analyzeDocument(content, req.getInstruction());
 
-        // 2. Đánh dấu đã dùng 1 lượt AI sau khi xử lý xong
         packageValidationService.incrementAiUsage(user);
-        return aiService.analyzeDocument(content, req.getInstruction());
+
+        return result;
     }
 
     @Override
