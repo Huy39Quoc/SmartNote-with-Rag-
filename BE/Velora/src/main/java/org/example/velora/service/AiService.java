@@ -5,6 +5,9 @@ import org.example.velora.dto.response.DocumentResponse;
 import org.example.velora.dto.response.KnowledgeGroupResponse;
 import org.example.velora.dto.response.NoteResponse;
 import org.example.velora.dto.response.ScheduleResponse;
+import org.example.velora.entity.Flashcard;
+import org.example.velora.entity.Note;
+
 import java.util.List;
 
 public interface AiService {
@@ -20,4 +23,5 @@ public interface AiService {
     /** Đề xuất tiêu đề từ nội dung */
     String suggestTitle(String content);
     String getPrompt(String promptKey);
+    java.util.List<Flashcard> generateFlashcardsFromNote(Note note);
 }

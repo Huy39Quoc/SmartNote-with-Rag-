@@ -58,7 +58,16 @@ public class PackageValidationServiceImpl implements PackageValidationService {
         if (user.getCurrentPackage() == null ||
                 user.getPackageExpiryDate() == null ||
                 user.getPackageExpiryDate().isBefore(LocalDateTime.now())) {
-            throw new BadRequestException("Bạn cần đăng ký gói dịch vụ để thực hiện chức năng này.");
+
+            PackageService freePackage = new PackageService();
+            freePackage.setName("FREE");
+            freePackage.setStorageGb(50);
+            freePackage.setMaxNotes(50);
+            freePackage.setMaxDevices(2);
+            freePackage.setMaxAiFormatsPerMonth(50);
+            freePackage.setFeatures("AI_CHAT,AI_SUMMARY,AI_TRANSLATE,EXTRACT_SCHEDULE");
+
+            return freePackage;
         }
         return user.getCurrentPackage();
     }

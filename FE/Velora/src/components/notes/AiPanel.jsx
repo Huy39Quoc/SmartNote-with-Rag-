@@ -14,6 +14,8 @@ export default function AiPanel({ noteId, content, title, onApply, onDong }) {
   const [loading, setLoading] = useState(false)
   const [ketQua, setKetQua] = useState(null)
   const [hanhDong, setHanhDong] = useState('SUMMARIZE')
+    const [cards, setCards] = useState([]);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
   const xuLy = async () => {
     if (!content?.trim()) { toast.error('Ghi chú đang trống'); return }
@@ -35,6 +37,18 @@ export default function AiPanel({ noteId, content, title, onApply, onDong }) {
     const boQua = () => {
         setKetQua(null)
     }
+    const handleGenerateFlashcards = async () => {
+        setLoading(true);
+        try {
+            const response = await flashcardApi.generate(noteId);
+            setCards(response.data);
+            setIsModalOpen(true);
+        } catch (error) {
+            alert("Không thể tạo flashcard: " + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
   return (
     <div style={styles.panel}>
       <div style={styles.header}>
