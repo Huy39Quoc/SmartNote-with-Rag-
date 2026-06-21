@@ -1,3 +1,4 @@
+
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
@@ -55,6 +56,12 @@ export default function GhiChu() {
 
     const [dangTaoFlashcard, setDangTaoFlashcard] = useState(false)
 
+    const [hienChecklistModal, setHienChecklistModal] = useState(false)
+    const [checklistItems, setChecklistItems] = useState([])
+    const [checklistDeadline, setChecklistDeadline] = useState('')
+    const [checklistPriority, setChecklistPriority] = useState('MEDIUM')
+    const [dangTaoChecklistTask, setDangTaoChecklistTask] = useState(false)
+
     const [shareEmail, setShareEmail] = useState('')
     const [sharePermission, setSharePermission] = useState('VIEW')
     const [shareList, setShareList] = useState([])
@@ -89,14 +96,11 @@ export default function GhiChu() {
     }, [])
 
     useEffect(() => {
-        if (idParam && danhSach.length) {
-            const found = danhSach.find(n => n.id === idParam)
+        if (!idParam) return
+        if (ghiChuHienTai?.id === idParam) return
 
-            if (found) {
-                chonGhiChu(found.id)
-            }
-        }
-    }, [idParam, danhSach])
+        chonGhiChu(idParam)
+    }, [idParam, ghiChuHienTai?.id])
 
     const chonGhiChu = async (id) => {
         try {
@@ -117,6 +121,11 @@ export default function GhiChu() {
         setShareEmail('')
         setSharePermission('VIEW')
         setShareList([])
+
+        setHienChecklistModal(false)
+        setChecklistItems([])
+        setChecklistDeadline('')
+        setChecklistPriority('MEDIUM')
     }
 
     const taiXuongGhiChu = async (format) => {
@@ -199,615 +208,650 @@ export default function GhiChu() {
                 })
 
                 navigate(`/ghi-chu/${ghiChuHienTai.id}/flashcards`)
-            } else {
-                toast.error('AI chưa tìm thấy đủ thông tin cốt lõi để tạo bộ câu hỏi.', {
-                    id: loadToast,
-                })
-            }
-        } catch (error) {
-            console.error(error)
-            toast.error(error.response?.data?.message || 'Không thể kết nối với mô hình AI lúc này.', {
-                id: loadToast,
-            })
-        } finally {
-            setDangTaoFlashcard(false)
-        }
+} else {
+    toast.error('AI chưa tìm thấy đủ thông tin cốt lõi để tạo bộ câu hỏi.', {
+        id: loadToast,
+    })
+}
+} catch (error) {
+    console.error(error)
+    toast.error(error.response?.data?.message || 'Không thể kết nối với mô hình AI lúc này.', {
+        id: loadToast,
+    })
+} finally {
+    setDangTaoFlashcard(false)
+}
+}
+
+const taoMoi = async () => {
+    try {
+        const { data } = await noteApi.taoMoi({
+            title: 'Ghi chú mới',
+            content: '',
+        })
+
+        const ghiChu = data.data
+
+        setDanhSach(p => [ghiChu, ...p])
+        setGhiChuHienTai(ghiChu)
+        navigate(`/ghi-chu/${ghiChu.id}`, { replace: true })
+    } catch {
+        toast.error('Không thể tạo ghi chú')
     }
+}
 
-    const taoMoi = async () => {
-        try {
-            const { data } = await noteApi.taoMoi({
-                title: 'Ghi chú mới',
-                content: '',
-            })
+const luu = async () => {
+    if (!ghiChuHienTai) return
 
-            const ghiChu = data.data
+    setDangLuu(true)
 
-            setDanhSach(p => [ghiChu, ...p])
-            setGhiChuHienTai(ghiChu)
-            navigate(`/ghi-chu/${ghiChu.id}`, { replace: true })
-        } catch {
-            toast.error('Không thể tạo ghi chú')
-        }
+    try {
+        const { data } = await noteApi.capNhat(ghiChuHienTai.id, {
+            title: ghiChuHienTai.title,
+            content: ghiChuHienTai.content,
+            tagIds: ghiChuHienTai.tags?.map(t => t.id),
+        })
+
+        setDanhSach(p =>
+            p.map(n => n.id === data.data.id ? { ...n, ...data.data } : n)
+        )
+
+        toast.success('Đã lưu')
+    } catch {
+        toast.error('Lưu thất bại')
+    } finally {
+        setDangLuu(false)
     }
+}
 
-    const luu = async () => {
-        if (!ghiChuHienTai) return
+const xoa = async () => {
+    if (!ghiChuHienTai || !window.confirm('Xoá ghi chú này?')) return
 
-        setDangLuu(true)
+    try {
+        await noteApi.xoa(ghiChuHienTai.id)
 
-        try {
-            const { data } = await noteApi.capNhat(ghiChuHienTai.id, {
-                title: ghiChuHienTai.title,
-                content: ghiChuHienTai.content,
-                tagIds: ghiChuHienTai.tags?.map(t => t.id),
-            })
+        setDanhSach(p => p.filter(n => n.id !== ghiChuHienTai.id))
+        setGhiChuHienTai(null)
+        navigate('/ghi-chu', { replace: true })
 
-            setDanhSach(p =>
-                p.map(n => n.id === data.data.id ? { ...n, ...data.data } : n)
+        toast.success('Đã xoá')
+    } catch {
+        toast.error('Xoá thất bại')
+    }
+}
+
+const danhDau = async () => {
+    if (!ghiChuHienTai) return
+
+    try {
+        const { data } = await noteApi.danhDau(ghiChuHienTai.id)
+
+        setGhiChuHienTai(data.data)
+        setDanhSach(p =>
+            p.map(n =>
+                n.id === data.data.id
+                    ? { ...n, isBookmarked: data.data.isBookmarked }
+                    : n
             )
+        )
+    } catch {}
+}
 
-            toast.success('Đã lưu')
-        } catch {
-            toast.error('Lưu thất bại')
-        } finally {
-            setDangLuu(false)
+const homNayIso = () => {
+    const today = new Date()
+    today.setMinutes(today.getMinutes() - today.getTimezoneOffset())
+    return today.toISOString().split('T')[0]
+}
+
+const apDungAi = async (ketQua) => {
+    if (!ketQua || !ghiChuHienTai) return
+
+    if (ketQua.checklist?.length > 0) {
+        if (!coTinhNang('CHECKLIST_BASIC')) {
+            toast.error(getUpgradeMessage('CHECKLIST_BASIC'))
+            navigate('/goi-dich-vu')
+            return
         }
+
+        const danhSachTask = ketQua.checklist
+            .map(item => typeof item === 'string' ? item.trim() : '')
+            .filter(Boolean)
+
+        if (danhSachTask.length === 0) {
+            toast.error('Checklist không có nội dung hợp lệ')
+            return
+        }
+
+        setChecklistItems(danhSachTask)
+        setChecklistDeadline('')
+        setChecklistPriority('MEDIUM')
+        setHienChecklistModal(true)
+
+        return
     }
 
-    const xoa = async () => {
-        if (!ghiChuHienTai || !window.confirm('Xoá ghi chú này?')) return
+    setGhiChuHienTai(p => {
+        if (!p) return p
 
-        try {
-            await noteApi.xoa(ghiChuHienTai.id)
+        let noiDungMoi = p.content || ''
+        let tieuDeMoi = p.title
 
-            setDanhSach(p => p.filter(n => n.id !== ghiChuHienTai.id))
-            setGhiChuHienTai(null)
-            navigate('/ghi-chu', { replace: true })
-
-            toast.success('Đã xoá')
-        } catch {
-            toast.error('Xoá thất bại')
+        if (ketQua.suggestedTitle) {
+            tieuDeMoi = ketQua.suggestedTitle
         }
+
+        if (ketQua.improvedContent) {
+            noiDungMoi = ketQua.improvedContent
+        } else if (ketQua.summary) {
+            noiDungMoi = noiDungMoi.trim() + '\n\n---\n\n## AI Summary\n' + ketQua.summary
+        }
+
+        return {
+            ...p,
+            title: tieuDeMoi,
+            content: noiDungMoi,
+        }
+    })
+}
+
+const xacNhanTaoTaskTuChecklist = async () => {
+    if (!ghiChuHienTai?.id) {
+        toast.error('Chưa chọn ghi chú')
+        return
     }
 
-    const danhDau = async () => {
-        if (!ghiChuHienTai) return
+    if (checklistItems.length === 0) {
+        toast.error('Checklist không có nội dung hợp lệ')
+        return
+    }
 
-        try {
-            const { data } = await noteApi.danhDau(ghiChuHienTai.id)
+    if (checklistDeadline && checklistDeadline < homNayIso()) {
+        toast.error('Deadline không được nằm trong quá khứ')
+        return
+    }
 
-            setGhiChuHienTai(data.data)
-            setDanhSach(p =>
-                p.map(n =>
-                    n.id === data.data.id
-                        ? { ...n, isBookmarked: data.data.isBookmarked }
-                        : n
-                )
+    setDangTaoChecklistTask(true)
+
+    const toastId = toast.loading('Đang tạo task từ checklist AI...')
+
+    try {
+        await Promise.all(
+            checklistItems.map(taskName =>
+                scheduleApi.taoMoi({
+                    taskName,
+                    description: `Tạo từ checklist AI của ghi chú: ${ghiChuHienTai.title || 'Không có tiêu đề'}`,
+                    deadline: checklistDeadline || null,
+                    priority: checklistPriority,
+                    noteId: ghiChuHienTai.id,
+                })
             )
-        } catch {}
+        )
+
+        toast.success(`Đã tạo ${checklistItems.length} task từ checklist AI`, {
+            id: toastId,
+        })
+
+        setChecklistItems([])
+        setChecklistDeadline('')
+        setChecklistPriority('MEDIUM')
+        setHienChecklistModal(false)
+    } catch (error) {
+        toast.error(error.response?.data?.message || 'Không thể tạo task từ checklist AI', {
+            id: toastId,
+        })
+    } finally {
+        setDangTaoChecklistTask(false)
+    }
+}
+
+const taoTagMoi = async () => {
+    const name = tenTagMoi.trim()
+
+    if (!name) {
+        toast.error('Vui lòng nhập tên tag')
+        return
     }
 
-    const apDungAi = async (ketQua) => {
-        if (!ketQua || !ghiChuHienTai) return
+    try {
+        const { data } = await tagApi.taoMoi({
+            name,
+            color: mauTagMoi,
+        })
 
-        if (ketQua.checklist?.length > 0) {
-            if (!coTinhNang('CHECKLIST_BASIC')) {
-                toast.error(getUpgradeMessage('CHECKLIST_BASIC'))
-                navigate('/goi-dich-vu')
-                return
-            }
+        const tagMoi = data.data
 
-            const danhSachTask = ketQua.checklist
-                .map(item => typeof item === 'string' ? item.trim() : '')
-                .filter(Boolean)
-
-            if (danhSachTask.length === 0) {
-                toast.error('Checklist không có nội dung hợp lệ')
-                return
-            }
-
-            const toastId = toast.loading('Đang tạo task từ checklist AI...')
-
-            try {
-                await Promise.all(
-                    danhSachTask.map(taskName =>
-                        scheduleApi.taoMoi({
-                            taskName,
-                            description: `Tạo từ checklist AI của ghi chú: ${ghiChuHienTai.title || 'Không có tiêu đề'}`,
-                            deadline: null,
-                            priority: 'MEDIUM',
-                            noteId: ghiChuHienTai.id,
-                        })
-                    )
-                )
-
-                toast.success(`Đã tạo ${danhSachTask.length} task từ checklist AI`, {
-                    id: toastId,
-                })
-
-                return
-            } catch (error) {
-                toast.error(error.response?.data?.message || 'Không thể tạo task từ checklist AI', {
-                    id: toastId,
-                })
-
-                throw error
-            }
-        }
+        setTags(p => [...p, tagMoi])
+        setTenTagMoi('')
+        setMauTagMoi('#3B82F6')
 
         setGhiChuHienTai(p => {
             if (!p) return p
 
-            let noiDungMoi = p.content || ''
-            let tieuDeMoi = p.title
-
-            if (ketQua.suggestedTitle) {
-                tieuDeMoi = ketQua.suggestedTitle
-            }
-
-            if (ketQua.improvedContent) {
-                noiDungMoi = ketQua.improvedContent
-            } else if (ketQua.summary) {
-                noiDungMoi = noiDungMoi.trim() + '\n\n---\n\n## AI Summary\n' + ketQua.summary
-            }
-
-            return {
-                ...p,
-                title: tieuDeMoi,
-                content: noiDungMoi,
-            }
-        })
-    }
-
-    const taoTagMoi = async () => {
-        const name = tenTagMoi.trim()
-
-        if (!name) {
-            toast.error('Vui lòng nhập tên tag')
-            return
-        }
-
-        try {
-            const { data } = await tagApi.taoMoi({
-                name,
-                color: mauTagMoi,
-            })
-
-            const tagMoi = data.data
-
-            setTags(p => [...p, tagMoi])
-            setTenTagMoi('')
-            setMauTagMoi('#3B82F6')
-
-            setGhiChuHienTai(p => {
-                if (!p) return p
-
-                const currentTags = p.tags || []
-                const daCo = currentTags.some(t => t.id === tagMoi.id)
-
-                return {
-                    ...p,
-                    tags: daCo ? currentTags : [...currentTags, tagMoi],
-                }
-            })
-
-            toast.success('Đã tạo tag mới')
-        } catch {
-            toast.error('Không thể tạo tag')
-        }
-    }
-
-    const toggleTagChoGhiChu = (tag) => {
-        if (!ghiChuHienTai) return
-
-        setGhiChuHienTai(p => {
             const currentTags = p.tags || []
-            const daCo = currentTags.some(t => t.id === tag.id)
+            const daCo = currentTags.some(t => t.id === tagMoi.id)
 
             return {
                 ...p,
-                tags: daCo
-                    ? currentTags.filter(t => t.id !== tag.id)
-                    : [...currentTags, tag],
+                tags: daCo ? currentTags : [...currentTags, tagMoi],
             }
         })
+
+        toast.success('Đã tạo tag mới')
+    } catch {
+        toast.error('Không thể tạo tag')
+    }
+}
+
+const toggleTagChoGhiChu = (tag) => {
+    if (!ghiChuHienTai) return
+
+    setGhiChuHienTai(p => {
+        const currentTags = p.tags || []
+        const daCo = currentTags.some(t => t.id === tag.id)
+
+        return {
+            ...p,
+            tags: daCo
+                ? currentTags.filter(t => t.id !== tag.id)
+                : [...currentTags, tag],
+        }
+    })
+}
+
+const taiDanhSachShare = async () => {
+    if (!ghiChuHienTai?.id) return
+
+    try {
+        const { data } = await noteApi.layDanhSachChiaSe(ghiChuHienTai.id)
+        setShareList(data.data || [])
+    } catch {
+        setShareList([])
+    }
+}
+
+useEffect(() => {
+    if (hienShare && ghiChuHienTai?.id) {
+        taiDanhSachShare()
+    }
+}, [hienShare, ghiChuHienTai?.id])
+
+const chiaSeGhiChu = async () => {
+    if (!coTinhNang('TEAM_WORK')) {
+        toast.error(getUpgradeMessage('TEAM_WORK'))
+        navigate('/goi-dich-vu')
+        return
     }
 
-    const taiDanhSachShare = async () => {
-        if (!ghiChuHienTai?.id) return
-
-        try {
-            const { data } = await noteApi.layDanhSachChiaSe(ghiChuHienTai.id)
-            setShareList(data.data || [])
-        } catch {
-            setShareList([])
-        }
+    if (!ghiChuHienTai?.id) {
+        toast.error('Chưa chọn ghi chú để chia sẻ')
+        return
     }
 
-    useEffect(() => {
-        if (hienShare && ghiChuHienTai?.id) {
-            taiDanhSachShare()
-        }
-    }, [hienShare, ghiChuHienTai?.id])
+    const email = shareEmail.trim().toLowerCase()
 
-    const chiaSeGhiChu = async () => {
-        if (!coTinhNang('TEAM_WORK')) {
-            toast.error(getUpgradeMessage('TEAM_WORK'))
-            navigate('/goi-dich-vu')
-            return
-        }
+    if (!email) {
+        toast.error('Vui lòng nhập email người nhận')
+        return
+    }
 
-        if (!ghiChuHienTai?.id) {
-            toast.error('Chưa chọn ghi chú để chia sẻ')
-            return
-        }
+    setDangShare(true)
 
-        const email = shareEmail.trim().toLowerCase()
+    try {
+        await noteApi.chiaSe(ghiChuHienTai.id, {
+            email,
+            permission: sharePermission,
+        })
 
-        if (!email) {
-            toast.error('Vui lòng nhập email người nhận')
-            return
-        }
+        toast.success('Đã chia sẻ ghi chú')
+        setShareEmail('')
+        setSharePermission('VIEW')
 
-        setDangShare(true)
+        await taiDanhSachShare()
+    } catch (error) {
+        toast.error(error.response?.data?.message || 'Không thể chia sẻ ghi chú')
+    } finally {
+        setDangShare(false)
+    }
+}
 
-        try {
-            await noteApi.chiaSe(ghiChuHienTai.id, {
-                email,
-                permission: sharePermission,
+const huyChiaSe = async (shareId) => {
+    if (!window.confirm('Hủy chia sẻ người này?')) return
+
+    try {
+        await noteApi.huyChiaSe(shareId)
+
+        toast.success('Đã hủy chia sẻ')
+        await taiDanhSachShare()
+    } catch (error) {
+        toast.error(error.response?.data?.message || 'Không thể hủy chia sẻ')
+    }
+}
+
+const coTheTrichLich = (text) => {
+    if (!text) return false
+
+    return /\b(?:\d{1,2}[:.][0-5]\d|[0-2]?\d\s*giờ|ngày\s*\d{1,2}|thứ\s*(?:hai|ba|tư|năm|sáu|bảy)|deadline|hẹn)\b/i.test(text)
+}
+
+useEffect(() => {
+    if (!ghiChuHienTai) return
+
+    const daTaoLich = noteDaTaoLichIds.has(ghiChuHienTai.id)
+    const duocTrichLich = coTinhNang('EXTRACT_SCHEDULE')
+
+    setHienLichGoiY(
+        duocTrichLich &&
+        !daTaoLich &&
+        coTheTrichLich(ghiChuHienTai.content)
+    )
+}, [
+    ghiChuHienTai?.id,
+    ghiChuHienTai?.content,
+    noteDaTaoLichIds,
+    nguoiDung?.packageFeatures,
+])
+
+useEffect(() => {
+    scheduleApi.layTatCa()
+        .then(r => {
+            const schedules = r.data.data || []
+            const ids = new Set(
+                schedules
+                    .filter(s => s.noteId)
+                    .map(s => s.noteId)
+            )
+
+            setNoteDaTaoLichIds(ids)
+        })
+        .catch(() => {})
+}, [])
+
+const trichXuatLich = async () => {
+    if (!coTinhNang('EXTRACT_SCHEDULE')) {
+        toast.error(getUpgradeMessage('EXTRACT_SCHEDULE'))
+        navigate('/goi-dich-vu')
+        return
+    }
+
+    if (!ghiChuHienTai?.content?.trim()) return
+
+    setDangTrichLich(true)
+
+    try {
+        const { data } = await scheduleApi.trichXuatTuGhiChu({
+            content: ghiChuHienTai.content,
+            noteId: ghiChuHienTai.id,
+        })
+
+        const total = data.data?.totalFound || 0
+
+        if (total > 0) {
+            setNoteDaTaoLichIds(prev => {
+                const next = new Set(prev)
+                next.add(ghiChuHienTai.id)
+                return next
             })
 
-            toast.success('Đã chia sẻ ghi chú')
-            setShareEmail('')
-            setSharePermission('VIEW')
-
-            await taiDanhSachShare()
-        } catch (error) {
-            toast.error(error.response?.data?.message || 'Không thể chia sẻ ghi chú')
-        } finally {
-            setDangShare(false)
+            setHienLichGoiY(false)
+            toast.success(`Đã tạo ${total} công việc / lịch`)
+        } else {
+            toast.error('AI chưa tìm thấy lịch/deadline hợp lệ trong ghi chú')
         }
+    } catch (error) {
+        toast.error(error.response?.data?.message || 'Không thể trích xuất lịch từ ghi chú')
+    } finally {
+        setDangTrichLich(false)
     }
+}
 
-    const huyChiaSe = async (shareId) => {
-        if (!window.confirm('Hủy chia sẻ người này?')) return
+useEffect(() => {
+    if (!ghiChuHienTai) return
 
-        try {
-            await noteApi.huyChiaSe(shareId)
+    const t = setTimeout(luu, 3000)
 
-            toast.success('Đã hủy chia sẻ')
-            await taiDanhSachShare()
-        } catch (error) {
-            toast.error(error.response?.data?.message || 'Không thể hủy chia sẻ')
-        }
-    }
+    return () => clearTimeout(t)
+}, [ghiChuHienTai?.content, ghiChuHienTai?.title])
 
-    const coTheTrichLich = (text) => {
-        if (!text) return false
+return (
+    <div style={styles.wrap}>
+        <div style={styles.list}>
+            <div style={styles.listHeader}>
+                <div style={styles.searchRow}>
+                    <div style={styles.searchWrap}>
+                        <IconSearch
+                            size={12}
+                            style={{
+                                position: 'absolute',
+                                left: 8,
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                color: 'var(--text-muted)',
+                            }}
+                        />
 
-        return /\b(?:\d{1,2}[:.][0-5]\d|[0-2]?\d\s*giờ|ngày\s*\d{1,2}|thứ\s*(?:hai|ba|tư|năm|sáu|bảy)|deadline|hẹn)\b/i.test(text)
-    }
-
-    useEffect(() => {
-        if (!ghiChuHienTai) return
-
-        const daTaoLich = noteDaTaoLichIds.has(ghiChuHienTai.id)
-        const duocTrichLich = coTinhNang('EXTRACT_SCHEDULE')
-
-        setHienLichGoiY(
-            duocTrichLich &&
-            !daTaoLich &&
-            coTheTrichLich(ghiChuHienTai.content)
-        )
-    }, [
-        ghiChuHienTai?.id,
-        ghiChuHienTai?.content,
-        noteDaTaoLichIds,
-        nguoiDung?.packageFeatures,
-    ])
-
-    useEffect(() => {
-        scheduleApi.layTatCa()
-            .then(r => {
-                const schedules = r.data.data || []
-                const ids = new Set(
-                    schedules
-                        .filter(s => s.noteId)
-                        .map(s => s.noteId)
-                )
-
-                setNoteDaTaoLichIds(ids)
-            })
-            .catch(() => {})
-    }, [])
-
-    const trichXuatLich = async () => {
-        if (!coTinhNang('EXTRACT_SCHEDULE')) {
-            toast.error(getUpgradeMessage('EXTRACT_SCHEDULE'))
-            navigate('/goi-dich-vu')
-            return
-        }
-
-        if (!ghiChuHienTai?.content?.trim()) return
-
-        setDangTrichLich(true)
-
-        try {
-            const { data } = await scheduleApi.trichXuatTuGhiChu({
-                content: ghiChuHienTai.content,
-                noteId: ghiChuHienTai.id,
-            })
-
-            const total = data.data?.totalFound || 0
-
-            if (total > 0) {
-                setNoteDaTaoLichIds(prev => {
-                    const next = new Set(prev)
-                    next.add(ghiChuHienTai.id)
-                    return next
-                })
-
-                setHienLichGoiY(false)
-                toast.success(`Đã tạo ${total} công việc / lịch`)
-            } else {
-                toast.error('AI chưa tìm thấy lịch/deadline hợp lệ trong ghi chú')
-            }
-        } catch (error) {
-            toast.error(error.response?.data?.message || 'Không thể trích xuất lịch từ ghi chú')
-        } finally {
-            setDangTrichLich(false)
-        }
-    }
-
-    useEffect(() => {
-        if (!ghiChuHienTai) return
-
-        const t = setTimeout(luu, 3000)
-
-        return () => clearTimeout(t)
-    }, [ghiChuHienTai?.content, ghiChuHienTai?.title])
-
-    return (
-        <div style={styles.wrap}>
-            <div style={styles.list}>
-                <div style={styles.listHeader}>
-                    <div style={styles.searchRow}>
-                        <div style={styles.searchWrap}>
-                            <IconSearch
-                                size={12}
-                                style={{
-                                    position: 'absolute',
-                                    left: 8,
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    color: 'var(--text-muted)',
-                                }}
-                            />
-
-                            <input
-                                placeholder="Tìm kiếm..."
-                                style={{
-                                    paddingLeft: 26,
-                                    fontSize: 12,
-                                    height: 30,
-                                }}
-                                value={timKiem}
-                                onChange={e => setTimKiem(e.target.value)}
-                            />
-                        </div>
-
-                        <button
-                            className="btn-ghost"
-                            onClick={taoMoi}
-                            style={{ padding: 5, flexShrink: 0 }}
-                            title="Tạo ghi chú mới"
-                        >
-                            <IconPlus size={15} />
-                        </button>
+                        <input
+                            placeholder="Tìm kiếm..."
+                            style={{
+                                paddingLeft: 26,
+                                fontSize: 12,
+                                height: 30,
+                            }}
+                            value={timKiem}
+                            onChange={e => setTimKiem(e.target.value)}
+                        />
                     </div>
 
-                    <div style={styles.tagFilter}>
+                    <button
+                        className="btn-ghost"
+                        onClick={taoMoi}
+                        style={{ padding: 5, flexShrink: 0 }}
+                        title="Tạo ghi chú mới"
+                    >
+                        <IconPlus size={15} />
+                    </button>
+                </div>
+
+                <div style={styles.tagFilter}>
+                    <button
+                        className={locTag ? 'btn-ghost' : 'btn-ai'}
+                        onClick={() => setLocTag(null)}
+                        style={{
+                            fontSize: 10,
+                            padding: '2px 8px',
+                        }}
+                    >
+                        Tất cả
+                    </button>
+
+                    {tags.map(t => (
                         <button
-                            className={locTag ? 'btn-ghost' : 'btn-ai'}
-                            onClick={() => setLocTag(null)}
+                            key={t.id}
                             style={{
                                 fontSize: 10,
                                 padding: '2px 8px',
+                                background: locTag === t.id
+                                    ? 'var(--bg-ai)'
+                                    : 'transparent',
                             }}
+                            className={locTag === t.id ? 'btn-ai' : 'btn-ghost'}
+                            onClick={() => setLocTag(locTag === t.id ? null : t.id)}
                         >
-                            Tất cả
+                            {t.name}
                         </button>
-
-                        {tags.map(t => (
-                            <button
-                                key={t.id}
-                                style={{
-                                    fontSize: 10,
-                                    padding: '2px 8px',
-                                    background: locTag === t.id
-                                        ? 'var(--bg-ai)'
-                                        : 'transparent',
-                                }}
-                                className={locTag === t.id ? 'btn-ai' : 'btn-ghost'}
-                                onClick={() => setLocTag(locTag === t.id ? null : t.id)}
-                            >
-                                {t.name}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                <div style={styles.listBody}>
-                    {dangTai ? (
-                        <div style={{ display: 'flex', justifyContent: 'center', padding: 20 }}>
-                            <Spinner />
-                        </div>
-                    ) : danhSach.length === 0 ? (
-                        <EmptyState
-                            icon={IconSearch}
-                            title="Không tìm thấy ghi chú"
-                            desc="Thử tạo ghi chú mới"
-                        />
-                    ) : (
-                        danhSach.map(n => (
-                            <NoteCard
-                                key={n.id}
-                                note={n}
-                                active={ghiChuHienTai?.id === n.id}
-                                onClick={() => chonGhiChu(n.id)}
-                            />
-                        ))
-                    )}
+                    ))}
                 </div>
             </div>
 
-            <div style={styles.editor}>
-                {!ghiChuHienTai ? (
-                    <div style={styles.emptyEditor}>
-                        <EmptyState
-                            icon={IconPlus}
-                            title="Chọn hoặc tạo ghi chú"
-                            action={
-                                <button className="btn-primary" onClick={taoMoi}>
-                                    <IconPlus size={13} />
-                                    Ghi chú mới
-                                </button>
-                            }
-                        />
+            <div style={styles.listBody}>
+                {dangTai ? (
+                    <div style={{ display: 'flex', justifyContent: 'center', padding: 20 }}>
+                        <Spinner />
                     </div>
+                ) : danhSach.length === 0 ? (
+                    <EmptyState
+                        icon={IconSearch}
+                        title="Không tìm thấy ghi chú"
+                        desc="Thử tạo ghi chú mới"
+                    />
                 ) : (
-                    <>
-                        <div style={styles.toolbar}>
-                            <input
-                                value={ghiChuHienTai.title}
-                                onChange={e =>
-                                    setGhiChuHienTai(p => ({
-                                        ...p,
-                                        title: e.target.value,
-                                    }))
-                                }
-                                placeholder="Tiêu đề ghi chú..."
-                                style={styles.tieuDe}
-                            />
+                    danhSach.map(n => (
+                        <NoteCard
+                            key={n.id}
+                            note={n}
+                            active={ghiChuHienTai?.id === n.id}
+                            onClick={() => chonGhiChu(n.id)}
+                        />
+                    ))
+                )}
+            </div>
+        </div>
 
-                            <div style={styles.toolbarRight}>
-                                {dangLuu && (
-                                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+        <div style={styles.editor}>
+            {!ghiChuHienTai ? (
+                <div style={styles.emptyEditor}>
+                    <EmptyState
+                        icon={IconPlus}
+                        title="Chọn hoặc tạo ghi chú"
+                        action={
+                            <button className="btn-primary" onClick={taoMoi}>
+                                <IconPlus size={13} />
+                                Ghi chú mới
+                            </button>
+                        }
+                    />
+                </div>
+            ) : (
+                <>
+                    <div style={styles.toolbar}>
+                        <input
+                            value={ghiChuHienTai.title}
+                            onChange={e =>
+                                setGhiChuHienTai(p => ({
+                                    ...p,
+                                    title: e.target.value,
+                                }))
+                            }
+                            placeholder="Tiêu đề ghi chú..."
+                            style={styles.tieuDe}
+                        />
+
+                        <div style={styles.toolbarRight}>
+                            {dangLuu && (
+                                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                                         Đang lưu...
                                     </span>
-                                )}
+                            )}
 
+                            <button
+                                className="btn-ghost"
+                                onClick={danhDau}
+                                title={ghiChuHienTai.isBookmarked ? 'Bỏ đánh dấu' : 'Đánh dấu'}
+                            >
+                                {ghiChuHienTai.isBookmarked ? (
+                                    <IconBookmarkFilled
+                                        size={14}
+                                        style={{ color: 'var(--accent-amber)' }}
+                                    />
+                                ) : (
+                                    <IconBookmark size={14} />
+                                )}
+                            </button>
+
+                            {coTinhNang('AI_FLASHCARD') && (
                                 <button
                                     className="btn-ghost"
-                                    onClick={danhDau}
-                                    title={ghiChuHienTai.isBookmarked ? 'Bỏ đánh dấu' : 'Đánh dấu'}
+                                    onClick={handleTaoFlashcard}
+                                    disabled={dangTaoFlashcard}
+                                    style={{ gap: 4 }}
+                                    title="Tạo bộ câu hỏi ôn tập chuyển trang"
                                 >
-                                    {ghiChuHienTai.isBookmarked ? (
-                                        <IconBookmarkFilled
-                                            size={14}
-                                            style={{ color: 'var(--accent-amber)' }}
-                                        />
-                                    ) : (
-                                        <IconBookmark size={14} />
-                                    )}
-                                </button>
+                                    <IconCards
+                                        size={14}
+                                        className={dangTaoFlashcard ? 'animate-spin' : ''}
+                                    />
 
-                                {coTinhNang('AI_FLASHCARD') && (
-                                    <button
-                                        className="btn-ghost"
-                                        onClick={handleTaoFlashcard}
-                                        disabled={dangTaoFlashcard}
-                                        style={{ gap: 4 }}
-                                        title="Tạo bộ câu hỏi ôn tập chuyển trang"
-                                    >
-                                        <IconCards
-                                            size={14}
-                                            className={dangTaoFlashcard ? 'animate-spin' : ''}
-                                        />
-
-                                        <span style={{ fontSize: 11 }}>
+                                    <span style={{ fontSize: 11 }}>
                                             Flashcard AI
                                         </span>
-                                    </button>
-                                )}
+                                </button>
+                            )}
 
-                                {coTinhNang('EXPORT_FILE') && (
-                                    <>
-                                        <button
-                                            className="btn-ghost"
-                                            onClick={() => taiXuongGhiChu('pdf')}
-                                            style={{ gap: 4 }}
-                                            title="Export ghi chú ra PDF"
-                                        >
-                                            <IconDownload size={14} />
-                                            <span style={{ fontSize: 11 }}>PDF</span>
-                                        </button>
-
-                                        <button
-                                            className="btn-ghost"
-                                            onClick={() => taiXuongGhiChu('docx')}
-                                            style={{ gap: 4 }}
-                                            title="Export ghi chú ra Word"
-                                        >
-                                            <IconDownload size={14} />
-                                            <span style={{ fontSize: 11 }}>Word</span>
-                                        </button>
-                                    </>
-                                )}
-
-                                {coTinhNang('TEAM_WORK') && (
+                            {coTinhNang('EXPORT_FILE') && (
+                                <>
                                     <button
-                                        className={hienShare ? 'btn-ai' : 'btn-ghost'}
-                                        onClick={() => setHienShare(p => !p)}
+                                        className="btn-ghost"
+                                        onClick={() => taiXuongGhiChu('pdf')}
                                         style={{ gap: 4 }}
-                                        title="Chia sẻ ghi chú"
+                                        title="Export ghi chú ra PDF"
                                     >
-                                        <IconShare size={14} />
-                                        <span style={{ fontSize: 11 }}>Chia sẻ</span>
+                                        <IconDownload size={14} />
+                                        <span style={{ fontSize: 11 }}>PDF</span>
                                     </button>
-                                )}
 
-                                <button
-                                    className={hienAi ? 'btn-ai' : 'btn-ghost'}
-                                    onClick={() => setHienAi(p => !p)}
-                                    title="Trợ lý AI"
-                                >
-                                    <IconSparkles size={14} />
-                                    <span style={{ fontSize: 11 }}>AI</span>
-                                </button>
+                                    <button
+                                        className="btn-ghost"
+                                        onClick={() => taiXuongGhiChu('docx')}
+                                        style={{ gap: 4 }}
+                                        title="Export ghi chú ra Word"
+                                    >
+                                        <IconDownload size={14} />
+                                        <span style={{ fontSize: 11 }}>Word</span>
+                                    </button>
+                                </>
+                            )}
 
+                            {coTinhNang('TEAM_WORK') && (
                                 <button
-                                    className={hienTag ? 'btn-ai' : 'btn-ghost'}
-                                    onClick={() => setHienTag(p => !p)}
-                                    title="Gắn tag"
+                                    className={hienShare ? 'btn-ai' : 'btn-ghost'}
+                                    onClick={() => setHienShare(p => !p)}
+                                    style={{ gap: 4 }}
+                                    title="Chia sẻ ghi chú"
                                 >
-                                    <IconTag size={14} />
-                                    <span style={{ fontSize: 11 }}>Tag</span>
+                                    <IconShare size={14} />
+                                    <span style={{ fontSize: 11 }}>Chia sẻ</span>
                                 </button>
+                            )}
 
-                                <button
-                                    className="btn-danger btn-ghost"
-                                    onClick={xoa}
-                                    title="Xoá"
-                                >
-                                    <IconTrash size={13} />
-                                </button>
+                            <button
+                                className={hienAi ? 'btn-ai' : 'btn-ghost'}
+                                onClick={() => setHienAi(p => !p)}
+                                title="Trợ lý AI"
+                            >
+                                <IconSparkles size={14} />
+                                <span style={{ fontSize: 11 }}>AI</span>
+                            </button>
 
-                                <button
-                                    className="btn-primary"
-                                    onClick={luu}
-                                    style={{
-                                        padding: '4px 12px',
-                                        fontSize: 12,
-                                    }}
-                                >
-                                    <IconCheck size={12} /> Lưu
-                                </button>
-                            </div>
+                            <button
+                                className={hienTag ? 'btn-ai' : 'btn-ghost'}
+                                onClick={() => setHienTag(p => !p)}
+                                title="Gắn tag"
+                            >
+                                <IconTag size={14} />
+                                <span style={{ fontSize: 11 }}>Tag</span>
+                            </button>
+
+                            <button
+                                className="btn-danger btn-ghost"
+                                onClick={xoa}
+                                title="Xoá"
+                            >
+                                <IconTrash size={13} />
+                            </button>
+
+                            <button
+                                className="btn-primary"
+                                onClick={luu}
+                                style={{
+                                    padding: '4px 12px',
+                                    fontSize: 12,
+                                }}
+                            >
+                                <IconCheck size={12} /> Lưu
+                            </button>
                         </div>
+                    </div>
 
-                        <div style={styles.editorBody}>
+                    <div style={styles.editorBody}>
                             <textarea
                                 value={ghiChuHienTai.content || ''}
                                 onChange={e =>
@@ -820,46 +864,46 @@ export default function GhiChu() {
                                 style={styles.textarea}
                             />
 
-                            {hienLichGoiY && (
-                                <div style={styles.schedulePrompt}>
-                                    <div style={{ fontSize: 12, marginBottom: 8 }}>
-                                        <strong>AI phát hiện thông tin thời gian.</strong>
-                                        {' '}
-                                        Bạn có muốn trích xuất lịch / công việc?
-                                    </div>
-
-                                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                        <button
-                                            className="btn-primary"
-                                            onClick={trichXuatLich}
-                                            disabled={dangTrichLich}
-                                            style={{
-                                                flex: 1,
-                                                justifyContent: 'center',
-                                                fontSize: 12,
-                                            }}
-                                        >
-                                            {dangTrichLich ? 'Đang xử lý...' : 'Có, tạo lịch'}
-                                        </button>
-
-                                        <button
-                                            className="btn-ghost"
-                                            onClick={() => setHienLichGoiY(false)}
-                                            style={{
-                                                flex: 1,
-                                                justifyContent: 'center',
-                                                fontSize: 12,
-                                            }}
-                                        >
-                                            Không, để sau
-                                        </button>
-                                    </div>
+                        {hienLichGoiY && (
+                            <div style={styles.schedulePrompt}>
+                                <div style={{ fontSize: 12, marginBottom: 8 }}>
+                                    <strong>AI phát hiện thông tin thời gian.</strong>
+                                    {' '}
+                                    Bạn có muốn trích xuất lịch / công việc?
                                 </div>
-                            )}
 
-                            {hienTag && (
-                                <div style={styles.tagPanel}>
-                                    <div style={styles.tagPanelHeader}>
+                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                    <button
+                                        className="btn-primary"
+                                        onClick={trichXuatLich}
+                                        disabled={dangTrichLich}
+                                        style={{
+                                            flex: 1,
+                                            justifyContent: 'center',
+                                            fontSize: 12,
+                                        }}
+                                    >
+                                        {dangTrichLich ? 'Đang xử lý...' : 'Có, tạo lịch'}
+                                    </button>
+
+                                    <button
+                                        className="btn-ghost"
+                                        onClick={() => setHienLichGoiY(false)}
+                                        style={{
+                                            flex: 1,
+                                            justifyContent: 'center',
+                                            fontSize: 12,
+                                        }}
+                                    >
+                                        Không, để sau
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {hienTag && (
+                            <div style={styles.tagPanel}>
+                                <div style={styles.tagPanelHeader}>
                                         <span style={styles.panelTitle}>
                                             <IconTag
                                                 size={13}
@@ -871,74 +915,74 @@ export default function GhiChu() {
                                             </span>
                                         </span>
 
-                                        <button
-                                            className="btn-ghost"
-                                            onClick={() => setHienTag(false)}
-                                            style={{ padding: 3 }}
-                                        >
-                                            <IconX size={13} />
-                                        </button>
-                                    </div>
+                                    <button
+                                        className="btn-ghost"
+                                        onClick={() => setHienTag(false)}
+                                        style={{ padding: 3 }}
+                                    >
+                                        <IconX size={13} />
+                                    </button>
+                                </div>
 
-                                    <div style={styles.tagPanelBody}>
-                                        <div style={styles.tagCreateBox}>
+                                <div style={styles.tagPanelBody}>
+                                    <div style={styles.tagCreateBox}>
+                                        <input
+                                            value={tenTagMoi}
+                                            onChange={e => setTenTagMoi(e.target.value)}
+                                            placeholder="Tên tag mới..."
+                                            style={{
+                                                fontSize: 12,
+                                                height: 30,
+                                            }}
+                                        />
+
+                                        <div style={{ display: 'flex', gap: 6 }}>
                                             <input
-                                                value={tenTagMoi}
-                                                onChange={e => setTenTagMoi(e.target.value)}
-                                                placeholder="Tên tag mới..."
-                                                style={{
-                                                    fontSize: 12,
-                                                    height: 30,
-                                                }}
+                                                type="color"
+                                                value={mauTagMoi}
+                                                onChange={e => setMauTagMoi(e.target.value)}
+                                                style={styles.colorInput}
                                             />
 
-                                            <div style={{ display: 'flex', gap: 6 }}>
-                                                <input
-                                                    type="color"
-                                                    value={mauTagMoi}
-                                                    onChange={e => setMauTagMoi(e.target.value)}
-                                                    style={styles.colorInput}
-                                                />
+                                            <button
+                                                className="btn-primary"
+                                                onClick={taoTagMoi}
+                                                style={{
+                                                    flex: 1,
+                                                    justifyContent: 'center',
+                                                    fontSize: 12,
+                                                }}
+                                            >
+                                                <IconPlus size={12} /> Tạo tag
+                                            </button>
+                                        </div>
+                                    </div>
 
-                                                <button
-                                                    className="btn-primary"
-                                                    onClick={taoTagMoi}
-                                                    style={{
-                                                        flex: 1,
-                                                        justifyContent: 'center',
-                                                        fontSize: 12,
-                                                    }}
-                                                >
-                                                    <IconPlus size={12} /> Tạo tag
-                                                </button>
-                                            </div>
+                                    <div style={styles.tagListBox}>
+                                        <div style={styles.tagSectionTitle}>
+                                            Tag hiện có
                                         </div>
 
-                                        <div style={styles.tagListBox}>
-                                            <div style={styles.tagSectionTitle}>
-                                                Tag hiện có
+                                        {tags.length === 0 ? (
+                                            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                                                Chưa có tag nào
                                             </div>
+                                        ) : (
+                                            tags.map(tag => {
+                                                const selected = ghiChuHienTai.tags?.some(t => t.id === tag.id)
 
-                                            {tags.length === 0 ? (
-                                                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                                                    Chưa có tag nào
-                                                </div>
-                                            ) : (
-                                                tags.map(tag => {
-                                                    const selected = ghiChuHienTai.tags?.some(t => t.id === tag.id)
-
-                                                    return (
-                                                        <button
-                                                            key={tag.id}
-                                                            className={selected ? 'btn-ai' : 'btn-ghost'}
-                                                            onClick={() => toggleTagChoGhiChu(tag)}
-                                                            style={{
-                                                                ...styles.tagSelectItem,
-                                                                borderColor: selected
-                                                                    ? tag.color
-                                                                    : 'var(--border)',
-                                                            }}
-                                                        >
+                                                return (
+                                                    <button
+                                                        key={tag.id}
+                                                        className={selected ? 'btn-ai' : 'btn-ghost'}
+                                                        onClick={() => toggleTagChoGhiChu(tag)}
+                                                        style={{
+                                                            ...styles.tagSelectItem,
+                                                            borderColor: selected
+                                                                ? tag.color
+                                                                : 'var(--border)',
+                                                        }}
+                                                    >
                                                             <span
                                                                 style={{
                                                                     width: 8,
@@ -949,33 +993,33 @@ export default function GhiChu() {
                                                                 }}
                                                             />
 
-                                                            <span>{tag.name}</span>
+                                                        <span>{tag.name}</span>
 
-                                                            {selected && <IconCheck size={12} />}
-                                                        </button>
-                                                    )
-                                                })
-                                            )}
-                                        </div>
-
-                                        <button
-                                            className="btn-primary"
-                                            onClick={luu}
-                                            style={{
-                                                width: '100%',
-                                                justifyContent: 'center',
-                                                fontSize: 12,
-                                            }}
-                                        >
-                                            Lưu tag cho ghi chú
-                                        </button>
+                                                        {selected && <IconCheck size={12} />}
+                                                    </button>
+                                                )
+                                            })
+                                        )}
                                     </div>
-                                </div>
-                            )}
 
-                            {hienShare && (
-                                <div style={styles.sharePanel}>
-                                    <div style={styles.sharePanelHeader}>
+                                    <button
+                                        className="btn-primary"
+                                        onClick={luu}
+                                        style={{
+                                            width: '100%',
+                                            justifyContent: 'center',
+                                            fontSize: 12,
+                                        }}
+                                    >
+                                        Lưu tag cho ghi chú
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {hienShare && (
+                            <div style={styles.sharePanel}>
+                                <div style={styles.sharePanelHeader}>
                                         <span style={styles.panelTitle}>
                                             <IconShare
                                                 size={13}
@@ -987,106 +1031,201 @@ export default function GhiChu() {
                                             </span>
                                         </span>
 
-                                        <button
-                                            className="btn-ghost"
-                                            onClick={() => setHienShare(false)}
-                                            style={{ padding: 3 }}
+                                    <button
+                                        className="btn-ghost"
+                                        onClick={() => setHienShare(false)}
+                                        style={{ padding: 3 }}
+                                    >
+                                        <IconX size={13} />
+                                    </button>
+                                </div>
+
+                                <div style={styles.sharePanelBody}>
+                                    <div style={styles.shareBox}>
+                                        <input
+                                            value={shareEmail}
+                                            onChange={e => setShareEmail(e.target.value)}
+                                            placeholder="Email người nhận..."
+                                            style={{
+                                                fontSize: 12,
+                                                height: 30,
+                                            }}
+                                        />
+
+                                        <select
+                                            value={sharePermission}
+                                            onChange={e => setSharePermission(e.target.value)}
+                                            style={styles.shareSelect}
                                         >
-                                            <IconX size={13} />
+                                            <option value="VIEW">Chỉ xem</option>
+                                            <option value="EDIT">Có thể chỉnh sửa</option>
+                                        </select>
+
+                                        <button
+                                            className="btn-primary"
+                                            onClick={chiaSeGhiChu}
+                                            disabled={dangShare}
+                                            style={{
+                                                width: '100%',
+                                                justifyContent: 'center',
+                                                fontSize: 12,
+                                            }}
+                                        >
+                                            <IconUserPlus size={12} />
+                                            {dangShare ? 'Đang chia sẻ...' : 'Chia sẻ'}
                                         </button>
                                     </div>
 
-                                    <div style={styles.sharePanelBody}>
-                                        <div style={styles.shareBox}>
-                                            <input
-                                                value={shareEmail}
-                                                onChange={e => setShareEmail(e.target.value)}
-                                                placeholder="Email người nhận..."
-                                                style={{
-                                                    fontSize: 12,
-                                                    height: 30,
-                                                }}
-                                            />
-
-                                            <select
-                                                value={sharePermission}
-                                                onChange={e => setSharePermission(e.target.value)}
-                                                style={styles.shareSelect}
-                                            >
-                                                <option value="VIEW">Chỉ xem</option>
-                                                <option value="EDIT">Có thể chỉnh sửa</option>
-                                            </select>
-
-                                            <button
-                                                className="btn-primary"
-                                                onClick={chiaSeGhiChu}
-                                                disabled={dangShare}
-                                                style={{
-                                                    width: '100%',
-                                                    justifyContent: 'center',
-                                                    fontSize: 12,
-                                                }}
-                                            >
-                                                <IconUserPlus size={12} />
-                                                {dangShare ? 'Đang chia sẻ...' : 'Chia sẻ'}
-                                            </button>
+                                    <div style={styles.shareListBox}>
+                                        <div style={styles.tagSectionTitle}>
+                                            Đã chia sẻ
                                         </div>
 
-                                        <div style={styles.shareListBox}>
-                                            <div style={styles.tagSectionTitle}>
-                                                Đã chia sẻ
+                                        {shareList.length === 0 ? (
+                                            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                                                Chưa chia sẻ cho ai
                                             </div>
-
-                                            {shareList.length === 0 ? (
-                                                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                                                    Chưa chia sẻ cho ai
-                                                </div>
-                                            ) : (
-                                                shareList.map(item => (
-                                                    <div key={item.id} style={styles.shareItem}>
-                                                        <div style={{ flex: 1, overflow: 'hidden' }}>
-                                                            <div style={styles.shareEmail}>
-                                                                {item.sharedWithEmail}
-                                                            </div>
-
-                                                            <div style={styles.shareMeta}>
-                                                                {item.permission === 'EDIT'
-                                                                    ? 'Có thể chỉnh sửa'
-                                                                    : 'Chỉ xem'}
-                                                            </div>
+                                        ) : (
+                                            shareList.map(item => (
+                                                <div key={item.id} style={styles.shareItem}>
+                                                    <div style={{ flex: 1, overflow: 'hidden' }}>
+                                                        <div style={styles.shareEmail}>
+                                                            {item.sharedWithEmail}
                                                         </div>
 
-                                                        <button
-                                                            className="btn-ghost"
-                                                            onClick={() => huyChiaSe(item.id)}
-                                                            style={{ padding: 4 }}
-                                                            title="Hủy chia sẻ"
-                                                        >
-                                                            <IconX size={12} />
-                                                        </button>
+                                                        <div style={styles.shareMeta}>
+                                                            {item.permission === 'EDIT'
+                                                                ? 'Có thể chỉnh sửa'
+                                                                : 'Chỉ xem'}
+                                                        </div>
                                                     </div>
-                                                ))
-                                            )}
-                                        </div>
+
+                                                    <button
+                                                        className="btn-ghost"
+                                                        onClick={() => huyChiaSe(item.id)}
+                                                        style={{ padding: 4 }}
+                                                        title="Hủy chia sẻ"
+                                                    >
+                                                        <IconX size={12} />
+                                                    </button>
+                                                </div>
+                                            ))
+                                        )}
                                     </div>
                                 </div>
-                            )}
+                            </div>
+                        )}
 
-                            {hienAi && (
-                                <AiPanel
-                                    noteId={ghiChuHienTai.id}
-                                    content={ghiChuHienTai.content}
-                                    title={ghiChuHienTai.title}
-                                    onApply={apDungAi}
-                                    onDong={() => setHienAi(false)}
-                                />
-                            )}
-                        </div>
-                    </>
-                )}
-            </div>
+                        {hienAi && (
+                            <AiPanel
+                                noteId={ghiChuHienTai.id}
+                                content={ghiChuHienTai.content}
+                                title={ghiChuHienTai.title}
+                                onApply={apDungAi}
+                                onDong={() => setHienAi(false)}
+                            />
+                        )}
+                    </div>
+                </>
+            )}
         </div>
-    )
+
+        {hienChecklistModal && (
+            <div style={styles.modalBackdrop}>
+                <div style={styles.checklistModal}>
+                    <div style={styles.modalHeader}>
+                        <div>
+                            <div style={styles.modalTitle}>
+                                Tạo task từ checklist AI
+                            </div>
+
+                            <div style={styles.modalSubtitle}>
+                                Chọn deadline và mức ưu tiên trước khi lưu vào Lịch.
+                            </div>
+                        </div>
+
+                        <button
+                            className="btn-ghost"
+                            onClick={() => setHienChecklistModal(false)}
+                            style={{ padding: 4 }}
+                        >
+                            <IconX size={14} />
+                        </button>
+                    </div>
+
+                    <div style={styles.modalBody}>
+                        <div style={styles.checklistPreview}>
+                            <div style={styles.modalSectionTitle}>
+                                Danh sách task sẽ tạo
+                            </div>
+
+                            {checklistItems.map((item, index) => (
+                                <div key={`${item}-${index}`} style={styles.checklistPreviewItem}>
+                                        <span style={styles.checkIndex}>
+                                            {index + 1}
+                                        </span>
+
+                                    <span>{item}</span>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div style={styles.modalForm}>
+                            <label style={styles.modalLabel}>
+                                Deadline
+
+                                <input
+                                    type="date"
+                                    value={checklistDeadline}
+                                    min={homNayIso()}
+                                    onChange={e => setChecklistDeadline(e.target.value)}
+                                    style={styles.modalInput}
+                                />
+                            </label>
+
+                            <div style={styles.modalHint}>
+                                Để trống nếu task chưa có deadline.
+                            </div>
+
+                            <label style={styles.modalLabel}>
+                                Mức ưu tiên
+
+                                <select
+                                    value={checklistPriority}
+                                    onChange={e => setChecklistPriority(e.target.value)}
+                                    style={styles.modalInput}
+                                >
+                                    <option value="LOW">Thấp</option>
+                                    <option value="MEDIUM">Vừa</option>
+                                    <option value="HIGH">Cao</option>
+                                    <option value="URGENT">Khẩn</option>
+                                </select>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div style={styles.modalFooter}>
+                        <button
+                            className="btn-ghost"
+                            onClick={() => setHienChecklistModal(false)}
+                            disabled={dangTaoChecklistTask}
+                        >
+                            Hủy
+                        </button>
+
+                        <button
+                            className="btn-primary"
+                            onClick={xacNhanTaoTaskTuChecklist}
+                            disabled={dangTaoChecklistTask}
+                        >
+                            {dangTaoChecklistTask ? 'Đang tạo...' : 'Tạo task'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+    </div>
+)
 }
 
 const styles = {
@@ -1325,5 +1464,122 @@ const styles = {
         fontSize: 10,
         color: 'var(--text-muted)',
         marginTop: 2,
+    },
+    modalBackdrop: {
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.45)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: 16,
+    },
+    checklistModal: {
+        width: 520,
+        maxWidth: '100%',
+        maxHeight: '90vh',
+        overflow: 'hidden',
+        background: 'var(--bg-surface)',
+        border: '.5px solid var(--border)',
+        borderRadius: 14,
+        boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
+        display: 'flex',
+        flexDirection: 'column',
+    },
+    modalHeader: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        gap: 12,
+        padding: 16,
+        borderBottom: '.5px solid var(--border)',
+    },
+    modalTitle: {
+        fontSize: 15,
+        fontWeight: 700,
+        color: 'var(--text-primary)',
+    },
+    modalSubtitle: {
+        fontSize: 12,
+        color: 'var(--text-muted)',
+        marginTop: 4,
+        lineHeight: 1.5,
+    },
+    modalBody: {
+        padding: 16,
+        overflowY: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 14,
+    },
+    modalSectionTitle: {
+        fontSize: 11,
+        textTransform: 'uppercase',
+        letterSpacing: '0.05em',
+        color: 'var(--text-muted)',
+        marginBottom: 8,
+    },
+    checklistPreview: {
+        background: 'var(--bg-elevated)',
+        border: '.5px solid var(--border)',
+        borderRadius: 8,
+        padding: 10,
+    },
+    checklistPreviewItem: {
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 8,
+        fontSize: 12,
+        color: 'var(--text-secondary)',
+        padding: '5px 0',
+        lineHeight: 1.5,
+    },
+    checkIndex: {
+        width: 18,
+        height: 18,
+        borderRadius: '50%',
+        background: 'var(--bg-ai)',
+        color: 'var(--accent-blue-dim)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 10,
+        fontWeight: 700,
+        flexShrink: 0,
+    },
+    modalForm: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+    },
+    modalLabel: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 6,
+        fontSize: 12,
+        color: 'var(--text-secondary)',
+        fontWeight: 500,
+    },
+    modalInput: {
+        height: 34,
+        fontSize: 12,
+        border: '.5px solid var(--border)',
+        borderRadius: 8,
+        background: 'var(--bg-elevated)',
+        color: 'var(--text-primary)',
+        padding: '0 10px',
+    },
+    modalHint: {
+        fontSize: 11,
+        color: 'var(--text-muted)',
+        marginTop: -4,
+    },
+    modalFooter: {
+        display: 'flex',
+        justifyContent: 'flex-end',
+        gap: 8,
+        padding: 16,
+        borderTop: '.5px solid var(--border)',
     },
 }

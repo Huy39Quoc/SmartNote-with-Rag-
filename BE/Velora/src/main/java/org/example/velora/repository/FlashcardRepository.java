@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Repository
-public interface FlashcardRepository extends JpaRepository<Flashcard, Long> {
+public interface FlashcardRepository extends JpaRepository<Flashcard, String> {
 
     List<Flashcard> findByNoteId(UUID noteId);
 
