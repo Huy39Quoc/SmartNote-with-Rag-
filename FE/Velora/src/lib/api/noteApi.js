@@ -16,6 +16,18 @@ const noteApi = {
     xuatWord:   (id)         => client.get(`/notes/${id}/export/docx`, {
         responseType: 'blob',
     }),
+
+    chiaSe: (noteId, data) =>
+        client.post(`/note-shares/notes/${noteId}`, data),
+
+    layDanhSachChiaSe: (noteId) =>
+        client.get(`/note-shares/notes/${noteId}`),
+
+    huyChiaSe: (shareId) =>
+        client.delete(`/note-shares/${shareId}`),
+
+    layGhiChuDuocChiaSe: () =>
+        client.get('/note-shares/shared-with-me'),
 }
 
 export default noteApi

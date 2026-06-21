@@ -26,7 +26,8 @@ import org.example.velora.client.ChromaDbClient;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-
+import org.example.velora.entity.NoteShare;
+import org.example.velora.repository.NoteShareRepository;
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -39,6 +40,8 @@ public class NoteServiceImpl implements NoteService {
     private final NoteMapper noteMapper;
     private final ChromaDbClient chromaDbClient;
     private final PackageValidationService packageValidationService;
+    private final NoteShareRepository noteShareRepository;
+
     @Override
     public NoteResponse.Detail create(UUID userId, NoteRequest.Create req) {
         User user = userRepository.findById(userId)
@@ -66,7 +69,7 @@ public class NoteServiceImpl implements NoteService {
 
     @Override
     public NoteResponse.Detail update(UUID userId, UUID noteId, NoteRequest.Update req) {
-        Note note = getNote(userId, noteId);
+        Note note = getEditableNote(userId, noteId);
 
         if (StringUtils.hasText(req.getTitle())) {
             note.setTitle(req.getTitle());
@@ -90,7 +93,7 @@ public class NoteServiceImpl implements NoteService {
 
     @Override
     public void delete(UUID userId, UUID noteId) {
-        Note note = getNote(userId, noteId);
+        Note note = getOwnedNote(userId, noteId);
         chromaDbClient.delete(note.getId().toString());
         noteRepository.delete(note);
     }
@@ -125,7 +128,7 @@ public class NoteServiceImpl implements NoteService {
     @Override
     @Transactional(readOnly = true)
     public NoteResponse.Detail getById(UUID userId, UUID noteId) {
-        return noteMapper.toDetail(getNote(userId, noteId));
+        return noteMapper.toDetail(getAccessibleNote(userId, noteId));
     }
 
     @Override
@@ -164,7 +167,7 @@ public class NoteServiceImpl implements NoteService {
 
     @Override
     public NoteResponse.Detail toggleBookmark(UUID userId, UUID noteId) {
-        Note note = getNote(userId, noteId);
+        Note note = getOwnedNote(userId, noteId);
         note.setIsBookmarked(!note.getIsBookmarked());
         return noteMapper.toDetail(noteRepository.save(note));
     }
@@ -176,18 +179,54 @@ public class NoteServiceImpl implements NoteService {
             packageValidationService.validateFeatureAccess(user, "CHECKLIST_BASIC");
         }
         packageValidationService.validateAiUsage(user, "AI_NOTE_FORMAT");
-        getNote(userId, noteId);
+        getEditableNote(userId, noteId);
         NoteResponse.AiResult result = aiService.improveNote(req.getContent(), req.getTitle(), req.getAction());
         packageValidationService.incrementAiUsage(user);
 
         return result;
     }
 
-    private Note getNote(UUID userId, UUID noteId) {
+    private Note getOwnedNote(UUID userId, UUID noteId) {
         Note note = noteRepository.findById(noteId)
-            .orElseThrow(() -> new ResourceNotFoundException("Ghi chú không tồn tại"));
-        if (!note.getUser().getId().equals(userId))
+                .orElseThrow(() -> new ResourceNotFoundException("Ghi chú không tồn tại"));
+
+        if (note.getUser() == null || !note.getUser().getId().equals(userId)) {
             throw new ResourceNotFoundException("Ghi chú không tồn tại");
+        }
+
+        return note;
+    }
+
+    private Note getAccessibleNote(UUID userId, UUID noteId) {
+        Note note = noteRepository.findById(noteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ghi chú không tồn tại"));
+
+        if (note.getUser() != null && note.getUser().getId().equals(userId)) {
+            return note;
+        }
+
+        if (noteShareRepository.existsByNoteIdAndSharedWithId(noteId, userId)) {
+            return note;
+        }
+
+        throw new ResourceNotFoundException("Ghi chú không tồn tại");
+    }
+
+    private Note getEditableNote(UUID userId, UUID noteId) {
+        Note note = noteRepository.findById(noteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ghi chú không tồn tại"));
+
+        if (note.getUser() != null && note.getUser().getId().equals(userId)) {
+            return note;
+        }
+
+        NoteShare share = noteShareRepository.findByNoteIdAndSharedWithId(noteId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ghi chú không tồn tại"));
+
+        if (share.getPermission() != NoteShare.Permission.EDIT) {
+            throw new BadRequestException("Bạn không có quyền chỉnh sửa ghi chú này");
+        }
+
         return note;
     }
 
