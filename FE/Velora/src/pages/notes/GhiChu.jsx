@@ -9,6 +9,7 @@ import {
     IconSparkles,
     IconTag,
     IconTrash,
+    IconDownload,
     IconX,
     IconCards // Icon đại diện cho Flashcard
 } from '@tabler/icons-react'
@@ -79,6 +80,54 @@ export default function GhiChu() {
             setGhiChuHienTai(data.data)
             navigate(`/ghi-chu/${id}`, { replace: true })
         } catch {}
+    }
+
+    const taiXuongGhiChu = async (format) => {
+        if (!coTinhNang('EXPORT_FILE')) {
+            toast.error(getUpgradeMessage('EXPORT_FILE'))
+            navigate('/goi-dich-vu')
+            return
+        }
+
+        if (!ghiChuHienTai?.id) {
+            toast.error('Chưa chọn ghi chú để export')
+            return
+        }
+
+        try {
+            const response = format === 'pdf'
+                ? await noteApi.xuatPdf(ghiChuHienTai.id)
+                : await noteApi.xuatWord(ghiChuHienTai.id)
+
+            const blob = new Blob([response.data], {
+                type: response.headers['content-type'] || 'application/octet-stream',
+            })
+
+            const contentDisposition = response.headers['content-disposition']
+            let fileName = `${ghiChuHienTai.title || 'ghi-chu'}.${format === 'pdf' ? 'pdf' : 'docx'}`
+
+            if (contentDisposition) {
+                const match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/)
+                if (match?.[1]) {
+                    fileName = decodeURIComponent(match[1])
+                }
+            }
+
+            const url = window.URL.createObjectURL(blob)
+            const a = document.createElement('a')
+
+            a.href = url
+            a.download = fileName
+            document.body.appendChild(a)
+            a.click()
+
+            a.remove()
+            window.URL.revokeObjectURL(url)
+
+            toast.success(`Đã export ${format.toUpperCase()}`)
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Không thể export ghi chú')
+        }
     }
 
     // --- HÀM XỬ LÝ GENERATE VÀ CHUYỂN TRANG FLASHCARD AI ---
@@ -343,7 +392,29 @@ export default function GhiChu() {
                                         <span style={{ fontSize: 11 }}>Flashcard AI</span>
                                     </button>
                                 )}
+                                {coTinhNang('EXPORT_FILE') && (
+                                    <>
+                                        <button
+                                            className="btn-ghost"
+                                            onClick={() => taiXuongGhiChu('pdf')}
+                                            style={{ gap: 4 }}
+                                            title="Export ghi chú ra PDF"
+                                        >
+                                            <IconDownload size={14} />
+                                            <span style={{ fontSize: 11 }}>PDF</span>
+                                        </button>
 
+                                        <button
+                                            className="btn-ghost"
+                                            onClick={() => taiXuongGhiChu('docx')}
+                                            style={{ gap: 4 }}
+                                            title="Export ghi chú ra Word"
+                                        >
+                                            <IconDownload size={14} />
+                                            <span style={{ fontSize: 11 }}>Word</span>
+                                        </button>
+                                    </>
+                                )}
                                 <button className={hienAi ? 'btn-ai' : 'btn-ghost'} onClick={() => setHienAi(p => !p)} title="Trợ lý AI">
                                     <IconSparkles size={14} /><span style={{ fontSize: 11 }}>AI</span>
                                 </button>

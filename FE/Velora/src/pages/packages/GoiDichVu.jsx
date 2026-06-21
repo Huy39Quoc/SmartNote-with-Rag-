@@ -484,9 +484,19 @@ function UsageItem({ label, value, percent }) {
 
 const styles = {
     page: {
+        width: '100%',
+        height: '100%',
+        minHeight: 0,
+        overflowY: 'auto',
+        overflowX: 'hidden',
         padding: '24px',
+        boxSizing: 'border-box',
+    },
+
+    inner: {
         maxWidth: '1200px',
         margin: '0 auto',
+        paddingBottom: '48px',
     },
     title: {
         fontSize: '22px',
@@ -684,6 +694,9 @@ const styles = {
         display: 'flex',
         flexDirection: 'column',
         gap: '6px',
+        maxHeight: 180,
+        overflowY: 'auto',
+        paddingRight: 4,
     },
     featureLi: {
         fontSize: '12px',
@@ -707,6 +720,7 @@ const styles = {
     },
     compareSection: {
         marginTop: 34,
+        marginBottom: 40,
         background: 'var(--bg-surface)',
         border: '0.5px solid var(--border)',
         borderRadius: 16,
