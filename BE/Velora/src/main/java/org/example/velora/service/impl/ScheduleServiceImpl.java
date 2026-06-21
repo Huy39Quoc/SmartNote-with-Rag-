@@ -119,9 +119,18 @@ public class ScheduleServiceImpl implements ScheduleService {
     public ScheduleResponse.ExtractResult extractFromNote(UUID userId, ScheduleRequest.ExtractFromNote req) {
         User user = getUser(userId);
 
-        Note note = req.getNoteId() != null
-                ? noteRepository.findById(req.getNoteId()).orElse(null)
-                : null;
+        Note note = null;
+
+        if (req.getNoteId() != null) {
+            note = noteRepository.findById(req.getNoteId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Ghi chú không tồn tại"));
+
+            if (note.getUser() == null || !note.getUser().getId().equals(userId)) {
+                throw new ResourceNotFoundException("Ghi chú không tồn tại");
+            }
+        }
+
+        final Note finalNote = note;
 
         ScheduleResponse.ExtractResult result = aiService.extractSchedules(req.getContent());
 
@@ -134,11 +143,11 @@ public class ScheduleServiceImpl implements ScheduleService {
                 .filter(item -> item.getDeadline() != null)
                 .filter(item -> !item.getDeadline().isBefore(LocalDate.now()))
                 .filter(item -> {
-                    if (note == null) return true;
+                    if (finalNote == null) return true;
 
                     return !scheduleRepository.existsByUserIdAndNoteIdAndTaskNameAndDeadline(
                             userId,
-                            note.getId(),
+                            finalNote.getId(),
                             item.getTaskName(),
                             item.getDeadline()
                     );
@@ -146,7 +155,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                 .map(item -> {
                     Schedule s = Schedule.builder()
                             .user(user)
-                            .note(note)
+                            .note(finalNote)
                             .taskName(item.getTaskName())
                             .deadline(item.getDeadline())
                             .priority(item.getPriority() != null ? item.getPriority() : Schedule.Priority.MEDIUM)

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
     IconFileText,
     IconMusic,
@@ -6,6 +7,7 @@ import {
     IconSparkles,
     IconMessages,
     IconFile,
+    IconCards,
 } from '@tabler/icons-react'
 import documentApi from '../../lib/api/documentApi'
 import scheduleApi from '../../lib/api/scheduleApi'
@@ -15,6 +17,7 @@ import EmptyState from '../../components/ui/EmptyState'
 import toast from 'react-hot-toast'
 import useAuthStore from '../../service/authStore'
 import { hasFeature, getUpgradeMessage } from '../../utils/packageFeatures'
+import flashcardApi from '../../lib/api/flashcardApi'
 
 const TRANG_THAI = {
     PENDING: { nhan: 'Chờ xử lý', mau: 'var(--text-muted)' },
@@ -25,7 +28,7 @@ const TRANG_THAI = {
 
 export default function TaiLieu() {
     const { nguoiDung } = useAuthStore()
-
+    const navigate = useNavigate()
     const [danhSach, setDanhSach] = useState([])
     const [chon, setChon] = useState(null)
     const [dangTai, setDangTai] = useState(true)
@@ -41,6 +44,8 @@ export default function TaiLieu() {
     const coAiAnalyze = hasFeature(nguoiDung, 'AI_ANALYZE')
     const coAiChat = hasFeature(nguoiDung, 'AI_CHAT')
     const coExtractSchedule = hasFeature(nguoiDung, 'EXTRACT_SCHEDULE')
+    const coAiFlashcard = hasFeature(nguoiDung, 'AI_FLASHCARD')
+    const [dangTaoFlashcard, setDangTaoFlashcard] = useState(false)
 
     const tai = async () => {
         setDangTai(true)
@@ -153,6 +158,52 @@ export default function TaiLieu() {
             toast.error(error.response?.data?.message || 'Phân tích âm thanh thất bại')
         } finally {
             setDangXuLyAi(false)
+        }
+    }
+
+
+
+    const taoFlashcardTuTaiLieu = async () => {
+        if (!coAiFlashcard) {
+            toast.error(getUpgradeMessage('AI_FLASHCARD'))
+            return
+        }
+
+        if (!chon || chon.status !== 'DONE') {
+            toast.error('Tài liệu chưa xử lý xong')
+            return
+        }
+
+        setDangTaoFlashcard(true)
+
+        const toastId = toast.loading('AI đang tạo flashcard từ tài liệu...')
+
+        try {
+            const { data } = await flashcardApi.generateFromDocument(chon.id)
+            const result = data.data || data
+
+            const total = result.total || result.cards?.length || 0
+
+            if (total <= 0) {
+                toast.error('AI chưa tìm thấy đủ nội dung để tạo flashcard', {
+                    id: toastId,
+                })
+                return
+            }
+
+            toast.success(`Đã tạo ${total} flashcard từ tài liệu`, {
+                id: toastId,
+            })
+
+            if (result.noteId) {
+                navigate(`/ghi-chu/${result.noteId}/flashcards`)
+            }
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Không thể tạo flashcard từ tài liệu', {
+                id: toastId,
+            })
+        } finally {
+            setDangTaoFlashcard(false)
         }
     }
 
@@ -389,6 +440,18 @@ export default function TaiLieu() {
                                         </button>
                                     )}
                                 </div>
+                            )}
+                            {chon.status === 'DONE' && coAiFlashcard && (
+                                <button
+                                    className="btn-ghost"
+                                    onClick={taoFlashcardTuTaiLieu}
+                                    disabled={dangTaoFlashcard}
+                                    style={{ gap: 4 }}
+                                    title="Tạo flashcard từ tài liệu"
+                                >
+                                    <IconCards size={13} className={dangTaoFlashcard ? 'animate-spin' : ''} />
+                                    {dangTaoFlashcard ? 'Đang tạo...' : 'Flashcard AI'}
+                                </button>
                             )}
 
                             {chon.status === 'DONE' && !coAiAnalyze && (
