@@ -21,15 +21,28 @@ public interface ScheduleRepository extends JpaRepository<Schedule, UUID> {
             @Param("uid")  UUID userId,
             @Param("from") LocalDate from,
             @Param("to")   LocalDate to,
-            @Param("done") Boolean done);
+            @Param("done") Boolean done
+    );
 
     @Query("SELECT s FROM Schedule s WHERE s.user.id = :uid AND s.deadline < :today AND s.isDone = :done")
     List<Schedule> findOverdue(
             @Param("uid")   UUID userId,
             @Param("today") LocalDate today,
-            @Param("done")  Boolean done);
+            @Param("done")  Boolean done
+    );
+
+    long countByUserId(UUID userId);
+
+    long countByUserIdAndIsDoneTrue(UUID userId);
 
     long countByUserIdAndIsDoneFalse(UUID userId);
+
+    long countByUserIdAndIsDoneFalseAndDeadlineBefore(UUID userId, LocalDate today);
+
+    long countByUserIdAndIsDoneFalseAndDeadlineBetween(UUID userId, LocalDate from, LocalDate to);
+
+    long countByUserIdAndDeadlineIsNull(UUID userId);
+
     List<Schedule> findByIsDoneFalseAndDeadlineBetweenOrderByDeadlineAsc(
             LocalDate from,
             LocalDate to
@@ -38,6 +51,7 @@ public interface ScheduleRepository extends JpaRepository<Schedule, UUID> {
     List<Schedule> findByIsDoneFalseAndDeadlineBeforeOrderByDeadlineAsc(
             LocalDate today
     );
+
     boolean existsByUserIdAndNoteIdAndTaskNameAndDeadline(
             UUID userId,
             UUID noteId,

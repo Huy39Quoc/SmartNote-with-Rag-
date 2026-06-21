@@ -6,7 +6,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,4 +27,6 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 
     @Query("SELECT COALESCE(SUM(d.fileSize), 0) FROM Document d WHERE d.user.id = :userId")
     Long sumFileSizeByUserId(@Param("userId") UUID userId);
+
+    long countByUserIdAndUploadedAtAfter(UUID userId, LocalDateTime from);
 }
