@@ -18,6 +18,9 @@ export default function DangKy() {
     else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Email không hợp lệ'
     if (!form.matKhau)  e.matKhau = 'Vui lòng nhập mật khẩu'
     else if (form.matKhau.length < 6) e.matKhau = 'Mật khẩu ít nhất 6 ký tự'
+    else if (form.matKhau !== form.matKhau.trim()) {
+        e.matKhau = 'Mật khẩu không được bắt đầu hoặc kết thúc bằng khoảng trắng'
+    }
     if (form.xacNhan !== form.matKhau) e.xacNhan = 'Mật khẩu không khớp'
     return e
   }

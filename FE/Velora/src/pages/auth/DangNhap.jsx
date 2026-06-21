@@ -24,13 +24,18 @@ export default function DangNhap() {
     return e
   }
 
-  const xuLyDangNhap = async e => {
-    e.preventDefault()
-    const err = validate()
-    if (Object.keys(err).length) { setLoi(err); return }
-    const ok = await dangNhap(form.email, form.matKhau)
-    if (ok) navigate('/ghi-chu')
-  }
+    const xuLyDangNhap = async e => {
+        e.preventDefault()
+
+        const err = validate()
+        if (Object.keys(err).length) {
+            setLoi(err)
+            return
+        }
+
+        const ok = await dangNhap(form.email.trim().toLowerCase(), form.matKhau)
+        if (ok) navigate('/ghi-chu')
+    }
 
   return (
     <div style={styles.wrap}>

@@ -31,16 +31,34 @@ export default function Lich() {
   }
   useEffect(() => { tai() }, [])
 
-  const taoMoi = async () => {
-    if (!form.taskName.trim()) { toast.error('Nhập tên công việc'); return }
-    try {
-      await scheduleApi.taoMoi({ taskName: form.taskName, deadline: form.deadline || null, priority: form.priority })
-      toast.success('Đã thêm công việc')
-      setForm({ taskName: '', deadline: '', priority: 'MEDIUM' })
-      setHienForm(false)
-      tai()
-    } catch { toast.error('Thêm thất bại') }
-  }
+    const taoMoi = async () => {
+        const taskName = form.taskName.trim()
+
+        if (!taskName) {
+            toast.error('Nhập tên công việc')
+            return
+        }
+
+        if (form.deadline && form.deadline < homNay) {
+            toast.error('Không được đặt deadline trong quá khứ')
+            return
+        }
+
+        try {
+            await scheduleApi.taoMoi({
+                taskName,
+                deadline: form.deadline || null,
+                priority: form.priority,
+            })
+
+            toast.success('Đã thêm công việc')
+            setForm({ taskName: '', deadline: '', priority: 'MEDIUM' })
+            setHienForm(false)
+            tai()
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Thêm thất bại')
+        }
+    }
 
   const hoanThanh = async (id) => {
     try {
@@ -70,6 +88,8 @@ export default function Lich() {
     if (!ngay) return null
     return new Date(ngay).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
   }
+
+    const homNay = new Date().toISOString().slice(0, 10)
 
   const tatCaTask = Object.values(nhomTask).flat()
 
@@ -102,9 +122,13 @@ export default function Lich() {
               <input placeholder="Tên công việc *" value={form.taskName}
                 onChange={e => setForm(p => ({ ...p, taskName: e.target.value }))}
                 style={{ fontSize: 12 }} />
-              <input type="date" value={form.deadline}
-                onChange={e => setForm(p => ({ ...p, deadline: e.target.value }))}
-                style={{ fontSize: 12 }} />
+                <input
+                    type="date"
+                    value={form.deadline}
+                    min={homNay}
+                    onChange={e => setForm(p => ({ ...p, deadline: e.target.value }))}
+                    style={{ fontSize: 12 }}
+                />
               <select value={form.priority} onChange={e => setForm(p => ({ ...p, priority: e.target.value }))}
                 style={{ fontSize: 12 }}>
                 <option value="LOW">Thấp</option>
