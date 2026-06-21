@@ -35,9 +35,16 @@ public class ScheduleServiceImpl implements ScheduleService {
 
         User user = getUser(userId);
 
-        Note note = req.getNoteId() != null
-                ? noteRepository.findById(req.getNoteId()).orElse(null)
-                : null;
+        Note note = null;
+
+        if (req.getNoteId() != null) {
+            note = noteRepository.findById(req.getNoteId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Ghi chú không tồn tại"));
+
+            if (note.getUser() == null || !note.getUser().getId().equals(userId)) {
+                throw new ResourceNotFoundException("Ghi chú không tồn tại");
+            }
+        }
 
         Schedule s = Schedule.builder()
                 .user(user)

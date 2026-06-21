@@ -88,12 +88,16 @@ export default function AiPanel({ noteId, content, title, onApply, onDong }) {
         }
     }
 
-    const apDung = () => {
+    const apDung = async () => {
         if (!ketQua) return
 
-        onApply?.(ketQua)
-        onDong?.()
-        toast.success('Đã áp dụng gợi ý AI')
+        try {
+            await onApply?.(ketQua)
+            onDong?.()
+            toast.success('Đã áp dụng gợi ý AI')
+        } catch (error) {
+            toast.error(error?.message || 'Không thể áp dụng gợi ý AI')
+        }
     }
 
     const boQua = () => {

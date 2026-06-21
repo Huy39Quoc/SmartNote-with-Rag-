@@ -214,21 +214,74 @@ export default function GhiChu() {
         } catch {}
     }
 
-    const apDungAi = (ketQua) => {
-        if (!ketQua) return
+    const apDungAi = async (ketQua) => {
+        if (!ketQua || !ghiChuHienTai) return
+
+        if (ketQua.checklist?.length > 0) {
+            if (!coTinhNang('CHECKLIST_BASIC')) {
+                toast.error(getUpgradeMessage('CHECKLIST_BASIC'))
+                navigate('/goi-dich-vu')
+                return
+            }
+
+            const danhSachTask = ketQua.checklist
+                .map(item => typeof item === 'string' ? item.trim() : '')
+                .filter(Boolean)
+
+            if (danhSachTask.length === 0) {
+                toast.error('Checklist không có nội dung hợp lệ')
+                return
+            }
+
+            const toastId = toast.loading('Đang tạo task từ checklist AI...')
+
+            try {
+                await Promise.all(
+                    danhSachTask.map(taskName =>
+                        scheduleApi.taoMoi({
+                            taskName,
+                            description: `Tạo từ checklist AI của ghi chú: ${ghiChuHienTai.title || 'Không có tiêu đề'}`,
+                            deadline: null,
+                            priority: 'MEDIUM',
+                            noteId: ghiChuHienTai.id,
+                        })
+                    )
+                )
+
+                toast.success(`Đã tạo ${danhSachTask.length} task từ checklist AI`, {
+                    id: toastId,
+                })
+
+                return
+            } catch (error) {
+                toast.error(error.response?.data?.message || 'Không thể tạo task từ checklist AI', {
+                    id: toastId,
+                })
+                throw error
+            }
+        }
+
         setGhiChuHienTai(p => {
             if (!p) return p
+
             let noiDungMoi = p.content || ''
             let tieuDeMoi = p.title
-            if (ketQua.suggestedTitle) tieuDeMoi = ketQua.suggestedTitle
+
+            if (ketQua.suggestedTitle) {
+                tieuDeMoi = ketQua.suggestedTitle
+            }
+
             if (ketQua.improvedContent) {
                 noiDungMoi = ketQua.improvedContent
             } else if (ketQua.summary) {
                 noiDungMoi = noiDungMoi.trim() + '\n\n---\n\n## AI Summary\n' + ketQua.summary
-            } else if (ketQua.checklist?.length > 0) {
-                noiDungMoi = noiDungMoi.trim() + '\n\n---\n\n## AI Checklist\n' + ketQua.checklist.map(item => `- [ ] ${item}`).join('\n')
             }
-            return { ...p, title: tieuDeMoi, content: noiDungMoi }
+
+            return {
+                ...p,
+                title: tieuDeMoi,
+                content: noiDungMoi,
+            }
         })
     }
 
