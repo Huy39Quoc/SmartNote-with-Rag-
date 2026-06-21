@@ -4,7 +4,7 @@ import org.example.velora.entity.Schedule;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
-
+import jakarta.validation.constraints.FutureOrPresent;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -18,6 +18,7 @@ public class ScheduleRequest {
 
         private String description;
 
+        @FutureOrPresent(message = "Deadline không được nằm trong quá khứ")
         private LocalDate deadline;
 
         private Schedule.Priority priority = Schedule.Priority.MEDIUM;
@@ -32,6 +33,7 @@ public class ScheduleRequest {
 
         private String description;
 
+        @FutureOrPresent(message = "Deadline không được nằm trong quá khứ")
         private LocalDate deadline;
 
         private Schedule.Priority priority;

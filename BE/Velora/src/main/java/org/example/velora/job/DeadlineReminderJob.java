@@ -62,18 +62,13 @@ public class DeadlineReminderJob {
         String title = buildTitle(task, today);
         String message = buildMessage(task, today);
 
-        LocalDateTime startOfToday = today.atStartOfDay();
-        LocalDateTime startOfTomorrow = today.plusDays(1).atStartOfDay();
-
-        boolean existedToday = notificationRepository.existsByUserIdAndTitleAndMessageAndCreatedAtBetween(
+        boolean existed = notificationRepository.existsByUserIdAndTitleAndMessage(
                 task.getUser().getId(),
                 title,
-                message,
-                startOfToday,
-                startOfTomorrow
+                message
         );
 
-        if (existedToday) {
+        if (existed) {
             return false;
         }
 

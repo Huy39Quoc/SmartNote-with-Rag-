@@ -120,11 +120,32 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void changePassword(String email, AuthRequest.ChangePassword req) {
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        if (!passwordEncoder.matches(req.getOldPassword(), user.getPasswordHash())) {
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        String oldPassword = req.getOldPassword();
+        String newPassword = req.getNewPassword();
+
+        if (newPassword == null || newPassword.isBlank()) {
+            throw new BadRequestException("Mật khẩu mới không được để trống");
+        }
+
+        if (!newPassword.equals(newPassword.trim())) {
+            throw new BadRequestException("Mật khẩu mới không được bắt đầu hoặc kết thúc bằng khoảng trắng");
+        }
+
+        if (newPassword.length() < 6 || newPassword.length() > 100) {
+            throw new BadRequestException("Mật khẩu mới phải từ 6–100 ký tự");
+        }
+
+        if (!passwordEncoder.matches(oldPassword, user.getPasswordHash())) {
             throw new BadRequestException("Mật khẩu cũ không đúng");
         }
-        user.setPasswordHash(passwordEncoder.encode(req.getNewPassword()));
+
+        if (passwordEncoder.matches(newPassword, user.getPasswordHash())) {
+            throw new BadRequestException("Mật khẩu mới không được trùng với mật khẩu cũ");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
         userRepository.save(user);
         refreshTokenRepository.deleteByUserId(user.getId());
     }

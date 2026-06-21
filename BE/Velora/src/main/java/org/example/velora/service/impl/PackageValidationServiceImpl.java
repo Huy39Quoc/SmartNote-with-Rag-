@@ -61,11 +61,11 @@ public class PackageValidationServiceImpl implements PackageValidationService {
 
             PackageService freePackage = new PackageService();
             freePackage.setName("FREE");
-            freePackage.setStorageGb(50);
+            freePackage.setStorageGb(1);
             freePackage.setMaxNotes(50);
-            freePackage.setMaxDevices(2);
-            freePackage.setMaxAiFormatsPerMonth(50);
-            freePackage.setFeatures("AI_CHAT,AI_SUMMARY,AI_TRANSLATE,EXTRACT_SCHEDULE");
+            freePackage.setMaxDevices(5);
+            freePackage.setMaxAiFormatsPerMonth(10);
+            freePackage.setFeatures("TAG_SUBJECT,CHECKLIST_BASIC,AI_NOTE_FORMAT,AI_SUMMARY,AI_SUMMARY_BASIC,AI_CHAT,AI_ANALYZE,DOCUMENT_UPLOAD,EXTRACT_SCHEDULE");
 
             return freePackage;
         }

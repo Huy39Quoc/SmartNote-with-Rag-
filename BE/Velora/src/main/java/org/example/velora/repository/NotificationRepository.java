@@ -18,4 +18,9 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
             LocalDateTime start,
             LocalDateTime end
     );
+    boolean existsByUserIdAndTitleAndMessage(
+            UUID userId,
+            String title,
+            String message
+    );
 }
