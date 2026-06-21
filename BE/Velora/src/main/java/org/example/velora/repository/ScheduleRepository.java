@@ -42,7 +42,7 @@ public interface ScheduleRepository extends JpaRepository<Schedule, UUID> {
     long countByUserIdAndIsDoneFalseAndDeadlineBetween(UUID userId, LocalDate from, LocalDate to);
 
     long countByUserIdAndDeadlineIsNull(UUID userId);
-
+    long countByUserIdAndIsDoneFalseAndDeadlineIsNull(UUID userId);
     List<Schedule> findByIsDoneFalseAndDeadlineBetweenOrderByDeadlineAsc(
             LocalDate from,
             LocalDate to

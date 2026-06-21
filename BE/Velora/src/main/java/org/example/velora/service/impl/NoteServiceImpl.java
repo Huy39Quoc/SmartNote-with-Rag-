@@ -64,7 +64,7 @@ public class NoteServiceImpl implements NoteService {
 
         embedNoteSafely(note);
 
-        return noteMapper.toDetail(noteRepository.save(note));
+        return toDetailWithAccess(noteRepository.save(note), userId);
     }
 
     @Override
@@ -88,7 +88,7 @@ public class NoteServiceImpl implements NoteService {
 
         embedNoteSafely(note);
 
-        return noteMapper.toDetail(noteRepository.save(note));
+        return toDetailWithAccess(noteRepository.save(note), userId);
     }
 
     @Override
@@ -128,7 +128,8 @@ public class NoteServiceImpl implements NoteService {
     @Override
     @Transactional(readOnly = true)
     public NoteResponse.Detail getById(UUID userId, UUID noteId) {
-        return noteMapper.toDetail(getAccessibleNote(userId, noteId));
+        Note note = getAccessibleNote(userId, noteId);
+        return toDetailWithAccess(note, userId);
     }
 
     @Override
@@ -234,4 +235,21 @@ public class NoteServiceImpl implements NoteService {
         return userRepository.findById(userId)
             .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
     }
+
+    private NoteResponse.Detail toDetailWithAccess(Note note, UUID userId) {
+        NoteResponse.Detail detail = noteMapper.toDetail(note);
+        detail.setAccessMode(resolveAccessMode(note, userId));
+        return detail;
+    }
+
+    private String resolveAccessMode(Note note, UUID userId) {
+        if (note.getUser() != null && note.getUser().getId().equals(userId)) {
+            return "OWNER";
+        }
+
+        return noteShareRepository.findByNoteIdAndSharedWithId(note.getId(), userId)
+                .map(share -> share.getPermission() == NoteShare.Permission.EDIT ? "EDIT" : "VIEW")
+                .orElse("VIEW");
+    }
+
 }

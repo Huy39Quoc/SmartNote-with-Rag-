@@ -42,7 +42,7 @@ public class DashboardServiceImpl implements DashboardService {
         long pendingTasks = scheduleRepository.countByUserIdAndIsDoneFalse(userId);
         long overdueTasks = scheduleRepository.countByUserIdAndIsDoneFalseAndDeadlineBefore(userId, today);
         long upcomingTasks = scheduleRepository.countByUserIdAndIsDoneFalseAndDeadlineBetween(userId, today, next7Days);
-        long tasksWithoutDeadline = scheduleRepository.countByUserIdAndDeadlineIsNull(userId);
+        long tasksWithoutDeadline = scheduleRepository.countByUserIdAndIsDoneFalseAndDeadlineIsNull(userId);
 
         double completionRate = totalTasks == 0
                 ? 0

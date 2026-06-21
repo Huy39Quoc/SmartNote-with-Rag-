@@ -32,6 +32,7 @@ public class NoteResponse {
         private List<TagResponse.Simple> tags;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
+        private String accessMode;
     }
 
     @Data

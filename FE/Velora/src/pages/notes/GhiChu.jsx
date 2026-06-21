@@ -34,6 +34,10 @@ export default function GhiChu() {
     const { nguoiDung } = useAuthStore()
 
     const coTinhNang = (featureCode) => hasFeature(nguoiDung, featureCode)
+    const accessMode = ghiChuHienTai?.accessMode || 'OWNER'
+    const laChuSoHuu = accessMode === 'OWNER'
+    const coTheChinhSua = accessMode === 'OWNER' || accessMode === 'EDIT'
+    const chiDuocXem = accessMode === 'VIEW'
 
     const [danhSach, setDanhSach] = useState([])
     const [ghiChuHienTai, setGhiChuHienTai] = useState(null)
@@ -240,8 +244,9 @@ const taoMoi = async () => {
     }
 }
 
-const luu = async () => {
-    if (!ghiChuHienTai) return
+    const luu = async () => {
+        if (!ghiChuHienTai) return
+        if (!coTheChinhSua) return
 
     setDangLuu(true)
 
@@ -604,13 +609,14 @@ const trichXuatLich = async () => {
     }
 }
 
-useEffect(() => {
-    if (!ghiChuHienTai) return
+    useEffect(() => {
+        if (!ghiChuHienTai) return
+        if (!coTheChinhSua) return
 
-    const t = setTimeout(luu, 3000)
+        const t = setTimeout(luu, 3000)
 
-    return () => clearTimeout(t)
-}, [ghiChuHienTai?.content, ghiChuHienTai?.title])
+        return () => clearTimeout(t)
+    }, [ghiChuHienTai?.content, ghiChuHienTai?.title, coTheChinhSua])
 
 return (
     <div style={styles.wrap}>
@@ -725,39 +731,54 @@ return (
                     <div style={styles.toolbar}>
                         <input
                             value={ghiChuHienTai.title}
-                            onChange={e =>
+                            onChange={e => {
+                                if (!coTheChinhSua) return
+
                                 setGhiChuHienTai(p => ({
                                     ...p,
                                     title: e.target.value,
                                 }))
-                            }
+                            }}
+                            readOnly={!coTheChinhSua}
                             placeholder="Tiêu đề ghi chú..."
-                            style={styles.tieuDe}
+                            style={{
+                                ...styles.tieuDe,
+                                cursor: coTheChinhSua ? 'text' : 'default',
+                                color: coTheChinhSua ? 'var(--text-primary)' : 'var(--text-secondary)',
+                            }}
                         />
 
                         <div style={styles.toolbarRight}>
-                            {dangLuu && (
-                                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                                        Đang lưu...
-                                    </span>
+                            {accessMode === 'VIEW' && (
+                                <span className="tag tag-dim" style={{ fontSize: 10 }}>
+        Chỉ xem
+    </span>
                             )}
 
-                            <button
-                                className="btn-ghost"
-                                onClick={danhDau}
-                                title={ghiChuHienTai.isBookmarked ? 'Bỏ đánh dấu' : 'Đánh dấu'}
-                            >
-                                {ghiChuHienTai.isBookmarked ? (
-                                    <IconBookmarkFilled
-                                        size={14}
-                                        style={{ color: 'var(--accent-amber)' }}
-                                    />
-                                ) : (
-                                    <IconBookmark size={14} />
-                                )}
-                            </button>
+                            {accessMode === 'EDIT' && (
+                                <span className="tag tag-blue" style={{ fontSize: 10 }}>
+        Được chỉnh sửa
+    </span>
+                            )}
 
-                            {coTinhNang('AI_FLASHCARD') && (
+                            {laChuSoHuu && (
+                                <button
+                                    className="btn-ghost"
+                                    onClick={danhDau}
+                                    title={ghiChuHienTai.isBookmarked ? 'Bỏ đánh dấu' : 'Đánh dấu'}
+                                >
+                                    {ghiChuHienTai.isBookmarked ? (
+                                        <IconBookmarkFilled
+                                            size={14}
+                                            style={{ color: 'var(--accent-amber)' }}
+                                        />
+                                    ) : (
+                                        <IconBookmark size={14} />
+                                    )}
+                                </button>
+                            )}
+
+                            {laChuSoHuu && coTinhNang('AI_FLASHCARD') && (
                                 <button
                                     className="btn-ghost"
                                     onClick={handleTaoFlashcard}
@@ -776,7 +797,7 @@ return (
                                 </button>
                             )}
 
-                            {coTinhNang('EXPORT_FILE') && (
+                            {laChuSoHuu && coTinhNang('EXPORT_FILE') && (
                                 <>
                                     <button
                                         className="btn-ghost"
@@ -800,7 +821,7 @@ return (
                                 </>
                             )}
 
-                            {coTinhNang('TEAM_WORK') && (
+                            {laChuSoHuu && coTinhNang('TEAM_WORK') && (
                                 <button
                                     className={hienShare ? 'btn-ai' : 'btn-ghost'}
                                     onClick={() => setHienShare(p => !p)}
@@ -812,57 +833,72 @@ return (
                                 </button>
                             )}
 
-                            <button
-                                className={hienAi ? 'btn-ai' : 'btn-ghost'}
-                                onClick={() => setHienAi(p => !p)}
-                                title="Trợ lý AI"
-                            >
-                                <IconSparkles size={14} />
-                                <span style={{ fontSize: 11 }}>AI</span>
-                            </button>
+                            {coTheChinhSua && (
+                                <button
+                                    className={hienAi ? 'btn-ai' : 'btn-ghost'}
+                                    onClick={() => setHienAi(p => !p)}
+                                    title="Trợ lý AI"
+                                >
+                                    <IconSparkles size={14} />
+                                    <span style={{ fontSize: 11 }}>AI</span>
+                                </button>
+                            )}
 
-                            <button
-                                className={hienTag ? 'btn-ai' : 'btn-ghost'}
-                                onClick={() => setHienTag(p => !p)}
-                                title="Gắn tag"
-                            >
-                                <IconTag size={14} />
-                                <span style={{ fontSize: 11 }}>Tag</span>
-                            </button>
+                            {coTheChinhSua && (
+                                <button
+                                    className={hienTag ? 'btn-ai' : 'btn-ghost'}
+                                    onClick={() => setHienTag(p => !p)}
+                                    title="Gắn tag"
+                                >
+                                    <IconTag size={14} />
+                                    <span style={{ fontSize: 11 }}>Tag</span>
+                                </button>
+                            )}
 
-                            <button
-                                className="btn-danger btn-ghost"
-                                onClick={xoa}
-                                title="Xoá"
-                            >
-                                <IconTrash size={13} />
-                            </button>
+                            {laChuSoHuu && (
+                                <button
+                                    className="btn-danger btn-ghost"
+                                    onClick={xoa}
+                                    title="Xoá"
+                                >
+                                    <IconTrash size={13} />
+                                </button>
+                            )}
 
-                            <button
-                                className="btn-primary"
-                                onClick={luu}
-                                style={{
-                                    padding: '4px 12px',
-                                    fontSize: 12,
-                                }}
-                            >
-                                <IconCheck size={12} /> Lưu
-                            </button>
+                            {coTheChinhSua && (
+                                <button
+                                    className="btn-primary"
+                                    onClick={luu}
+                                    style={{
+                                        padding: '4px 12px',
+                                        fontSize: 12,
+                                    }}
+                                >
+                                    <IconCheck size={12} /> Lưu
+                                </button>
+                            )}
                         </div>
                     </div>
 
                     <div style={styles.editorBody}>
-                            <textarea
-                                value={ghiChuHienTai.content || ''}
-                                onChange={e =>
-                                    setGhiChuHienTai(p => ({
-                                        ...p,
-                                        content: e.target.value,
-                                    }))
-                                }
-                                placeholder="Bắt đầu ghi chú... (hỗ trợ Markdown)"
-                                style={styles.textarea}
-                            />
+                           <textarea
+                               value={ghiChuHienTai.content || ''}
+                               onChange={e => {
+                                   if (!coTheChinhSua) return
+
+                                   setGhiChuHienTai(p => ({
+                                       ...p,
+                                       content: e.target.value,
+                                   }))
+                               }}
+                               readOnly={!coTheChinhSua}
+                               placeholder={coTheChinhSua ? 'Bắt đầu ghi chú... (hỗ trợ Markdown)' : 'Bạn chỉ có quyền xem ghi chú này'}
+                               style={{
+                                   ...styles.textarea,
+                                   cursor: coTheChinhSua ? 'text' : 'default',
+                                   color: coTheChinhSua ? 'var(--text-primary)' : 'var(--text-secondary)',
+                               }}
+                           />
 
                         {hienLichGoiY && (
                             <div style={styles.schedulePrompt}>
