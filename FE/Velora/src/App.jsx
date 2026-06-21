@@ -4,7 +4,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import useAuthStore from './service/authStore'
 import MainLayout from './components/layout/MainLayout'
 import { ProtectedRoute, AdminRoute, PublicOnlyRoute } from './components/layout/ProtectedRoute'
-
+import GhiChuDuocChiaSe from './pages/notes/GhiChuDuocChiaSe'
 // Pages
 import Landing    from './pages/landing/Landing'
 import DangNhap   from './pages/auth/DangNhap'
@@ -43,6 +43,7 @@ export default function App() {
                 <Route path="/ghi-chu"             element={<GhiChu />} />
                 <Route path="/ghi-chu/:id"         element={<GhiChu />} />
                 <Route path="/ghi-chu/:id/flashcards" element={<TrangFlashcardAI />} />
+                <Route path="/ghi-chu-duoc-chia-se" element={<GhiChuDuocChiaSe />} />
                 <Route path="/chat"                element={<Chat />} />
                 <Route path="/tai-lieu"            element={<TaiLieu />} />
                 <Route path="/lich"                element={<Lich />} />
