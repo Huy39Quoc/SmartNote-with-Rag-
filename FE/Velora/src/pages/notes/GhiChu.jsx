@@ -21,10 +21,14 @@ import AiPanel from '../../components/notes/AiPanel'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
 import toast from 'react-hot-toast'
-
+import useAuthStore from '../../service/authStore'
+import { hasFeature, getUpgradeMessage } from '../../utils/packageFeatures'
 export default function GhiChu() {
     const { id: idParam } = useParams()
     const navigate = useNavigate()
+    const { nguoiDung } = useAuthStore()
+
+    const coTinhNang = (featureCode) => hasFeature(nguoiDung, featureCode)
     const [danhSach, setDanhSach]     = useState([])
     const [ghiChuHienTai, setGhiChuHienTai] = useState(null)
     const [tags, setTags]             = useState([])
@@ -79,10 +83,17 @@ export default function GhiChu() {
 
     // --- HÀM XỬ LÝ GENERATE VÀ CHUYỂN TRANG FLASHCARD AI ---
     const handleTaoFlashcard = async () => {
+        if (!coTinhNang('AI_FLASHCARD')) {
+            toast.error(getUpgradeMessage('AI_FLASHCARD'))
+            navigate('/goi-dich-vu')
+            return
+        }
+
         if (!ghiChuHienTai || !ghiChuHienTai.id) {
             toast.error('Không tìm thấy mã định danh ghi chú hợp lệ!')
             return
         }
+
         if (!ghiChuHienTai.content?.trim()) {
             toast.error('Vui lòng viết thêm nội dung kiến thức vào ghi chú để AI bóc tách!')
             return
@@ -92,15 +103,12 @@ export default function GhiChu() {
         const loadToast = toast.loading('Trợ lý AI đang phân tích dữ liệu và soạn trang ôn tập...')
 
         try {
-            // 1. Gọi API sinh dữ liệu (URL backend chứa /api/v1/...)
             const response = await flashcardApi.generate(ghiChuHienTai.id)
-            const cards = response.data?.data || response.data;
+            const cards = response.data?.data || response.data
 
             if (cards && cards.length > 0) {
                 toast.success(`Đã biên soạn thành công ${cards.length} thẻ học tập!`, { id: loadToast })
-
-                // 2. CHUYỂN HƯỚNG SANG TRANG CẤU TRÚC RIÊNG BIỆT TOÀN MÀN HÌNH
-                navigate(`/ghi-chu/${ghiChuHienTai.id}/flashcards`);
+                navigate(`/ghi-chu/${ghiChuHienTai.id}/flashcards`)
             } else {
                 toast.error('AI chưa tìm thấy đủ thông tin cốt lõi để tạo bộ câu hỏi.', { id: loadToast })
             }
@@ -210,9 +218,21 @@ export default function GhiChu() {
 
     useEffect(() => {
         if (!ghiChuHienTai) return
+
         const daTaoLich = noteDaTaoLichIds.has(ghiChuHienTai.id)
-        setHienLichGoiY(!daTaoLich && coTheTrichLich(ghiChuHienTai.content))
-    }, [ghiChuHienTai?.id, ghiChuHienTai?.content, noteDaTaoLichIds])
+        const duocTrichLich = coTinhNang('EXTRACT_SCHEDULE')
+
+        setHienLichGoiY(
+            duocTrichLich &&
+            !daTaoLich &&
+            coTheTrichLich(ghiChuHienTai.content)
+        )
+    }, [
+        ghiChuHienTai?.id,
+        ghiChuHienTai?.content,
+        noteDaTaoLichIds,
+        nguoiDung?.packageFeatures,
+    ])
 
     useEffect(() => {
         scheduleApi.layTatCa()
@@ -224,20 +244,41 @@ export default function GhiChu() {
     }, [])
 
     const trichXuatLich = async () => {
+        if (!coTinhNang('EXTRACT_SCHEDULE')) {
+            toast.error(getUpgradeMessage('EXTRACT_SCHEDULE'))
+            navigate('/goi-dich-vu')
+            return
+        }
+
         if (!ghiChuHienTai?.content?.trim()) return
+
         setDangTrichLich(true)
+
         try {
-            const {data} = await scheduleApi.trichXuatTuGhiChu({ content: ghiChuHienTai.content, noteId: ghiChuHienTai.id })
+            const {data} = await scheduleApi.trichXuatTuGhiChu({
+                content: ghiChuHienTai.content,
+                noteId: ghiChuHienTai.id,
+            })
+
             const total = data.data?.totalFound || 0
+
             if (total > 0) {
-                setNoteDaTaoLichIds(prev => { const next = new Set(prev); next.add(ghiChuHienTai.id); return next; })
+                setNoteDaTaoLichIds(prev => {
+                    const next = new Set(prev)
+                    next.add(ghiChuHienTai.id)
+                    return next
+                })
+
                 setHienLichGoiY(false)
                 toast.success(`Đã tạo ${total} công việc / lịch`)
             } else {
                 toast.error('AI chưa tìm thấy lịch/deadline hợp lệ trong ghi chú')
             }
-        } catch (error) { toast.error('Không thể trích xuất lịch từ ghi chú') }
-        finally { setDangTrichLich(false) }
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Không thể trích xuất lịch từ ghi chú')
+        } finally {
+            setDangTrichLich(false)
+        }
     }
 
     useEffect(() => {
@@ -290,16 +331,18 @@ export default function GhiChu() {
                                 </button>
 
                                 {/* --- NÚT ĐIỀU KHIỂN CHUYỂN TRANG RIÊNG FLASHCARD AI --- */}
-                                <button
-                                    className="btn-ghost"
-                                    onClick={handleTaoFlashcard}
-                                    disabled={dangTaoFlashcard}
-                                    style={{ gap: 4 }}
-                                    title="Tạo bộ câu hỏi ôn tập chuyển trang"
-                                >
-                                    <IconCards size={14} className={dangTaoFlashcard ? 'animate-spin' : ''} />
-                                    <span style={{ fontSize: 11 }}>Flashcard AI</span>
-                                </button>
+                                {coTinhNang('AI_FLASHCARD') && (
+                                    <button
+                                        className="btn-ghost"
+                                        onClick={handleTaoFlashcard}
+                                        disabled={dangTaoFlashcard}
+                                        style={{ gap: 4 }}
+                                        title="Tạo bộ câu hỏi ôn tập chuyển trang"
+                                    >
+                                        <IconCards size={14} className={dangTaoFlashcard ? 'animate-spin' : ''} />
+                                        <span style={{ fontSize: 11 }}>Flashcard AI</span>
+                                    </button>
+                                )}
 
                                 <button className={hienAi ? 'btn-ai' : 'btn-ghost'} onClick={() => setHienAi(p => !p)} title="Trợ lý AI">
                                     <IconSparkles size={14} /><span style={{ fontSize: 11 }}>AI</span>

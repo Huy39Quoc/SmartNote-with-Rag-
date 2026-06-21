@@ -4,8 +4,13 @@ import { IconChevronLeft, IconChevronRight, IconArrowLeft, IconRefresh } from '@
 import flashcardApi from '../../lib/api/flashcardApi';
 import Spinner from '../../components/ui/Spinner';
 import toast from 'react-hot-toast';
+import useAuthStore from '../../service/authStore'
+import { hasFeature } from '../../utils/packageFeatures'
 
 export default function TrangFlashcardAI() {
+    const { nguoiDung } = useAuthStore()
+
+    const duocDungFlashcard = hasFeature(nguoiDung, 'AI_FLASHCARD')
     const { id } = useParams(); // Lấy UUID của ghi chú từ URL
     const navigate = useNavigate();
 
@@ -50,6 +55,30 @@ export default function TrangFlashcardAI() {
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [flashcards, currentIndex]);
+
+    if (!duocDungFlashcard) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
+                <p className="text-gray-600 dark:text-gray-400 font-medium mb-4">
+                    Tính năng Flashcard AI chỉ dành cho gói Pro hoặc Plus.
+                </p>
+
+                <button
+                    onClick={() => navigate('/goi-dich-vu')}
+                    className="btn-primary flex items-center gap-2"
+                >
+                    Nâng cấp gói
+                </button>
+
+                <button
+                    onClick={() => navigate(`/ghi-chu/${id}`)}
+                    className="btn-ghost flex items-center gap-2 mt-3"
+                >
+                    <IconArrowLeft size={16} /> Quay lại ghi chú
+                </button>
+            </div>
+        )
+    }
 
     if (dangTai) {
         return (
