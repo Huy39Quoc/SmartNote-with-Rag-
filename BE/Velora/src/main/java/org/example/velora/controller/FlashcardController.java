@@ -5,9 +5,13 @@ import org.example.velora.dto.response.ApiResponse;
 import org.example.velora.dto.response.FlashcardResponse;
 import org.example.velora.entity.Flashcard;
 import org.example.velora.entity.Note;
+import org.example.velora.entity.User;
+import org.example.velora.exception.ResourceNotFoundException;
 import org.example.velora.repository.FlashcardRepository;
 import org.example.velora.repository.NoteRepository;
-import org.example.velora.service.impl.AiServiceImpl;
+import org.example.velora.repository.UserRepository;
+import org.example.velora.service.AiService;
+import org.example.velora.service.PackageValidationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -26,7 +30,9 @@ public class FlashcardController {
 
     private final NoteRepository noteRepository;
     private final FlashcardRepository flashcardRepository;
-    private final AiServiceImpl aiService;
+    private final UserRepository userRepository;
+    private final AiService aiService;
+    private final PackageValidationService packageValidationService;
 
     @PostMapping("/generate/{noteId}")
     @Transactional
@@ -34,54 +40,63 @@ public class FlashcardController {
             @PathVariable String noteId,
             @AuthenticationPrincipal UserDetails userDetails) {
 
-        String cleanNoteIdStr = noteId.trim();
-        UUID uuidNoteId = UUID.fromString(cleanNoteIdStr);
-        Note note = noteRepository.findById(uuidNoteId)
-                .orElseThrow(() -> new org.example.velora.exception.ResourceNotFoundException("Ghi chú không tồn tại"));
+        User user = getCurrentUser(userDetails);
+        Note note = getOwnedNote(UUID.fromString(noteId.trim()), user);
 
-        flashcardRepository.deleteByNoteId(uuidNoteId);
+        packageValidationService.validateAiUsage(user, "AI_FLASHCARD");
+
+        flashcardRepository.deleteByNoteId(note.getId());
 
         List<Flashcard> createdCards = aiService.generateFlashcardsFromNote(note);
         List<Flashcard> savedCards = flashcardRepository.saveAll(createdCards);
 
-        List<FlashcardResponse> responseData = savedCards.stream().map(c -> FlashcardResponse.builder()
-                .id(c.getId())
-                .question(c.getQuestion())
-                .answer(c.getAnswer())
-                .noteId(c.getNote() != null ? String.valueOf(c.getNote().getId()) : null)
-                .createdAt(c.getCreatedAt())
-                .build()
-        ).collect(Collectors.toList());
+        packageValidationService.incrementAiUsage(user);
 
-        ApiResponse<List<FlashcardResponse>> apiResponse = ApiResponse.<List<FlashcardResponse>>builder()
-                .success(true)
-                .message("Tạo bộ flashcard thành công")
-                .data(responseData)
-                .build();
-
-        return ResponseEntity.ok(apiResponse);
+        return ResponseEntity.ok(
+                ApiResponse.ok("Tạo bộ flashcard thành công",
+                        savedCards.stream().map(this::toResponse).collect(Collectors.toList()))
+        );
     }
 
     @GetMapping("/note/{noteId}")
-    public ResponseEntity<ApiResponse<List<FlashcardResponse>>> getByNote(@PathVariable String noteId) {
-        UUID uuidNoteId = UUID.fromString(noteId.trim());
-        List<Flashcard> cards = flashcardRepository.findByNoteId(uuidNoteId);
+    public ResponseEntity<ApiResponse<List<FlashcardResponse>>> getByNote(
+            @PathVariable String noteId,
+            @AuthenticationPrincipal UserDetails userDetails) {
 
-        List<FlashcardResponse> responseData = cards.stream().map(c -> FlashcardResponse.builder()
+        User user = getCurrentUser(userDetails);
+        Note note = getOwnedNote(UUID.fromString(noteId.trim()), user);
+
+        List<Flashcard> cards = flashcardRepository.findByNoteId(note.getId());
+
+        return ResponseEntity.ok(
+                ApiResponse.ok("Tải danh sách flashcard thành công",
+                        cards.stream().map(this::toResponse).collect(Collectors.toList()))
+        );
+    }
+
+    private User getCurrentUser(UserDetails userDetails) {
+        return userRepository.findByEmail(userDetails.getUsername())
+                .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
+    }
+
+    private Note getOwnedNote(UUID noteId, User user) {
+        Note note = noteRepository.findById(noteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ghi chú không tồn tại"));
+
+        if (note.getUser() == null || !note.getUser().getId().equals(user.getId())) {
+            throw new ResourceNotFoundException("Ghi chú không tồn tại");
+        }
+
+        return note;
+    }
+
+    private FlashcardResponse toResponse(Flashcard c) {
+        return FlashcardResponse.builder()
                 .id(c.getId())
                 .question(c.getQuestion())
                 .answer(c.getAnswer())
                 .noteId(c.getNote() != null ? String.valueOf(c.getNote().getId()) : null)
                 .createdAt(c.getCreatedAt())
-                .build()
-        ).collect(Collectors.toList());
-
-        ApiResponse<List<FlashcardResponse>> apiResponse = ApiResponse.<List<FlashcardResponse>>builder()
-                .success(true)
-                .message("Tải danh sách flashcard thành công")
-                .data(responseData)
                 .build();
-
-        return ResponseEntity.ok(apiResponse);
     }
 }

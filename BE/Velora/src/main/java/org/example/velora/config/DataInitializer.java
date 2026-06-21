@@ -84,12 +84,12 @@ public class DataInitializer implements CommandLineRunner {
                 "FREE",
                 0.0,
                 0.0,
-                "Gói miễn phí dành cho người dùng mới. Phù hợp để ghi chú, dùng AI cơ bản và trải nghiệm SmartNote AI.",
+                "Gói miễn phí dành cho người dùng mới. Phù hợp để ghi chú, tag, upload tài liệu cơ bản và dùng AI cơ bản.",
                 50,
                 10,
                 1,
-                5,
-                "TAG_SUBJECT,CHECKLIST_BASIC,AI_NOTE_FORMAT,AI_SUMMARY,AI_SUMMARY_BASIC,AI_CHAT,AI_ANALYZE,DOCUMENT_UPLOAD,EXTRACT_SCHEDULE"
+                1,
+                "TAG_SUBJECT,CHECKLIST_BASIC,AI_NOTE_FORMAT,AI_SUMMARY_BASIC,AI_CHAT,DOCUMENT_UPLOAD"
         );
 
         upsertPackage(
@@ -101,9 +101,8 @@ public class DataInitializer implements CommandLineRunner {
                 null,
                 2,
                 3,
-                "TAG_SUBJECT,CHECKLIST_BASIC,AI_NOTE_FORMAT,AI_SUMMARY,AI_SUMMARY_BASIC,AI_SUMMARY_ADVANCED,AI_CHAT,AI_ANALYZE,DOCUMENT_UPLOAD,EXTRACT_SCHEDULE,DEADLINE_MANAGEMENT,PRIORITY_SUGGESTION,AI_FLASHCARD,EXPORT_FILE"
+                "TAG_SUBJECT,CHECKLIST_BASIC,AI_NOTE_FORMAT,AI_SUMMARY_BASIC,AI_SUMMARY_ADVANCED,AI_CHAT,AI_ANALYZE,DOCUMENT_UPLOAD,EXTRACT_SCHEDULE,DEADLINE_MANAGEMENT,PRIORITY_SUGGESTION,AI_FLASHCARD,EXPORT_FILE"
         );
-
         upsertPackage(
                 "PLUS",
                 9.99,
@@ -113,7 +112,7 @@ public class DataInitializer implements CommandLineRunner {
                 null,
                 10,
                 null,
-                "TAG_SUBJECT,CHECKLIST_BASIC,AI_NOTE_FORMAT,AI_SUMMARY,AI_SUMMARY_BASIC,AI_SUMMARY_ADVANCED,AI_CHAT,AI_ANALYZE,DOCUMENT_UPLOAD,EXTRACT_SCHEDULE,DEADLINE_MANAGEMENT,PRIORITY_SUGGESTION,AI_FLASHCARD,EXPORT_FILE,TEAM_WORK,AI_PROGRESS_ANALYTICS,TEAM_DASHBOARD,GOOGLE_CALENDAR,MANAGE_MEMBERS,CUSTOM_WORKSPACE,PRIORITY_SUPPORT"
+                "TAG_SUBJECT,CHECKLIST_BASIC,AI_NOTE_FORMAT,AI_SUMMARY_BASIC,AI_SUMMARY_ADVANCED,AI_CHAT,AI_ANALYZE,DOCUMENT_UPLOAD,EXTRACT_SCHEDULE,DEADLINE_MANAGEMENT,PRIORITY_SUGGESTION,AI_FLASHCARD,EXPORT_FILE,TEAM_WORK,AI_PROGRESS_ANALYTICS,TEAM_DASHBOARD,GOOGLE_CALENDAR,MANAGE_MEMBERS,CUSTOM_WORKSPACE,PRIORITY_SUPPORT"
         );
     }
 

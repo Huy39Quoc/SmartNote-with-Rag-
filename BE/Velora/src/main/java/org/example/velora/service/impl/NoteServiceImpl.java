@@ -173,7 +173,7 @@ public class NoteServiceImpl implements NoteService {
     public NoteResponse.AiResult improveWithAi(UUID userId, UUID noteId, NoteRequest.AiImprove req) {
         User user = getUser(userId);
         if (req.getAction() == NoteRequest.AiImprove.AiAction.CREATE_CHECKLIST) {
-            packageValidationService.validateFeatureAccess(user, "AI_CHECKLIST");
+            packageValidationService.validateFeatureAccess(user, "CHECKLIST_BASIC");
         }
         packageValidationService.validateAiUsage(user, "AI_NOTE_FORMAT");
         getNote(userId, noteId);

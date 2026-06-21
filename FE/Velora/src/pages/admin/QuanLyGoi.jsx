@@ -6,9 +6,13 @@ import Spinner from '../../components/ui/Spinner';
 const AVAILABLE_FEATURES = [
     { id: 'TAG_SUBJECT', label: 'Tag môn học / chủ đề / dự án' },
     { id: 'CHECKLIST_BASIC', label: 'Checklist công việc cơ bản' },
-    { id: 'AI_FORMAT', label: 'AI format ghi chú' },
+    { id: 'AI_NOTE_FORMAT', label: 'AI format ghi chú' },
     { id: 'AI_SUMMARY_BASIC', label: 'Tóm tắt AI cơ bản' },
     { id: 'AI_SUMMARY_ADVANCED', label: 'Tóm tắt & phân tích AI nâng cao' },
+    { id: 'AI_CHAT', label: 'Hỏi đáp AI với ghi chú / tài liệu' },
+    { id: 'AI_ANALYZE', label: 'AI phân tích tài liệu' },
+    { id: 'DOCUMENT_UPLOAD', label: 'Upload tài liệu' },
+    { id: 'EXTRACT_SCHEDULE', label: 'AI trích xuất deadline từ ghi chú' },
     { id: 'AI_FLASHCARD', label: 'Flashcard AI tự động' },
     { id: 'DEADLINE_MANAGEMENT', label: 'Quản lý deadline & lịch học thông minh' },
     { id: 'PRIORITY_SUGGESTION', label: 'Gợi ý ưu tiên công việc' },
@@ -19,8 +23,8 @@ const AVAILABLE_FEATURES = [
     { id: 'GOOGLE_CALENDAR', label: 'Tích hợp Google Calendar' },
     { id: 'MANAGE_MEMBERS', label: 'Admin quản lý thành viên nhóm' },
     { id: 'CUSTOM_WORKSPACE', label: 'Custom workspace theo nhóm' },
-    { id: 'PRIORITY_SUPPORT', label: 'Ưu tiên hỗ trợ khách hàng' }
-];
+    { id: 'PRIORITY_SUPPORT', label: 'Ưu tiên hỗ trợ khách hàng' },
+]
 
 const initialForm = {
     name: '',
