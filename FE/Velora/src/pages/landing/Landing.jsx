@@ -26,8 +26,8 @@ export default function Landing() {
       <nav style={styles.nav}>
         <img src={logo} alt="Velora" style={{ height: 26 }} />
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <button className="btn-ghost" onClick={() => navigate('/dang-nhap')} style={{ fontSize: 13 }}>Đăng nhập</button>
-          <button className="btn-primary" onClick={() => navigate('/dang-ky')} style={{ fontSize: 13, padding: '6px 16px' }}>
+          <button className="btn-ghost" onClick={() => navigate('/login')} style={{ fontSize: 13 }}>Đăng nhập</button>
+          <button className="btn-primary" onClick={() => navigate('/register')} style={{ fontSize: 13, padding: '6px 16px' }}>
             Bắt đầu miễn phí
           </button>
         </div>
@@ -50,11 +50,11 @@ export default function Landing() {
             không cần internet, không lo lộ dữ liệu.
           </p>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button className="btn-primary" onClick={() => navigate('/dang-ky')}
+            <button className="btn-primary" onClick={() => navigate('/register')}
               style={{ padding: '11px 28px', fontSize: 14 }}>
               Dùng thử miễn phí <IconArrowRight size={15} />
             </button>
-            <button className="btn-ghost" onClick={() => navigate('/dang-nhap')}
+            <button className="btn-ghost" onClick={() => navigate('/login')}
               style={{ padding: '11px 24px', fontSize: 14 }}>
               Đăng nhập
             </button>
@@ -105,7 +105,7 @@ export default function Landing() {
           <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 24 }}>
             Đăng ký ngay — hoàn toàn miễn phí, không yêu cầu thẻ tín dụng
           </p>
-          <button className="btn-primary" onClick={() => navigate('/dang-ky')}
+          <button className="btn-primary" onClick={() => navigate('/register')}
             style={{ padding: '12px 32px', fontSize: 15 }}>
             Tạo tài khoản miễn phí <IconArrowRight size={15} />
           </button>

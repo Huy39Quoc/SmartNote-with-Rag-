@@ -11,7 +11,7 @@ const TAB = [
   { key: 'thongbao',   nhan: 'Thông báo',    icon: IconBell },
 ]
 
-export default function QuanTri() {
+export default function AdminPanel() {
   const [tab, setTab]             = useState('thongke')
   const [thongKe, setThongKe]     = useState(null)
   const [nguoiDung, setNguoiDung] = useState([])

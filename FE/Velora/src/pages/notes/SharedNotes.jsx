@@ -14,7 +14,7 @@ import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
 import toast from 'react-hot-toast'
 
-export default function GhiChuDuocChiaSe() {
+export default function SharedNotes() {
     const navigate = useNavigate()
 
     const [danhSach, setDanhSach] = useState([])
@@ -60,7 +60,7 @@ export default function GhiChuDuocChiaSe() {
             return
         }
 
-        navigate(`/ghi-chu/${noteId}`)
+        navigate(`/notes/${noteId}`)
     }
 
     const formatNgay = (value) => {

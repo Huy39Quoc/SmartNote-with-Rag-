@@ -18,16 +18,16 @@ import notificationApi from '../../lib/api/notificationApi'
 
 
 const menu = [
-    { to: '/tong-quan', label: 'Tổng quan', icon: IconLayoutDashboard },
-    { to: '/goi-dich-vu', label: 'Gói Premium', icon: IconNotes },
-    { to: '/ghi-chu', label: 'Ghi chú', icon: IconNotes },
-    { to: '/ghi-chu-duoc-chia-se', label: 'Được chia sẻ', icon: IconShare },
+    { to: '/overview', label: 'Tổng quan', icon: IconLayoutDashboard },
+    { to: '/service-packages', label: 'Gói Premium', icon: IconNotes },
+    { to: '/notes', label: 'Ghi chú', icon: IconNotes },
+    { to: '/shared-notes', label: 'Được chia sẻ', icon: IconShare },
     { to: '/chat', label: 'Hỏi đáp AI', icon: IconMessages },
-    { to: '/tai-lieu', label: 'Tài liệu', icon: IconFileText },
-    { to: '/lich', label: 'Lịch & Deadline', icon: IconCalendar },
-    { to: '/kien-thuc', label: 'Kiến thức', icon: IconShare },
-    { to: '/tai-khoan', label: 'Tài khoản', icon: IconUser },
-    { to: '/thong-bao', label: 'Thông báo', icon: IconBell },
+    { to: '/documents', label: 'Tài liệu', icon: IconFileText },
+    { to: '/schedule', label: 'Lịch & Deadline', icon: IconCalendar },
+    { to: '/knowledge', label: 'Kiến thức', icon: IconShare },
+    { to: '/account', label: 'Tài khoản', icon: IconUser },
+    { to: '/notifications', label: 'Thông báo', icon: IconBell },
 ]
 
 export default function Sidebar() {
@@ -38,7 +38,7 @@ export default function Sidebar() {
     const handleDangXuat = async () => {
         await dangXuat()
         setSoThongBaoChuaDoc(0)
-        navigate('/dang-nhap')
+        navigate('/login')
     }
 
     const taiSoThongBaoChuaDoc = async () => {
@@ -85,7 +85,7 @@ export default function Sidebar() {
 
             <nav style={styles.nav}>
                 {menu.map(({ to, icon: Icon, label }) => {
-                    const laThongBao = to === '/thong-bao'
+                    const laThongBao = to === '/notifications'
 
                     return (
                         <NavLink
@@ -108,11 +108,11 @@ export default function Sidebar() {
 
                 {laAdmin() && (
                     <>
-                        <NavLink to="/quan-tri" style={navStyle} className={({ isActive }) => isActive ? 'active' : ''}>
+                        <NavLink to="/admin" style={navStyle} className={({ isActive }) => isActive ? 'active' : ''}>
                             <IconShield size={15} />
                             <span>Quản trị</span>
                         </NavLink>
-                        <NavLink to="/quan-tri/goi-dich-vu" style={navStyle} className={({ isActive }) => isActive ? 'active' : ''}>
+                        <NavLink to="/admin/service-packages" style={navStyle} className={({ isActive }) => isActive ? 'active' : ''}>
                             <IconShield size={15} />
                             <span>Quản lý Gói</span>
                         </NavLink>

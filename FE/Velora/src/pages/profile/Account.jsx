@@ -11,7 +11,7 @@ import toast from 'react-hot-toast'
 import authApi from '../../lib/api/authApi'
 import useAuthStore from '../../service/authStore'
 
-export default function TaiKhoan() {
+export default function Account() {
     const { nguoiDung, layThongTin } = useAuthStore()
 
     const [fullName, setFullName] = useState('')

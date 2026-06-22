@@ -4,7 +4,7 @@ import { IconEye, IconEyeOff } from '@tabler/icons-react'
 import useAuthStore from '../../service/authStore'
 import logo from '../../assets/logo.svg'
 
-export default function DangNhap() {
+export default function Login() {
     const location = useLocation()
 
     const [form, setForm] = useState({
@@ -34,7 +34,7 @@ export default function DangNhap() {
         }
 
         const ok = await dangNhap(form.email.trim().toLowerCase(), form.matKhau)
-        if (ok) navigate('/ghi-chu')
+        if (ok) navigate('/notes')
     }
 
   return (
@@ -111,7 +111,7 @@ export default function DangNhap() {
 
           <p style={{ textAlign: 'center', marginTop: 20, fontSize: 12, color: 'var(--text-muted)' }}>
             Chưa có tài khoản?{' '}
-            <Link to="/dang-ky" style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}>
+            <Link to="/register" style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}>
               Đăng ký ngay
             </Link>
           </p>

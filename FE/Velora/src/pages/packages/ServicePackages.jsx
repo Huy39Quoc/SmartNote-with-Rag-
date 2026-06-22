@@ -90,7 +90,7 @@ const FEATURE_ROWS = [
     },
 ]
 
-export default function GoiDichVu() {
+export default function ServicePackages() {
     const { nguoiDung, layThongTin } = useAuthStore()
 
     const [danhSachGoi, setDanhSachGoi] = useState([])

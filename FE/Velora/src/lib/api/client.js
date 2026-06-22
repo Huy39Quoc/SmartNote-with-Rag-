@@ -47,7 +47,7 @@ client.interceptors.response.use(
             } catch {
                 localStorage.removeItem('velora_token')
                 localStorage.removeItem('velora_refresh')
-                window.location.href = '/dang-nhap'
+                window.location.href = '/login'
             }
         }
 
