@@ -1,6 +1,7 @@
 package org.example.velora.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -24,6 +25,7 @@ public class User {
     @Column(name = "id", columnDefinition = "UNIQUEIDENTIFIER", updatable = false, nullable = false)
     private UUID id;
 
+    @Email(message = "Invalid email format")
     @Column(nullable = false, unique = true, length = 255, columnDefinition = "NVARCHAR(255)")
     private String email;
 

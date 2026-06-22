@@ -16,6 +16,8 @@ services:
       - "8080:8080"
     env_file:
       - .env
+    volumes:
+      - ./data/uploads:/app/uploads
     restart: unless-stopped
 
   ai:
@@ -24,4 +26,8 @@ services:
     container_name: velora-ai
     ports:
       - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./AI/chroma_data:/app/chroma_data
     restart: unless-stopped
