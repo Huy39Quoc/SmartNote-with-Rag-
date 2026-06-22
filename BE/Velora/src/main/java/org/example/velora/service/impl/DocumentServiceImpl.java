@@ -1,6 +1,6 @@
 package org.example.velora.service.impl;
 
-import org.example.velora.client.ChromaDbClient;
+import org.example.velora.util.ChromaDbClient;
 import org.example.velora.dto.request.DocumentRequest;
 import org.example.velora.dto.response.DocumentResponse;
 import org.example.velora.entity.Document;

@@ -2,8 +2,8 @@ package org.example.velora.service.impl;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.example.velora.client.LmStudioClient;
-import org.example.velora.client.ChromaDbClient;
+import org.example.velora.util.LmStudioClient;
+import org.example.velora.util.ChromaDbClient;
 import org.example.velora.dto.request.NoteRequest;
 import org.example.velora.dto.response.*;
 import org.example.velora.entity.Flashcard;
@@ -19,11 +19,8 @@ import org.springframework.util.StringUtils;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.io.File;
-import java.nio.file.Files;
 import java.time.LocalDate;
 import java.util.*;
-
-import static org.apache.commons.lang3.CharSetUtils.containsAny;
 
 @Service @RequiredArgsConstructor @Slf4j
 public class AiServiceImpl implements AiService {

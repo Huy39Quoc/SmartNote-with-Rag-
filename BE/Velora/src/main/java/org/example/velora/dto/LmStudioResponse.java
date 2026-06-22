@@ -1,4 +1,4 @@
-package org.example.velora.client.dto;
+package org.example.velora.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;

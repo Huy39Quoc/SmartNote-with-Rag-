@@ -1,4 +1,4 @@
-package org.example.velora.client.dto;
+package org.example.velora.dto;
 
 import lombok.Builder;
 import lombok.Data;

@@ -18,12 +18,11 @@ import org.example.velora.service.PackageValidationService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-import org.example.velora.client.ChromaDbClient;
-import java.util.ArrayList;
+import org.example.velora.util.ChromaDbClient;
+
 import java.util.List;
 import java.util.UUID;
 import org.example.velora.entity.NoteShare;

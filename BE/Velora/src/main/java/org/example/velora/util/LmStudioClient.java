@@ -1,7 +1,7 @@
-package org.example.velora.client;
+package org.example.velora.util;
 
-import org.example.velora.client.dto.LmStudioRequest;
-import org.example.velora.client.dto.LmStudioResponse;
+import org.example.velora.dto.LmStudioRequest;
+import org.example.velora.dto.LmStudioResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

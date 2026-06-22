@@ -6,7 +6,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.client.WebClient;
 
 @Configuration
-public class WebClientConfig {
+public class WebConfig {
 
     @Bean("lmStudioWebClient")
     public WebClient lmStudioWebClient(@Value("${ai.lm-studio.base-url}") String baseUrl) {

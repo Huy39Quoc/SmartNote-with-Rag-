@@ -1,7 +1,7 @@
 package org.example.velora.controller;
 
-import org.example.velora.client.ChromaDbClient;
-import org.example.velora.client.LmStudioClient;
+import org.example.velora.util.ChromaDbClient;
+import org.example.velora.util.LmStudioClient;
 import org.example.velora.dto.response.ApiResponse;
 import org.example.velora.repository.UserRepository;
 import lombok.RequiredArgsConstructor;

@@ -11,14 +11,13 @@ import org.example.velora.repository.ChatSessionRepository;
 import org.example.velora.repository.UserRepository;
 import org.example.velora.service.AiService;
 import org.example.velora.service.ChatService;
-import org.example.velora.client.ChromaDbClient;
+import org.example.velora.util.ChromaDbClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service @RequiredArgsConstructor @Transactional
 public class ChatServiceImpl implements ChatService {

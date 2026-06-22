@@ -1,4 +1,4 @@
-package org.example.velora.client;
+package org.example.velora.util;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
