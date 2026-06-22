@@ -11,9 +11,6 @@ import java.util.UUID;
 @Repository
 public interface PackageServiceRepository extends JpaRepository<PackageService, UUID> {
 
-    // Thêm dòng này để sửa lỗi "cannot find symbol findByName"
     Optional<PackageService> findByName(String name);
-
-    // Nếu hệ thống của bạn có dùng hàm findByIsActiveTrue() ở UserPackageController, hãy giữ nguyên nó
     List<PackageService> findByIsActiveTrue();
 }
