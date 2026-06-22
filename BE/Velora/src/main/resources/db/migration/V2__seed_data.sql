@@ -52,3 +52,6 @@ INSERT INTO system_prompts (id, prompt_key, prompt_text, description, is_active,
 (NEWID(), 'audio.transcribe',
  N'Bạn nhận được transcript âm thanh bằng tiếng Việt. Hãy: 1) Làm sạch văn bản, 2) Tổ chức thành ghi chú có cấu trúc với tiêu đề và bullet points, 3) Giữ nguyên nghĩa gốc. Trả về markdown.',
  N'Xử lý transcript âm thanh', 1, SYSDATETIME());
+
+INSERT INTO package_service (id, name, price, storage_gb, max_notes, max_devices, max_ai_formats_per_month, features, created_at)
+VALUES ('free-package-uuid-1111-2222', 'FREE', 0, 1, 10, 2, 5, 'AI_CHAT,AI_SUMMARY,AI_TRANSLATE,EXTRACT_SCHEDULE', NOW());

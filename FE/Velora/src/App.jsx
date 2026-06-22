@@ -20,6 +20,7 @@ import TaiKhoan   from './pages/profile/TaiKhoan'
 import ThongBao   from './pages/notifications/ThongBao'
 import GoiDichVu  from './pages/packages/GoiDichVu'
 import QuanLyGoi  from './pages/admin/QuanLyGoi'
+import TrangFlashcardAI from "./pages/notes/TrangFlashcardAI.jsx";
 
 
 export default function App() {
@@ -41,6 +42,7 @@ export default function App() {
                 <Route path="/tong-quan"           element={<TongQuan />} />
                 <Route path="/ghi-chu"             element={<GhiChu />} />
                 <Route path="/ghi-chu/:id"         element={<GhiChu />} />
+                <Route path="/ghi-chu/:id/flashcards" element={<TrangFlashcardAI />} />
                 <Route path="/chat"                element={<Chat />} />
                 <Route path="/tai-lieu"            element={<TaiLieu />} />
                 <Route path="/lich"                element={<Lich />} />

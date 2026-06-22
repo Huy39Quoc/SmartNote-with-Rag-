@@ -20,7 +20,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
-
+import org.example.velora.exception.BadRequestException;
 @Service @RequiredArgsConstructor @Transactional
 public class ScheduleServiceImpl implements ScheduleService {
 
@@ -31,24 +31,57 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     @Override
     public ScheduleResponse.Item create(UUID userId, ScheduleRequest.Create req) {
+        validateDeadlineNotPast(req.getDeadline());
+
         User user = getUser(userId);
+
         Note note = req.getNoteId() != null
-            ? noteRepository.findById(req.getNoteId()).orElse(null) : null;
+                ? noteRepository.findById(req.getNoteId()).orElse(null)
+                : null;
+
         Schedule s = Schedule.builder()
-            .user(user).note(note).taskName(req.getTaskName())
-            .description(req.getDescription()).deadline(req.getDeadline())
-            .priority(req.getPriority()).build();
+                .user(user)
+                .note(note)
+                .taskName(req.getTaskName() != null ? req.getTaskName().trim() : null)
+                .description(req.getDescription())
+                .deadline(req.getDeadline())
+                .priority(req.getPriority() != null ? req.getPriority() : Schedule.Priority.MEDIUM)
+                .build();
+
         return toItem(scheduleRepository.save(s));
     }
 
     @Override
     public ScheduleResponse.Item update(UUID userId, UUID scheduleId, ScheduleRequest.Update req) {
         Schedule s = getSchedule(userId, scheduleId);
-        if (req.getTaskName() != null) s.setTaskName(req.getTaskName());
-        if (req.getDescription() != null) s.setDescription(req.getDescription());
-        if (req.getDeadline() != null) s.setDeadline(req.getDeadline());
-        if (req.getPriority() != null) s.setPriority(req.getPriority());
-        if (req.getIsDone() != null) s.setIsDone(req.getIsDone());
+
+        if (req.getTaskName() != null) {
+            String taskName = req.getTaskName().trim();
+
+            if (taskName.isBlank()) {
+                throw new BadRequestException("Tên công việc không được để trống");
+            }
+
+            s.setTaskName(taskName);
+        }
+
+        if (req.getDescription() != null) {
+            s.setDescription(req.getDescription());
+        }
+
+        if (req.getDeadline() != null) {
+            validateDeadlineNotPast(req.getDeadline());
+            s.setDeadline(req.getDeadline());
+        }
+
+        if (req.getPriority() != null) {
+            s.setPriority(req.getPriority());
+        }
+
+        if (req.getIsDone() != null) {
+            s.setIsDone(req.getIsDone());
+        }
+
         return toItem(scheduleRepository.save(s));
     }
 
@@ -92,6 +125,7 @@ public class ScheduleServiceImpl implements ScheduleService {
         List<ScheduleResponse.Item> savedItems = result.getExtracted().stream()
                 .filter(item -> item.getTaskName() != null && !item.getTaskName().isBlank())
                 .filter(item -> item.getDeadline() != null)
+                .filter(item -> !item.getDeadline().isBefore(LocalDate.now()))
                 .filter(item -> {
                     if (note == null) return true;
 
@@ -156,4 +190,11 @@ public class ScheduleServiceImpl implements ScheduleService {
             .noteTitle(s.getNote() != null ? s.getNote().getTitle() : null)
             .daysUntilDeadline(days).createdAt(s.getCreatedAt()).build();
     }
+
+    private void validateDeadlineNotPast(LocalDate deadline) {
+        if (deadline != null && deadline.isBefore(LocalDate.now())) {
+            throw new BadRequestException("Deadline không được nằm trong quá khứ");
+        }
+    }
+
 }

@@ -9,7 +9,8 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
+import org.example.velora.entity.PackageService;
+import org.example.velora.repository.PackageServiceRepository;
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -17,7 +18,7 @@ public class DataInitializer implements CommandLineRunner {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-
+    private final PackageServiceRepository packageServiceRepository;
     @Value("${app.admin.email:admin@velora.local}")
     private String adminEmail;
 
@@ -30,6 +31,8 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
+        seedPackages();
+
         userRepository.findByEmail(adminEmail).ifPresentOrElse(
                 this::ensureAdmin,
                 this::createAdmin
@@ -75,5 +78,70 @@ public class DataInitializer implements CommandLineRunner {
         } else {
             log.info("Default admin account already exists: email={}", adminEmail);
         }
+    }
+    private void seedPackages() {
+        upsertPackage(
+                "FREE",
+                0.0,
+                0.0,
+                "Gói miễn phí dành cho người dùng mới. Phù hợp để ghi chú, dùng AI cơ bản và trải nghiệm SmartNote AI.",
+                50,
+                10,
+                1,
+                5,
+                "TAG_SUBJECT,CHECKLIST_BASIC,AI_NOTE_FORMAT,AI_SUMMARY,AI_SUMMARY_BASIC,AI_CHAT,AI_ANALYZE,DOCUMENT_UPLOAD,EXTRACT_SCHEDULE"
+        );
+
+        upsertPackage(
+                "PRO",
+                4.99,
+                39.99,
+                "Gói Pro mở khóa ghi chú không giới hạn, AI nâng cao, flashcard, deadline thông minh và export tài liệu.",
+                null,
+                null,
+                2,
+                3,
+                "TAG_SUBJECT,CHECKLIST_BASIC,AI_NOTE_FORMAT,AI_SUMMARY,AI_SUMMARY_BASIC,AI_SUMMARY_ADVANCED,AI_CHAT,AI_ANALYZE,DOCUMENT_UPLOAD,EXTRACT_SCHEDULE,DEADLINE_MANAGEMENT,PRIORITY_SUGGESTION,AI_FLASHCARD,EXPORT_FILE"
+        );
+
+        upsertPackage(
+                "PLUS",
+                9.99,
+                79.99,
+                "Gói Plus dành cho nhóm học tập/team nhỏ, bao gồm toàn bộ Pro và các tính năng học nhóm, dashboard nhóm, chia sẻ ghi chú.",
+                null,
+                null,
+                10,
+                null,
+                "TAG_SUBJECT,CHECKLIST_BASIC,AI_NOTE_FORMAT,AI_SUMMARY,AI_SUMMARY_BASIC,AI_SUMMARY_ADVANCED,AI_CHAT,AI_ANALYZE,DOCUMENT_UPLOAD,EXTRACT_SCHEDULE,DEADLINE_MANAGEMENT,PRIORITY_SUGGESTION,AI_FLASHCARD,EXPORT_FILE,TEAM_WORK,AI_PROGRESS_ANALYTICS,TEAM_DASHBOARD,GOOGLE_CALENDAR,MANAGE_MEMBERS,CUSTOM_WORKSPACE,PRIORITY_SUPPORT"
+        );
+    }
+
+    private void upsertPackage(
+            String name,
+            Double priceMonthly,
+            Double priceYearly,
+            String description,
+            Integer maxNotes,
+            Integer maxAiFormatsPerMonth,
+            Integer storageGb,
+            Integer maxDevices,
+            String features
+    ) {
+        PackageService pkg = packageServiceRepository.findByName(name)
+                .orElseGet(PackageService::new);
+
+        pkg.setName(name);
+        pkg.setPriceMonthly(priceMonthly);
+        pkg.setPriceYearly(priceYearly);
+        pkg.setDescription(description);
+        pkg.setMaxNotes(maxNotes);
+        pkg.setMaxAiFormatsPerMonth(maxAiFormatsPerMonth);
+        pkg.setStorageGb(storageGb);
+        pkg.setMaxDevices(maxDevices);
+        pkg.setFeatures(features);
+        pkg.setIsActive(true);
+
+        packageServiceRepository.save(pkg);
     }
 }

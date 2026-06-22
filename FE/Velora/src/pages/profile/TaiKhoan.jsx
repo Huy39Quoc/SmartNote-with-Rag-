@@ -73,6 +73,16 @@ export default function TaiKhoan() {
             return
         }
 
+        if (newPassword !== newPassword.trim()) {
+            toast.error('Mật khẩu mới không được bắt đầu hoặc kết thúc bằng khoảng trắng')
+            return
+        }
+
+        if (oldPassword === newPassword) {
+            toast.error('Mật khẩu mới không được trùng mật khẩu hiện tại')
+            return
+        }
+
         setDangDoiMatKhau(true)
 
         try {

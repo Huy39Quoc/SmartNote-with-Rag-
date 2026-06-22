@@ -6,6 +6,8 @@ import org.example.velora.client.LmStudioClient;
 import org.example.velora.client.ChromaDbClient;
 import org.example.velora.dto.request.NoteRequest;
 import org.example.velora.dto.response.*;
+import org.example.velora.entity.Flashcard;
+import org.example.velora.entity.Note;
 import org.example.velora.entity.Schedule;
 import org.example.velora.entity.SystemPrompt;
 import org.example.velora.repository.SystemPromptRepository;
@@ -660,6 +662,85 @@ public class AiServiceImpl implements AiService {
         return systemPromptRepository.findByPromptKeyAndIsActiveTrue(promptKey)
                 .map(SystemPrompt::getPromptText)
                 .orElse("Hãy xử lý nội dung sau bằng tiếng Việt:");
+    }
+
+    @lombok.Data
+    public static class AiFlashcardItem {
+        private String question;
+        private String answer;
+    }
+
+    @Override
+    public List<Flashcard> generateFlashcardsFromNote(Note note) {
+
+        String prompt = """
+        Bạn là một trợ lý học tập chuyên nghiệp chuyên bóc tách kiến thức.
+        Nhiệm vụ: Dựa trên nội dung ghi chú sau đây, hãy tạo ra các cặp câu hỏi và câu trả lời rút gọn (Flashcard) để phục vụ việc ôn thi.
+
+        Yêu cầu bắt buộc:
+        - Chỉ trả về DUY NHẤT một mảng JSON (JSON Array) hợp lệ.
+        - Không kèm theo bất kỳ lời giải thích, tiêu đề, hoặc ký tự markdown định dạng nào bên ngoài.
+        - Không bọc thẻ ```json ... ```.
+        - Nếu ghi chú quá ngắn hoặc không có thông tin để tạo câu hỏi, hãy trả về mảng rỗng [].
+
+        Cấu trúc JSON:
+        [
+          {
+            "question": "Nội dung câu hỏi cốt lõi",
+            "answer": "Nội dung câu trả lời rút gọn"
+          }
+        ]
+
+        Nội dung ghi chú:
+        """ + "\n" + note.getContent();
+
+        String aiRawJson = lmStudioClient.complete(prompt);
+
+        List<Flashcard> savedCards = new ArrayList<>();
+
+        try {
+
+            String cleanJson = extractJsonArray(aiRawJson);
+
+            AiFlashcardItem[] items =
+                    objectMapper.readValue(
+                            cleanJson,
+                            AiFlashcardItem[].class
+                    );
+
+            for (AiFlashcardItem item : items) {
+
+                if (item == null
+                        || !org.springframework.util.StringUtils.hasText(item.getQuestion())) {
+                    continue;
+                }
+
+                Flashcard card = Flashcard.builder()
+                        .question(item.getQuestion().trim())
+                        .answer(item.getAnswer() != null
+                                ? item.getAnswer().trim()
+                                : "")
+                        .note(note)
+                        .user(note.getUser())
+                        .build();
+
+                savedCards.add(card);
+            }
+
+        } catch (Exception e) {
+
+            log.error(
+                    "Lỗi phân rã JSON Flashcard từ AI: {}. Nội dung gốc: {}",
+                    e.getMessage(),
+                    aiRawJson
+            );
+
+            throw new org.example.velora.exception.BadRequestException(
+                    "Mô hình AI trả về cấu trúc dữ liệu không đúng định dạng mảng JSON. Hãy thử lại!"
+            );
+        }
+
+        return savedCards;
     }
 
     private List<String> parseJsonArray(String raw) {

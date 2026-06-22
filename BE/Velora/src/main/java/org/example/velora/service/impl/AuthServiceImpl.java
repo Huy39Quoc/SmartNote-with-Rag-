@@ -2,11 +2,14 @@ package org.example.velora.service.impl;
 
 import org.example.velora.dto.request.AuthRequest;
 import org.example.velora.dto.response.AuthResponse;
+import org.example.velora.entity.PackageService;
 import org.example.velora.entity.RefreshToken;
 import org.example.velora.entity.User;
 import org.example.velora.exception.BadRequestException;
 import org.example.velora.exception.ResourceNotFoundException;
 import org.example.velora.exception.UnauthorizedException;
+import org.example.velora.mapper.UserMapper;
+import org.example.velora.repository.PackageServiceRepository;
 import org.example.velora.repository.RefreshTokenRepository;
 import org.example.velora.repository.UserRepository;
 import org.example.velora.security.JwtTokenProvider;
@@ -33,22 +36,56 @@ public class AuthServiceImpl implements AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthenticationManager authenticationManager;
     private final PackageValidationService packageValidationService;
+    private final PackageServiceRepository packageServiceRepository;
+    private final UserMapper userMapper;
 
     @Value("${jwt.refresh-token-expiry}") private long refreshExpiry;
     @Value("${jwt.access-token-expiry}") private long accessExpiry;
 
     @Override
-    public AuthResponse.TokenPair register(AuthRequest.Register req) {
-        if (userRepository.existsByEmail(req.getEmail())) {
-            throw new BadRequestException("Email đã được sử dụng");
+    public AuthResponse.TokenPair register(AuthRequest.Register request) {
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new BadRequestException("Email đã được sử dụng!");
         }
-        User user = User.builder()
-            .email(req.getEmail())
-            .passwordHash(passwordEncoder.encode(req.getPassword()))
-            .fullName(req.getFullName())
-            .build();
-        userRepository.save(user);
-        return buildTokenPair(user);
+
+        User user = new User();
+        user.setEmail(request.getEmail());
+        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        user.setFullName(request.getFullName());
+        user.setRole(User.Role.USER);
+        user.setAiUsedThisMonth(0);
+
+        PackageService freePackage = packageServiceRepository.findByName("FREE")
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy cấu hình gói mặc định FREE trong hệ thống."));
+
+        user.setCurrentPackage(freePackage);
+        user.setPackageExpiryDate(LocalDateTime.now().plusYears(99));
+
+        User savedUser = userRepository.save(user);
+
+        String accessToken = jwtTokenProvider.generateAccessToken(savedUser.getEmail(), savedUser.getRole().name());
+        String rawRefresh = jwtTokenProvider.generateRefreshToken();
+
+        RefreshToken rt = RefreshToken.builder()
+                .user(savedUser)
+                .token(rawRefresh)
+                .expiredAt(LocalDateTime.now().plusSeconds(refreshExpiry / 1000))
+                .build();
+        refreshTokenRepository.save(rt);
+
+        return AuthResponse.TokenPair.builder()
+                .accessToken(accessToken)
+                .refreshToken(rawRefresh)
+                .tokenType("Bearer")
+                .expiresIn(accessExpiry / 1000)
+                .user(AuthResponse.UserInfo.builder()
+                        .id(savedUser.getId())
+                        .email(savedUser.getEmail())
+                        .fullName(savedUser.getFullName())
+                        .role(savedUser.getRole())
+                        .createdAt(savedUser.getCreatedAt())
+                        .build())
+                .build();
     }
 
     @Override
@@ -83,11 +120,32 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void changePassword(String email, AuthRequest.ChangePassword req) {
         User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        if (!passwordEncoder.matches(req.getOldPassword(), user.getPasswordHash())) {
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        String oldPassword = req.getOldPassword();
+        String newPassword = req.getNewPassword();
+
+        if (newPassword == null || newPassword.isBlank()) {
+            throw new BadRequestException("Mật khẩu mới không được để trống");
+        }
+
+        if (!newPassword.equals(newPassword.trim())) {
+            throw new BadRequestException("Mật khẩu mới không được bắt đầu hoặc kết thúc bằng khoảng trắng");
+        }
+
+        if (newPassword.length() < 6 || newPassword.length() > 100) {
+            throw new BadRequestException("Mật khẩu mới phải từ 6–100 ký tự");
+        }
+
+        if (!passwordEncoder.matches(oldPassword, user.getPasswordHash())) {
             throw new BadRequestException("Mật khẩu cũ không đúng");
         }
-        user.setPasswordHash(passwordEncoder.encode(req.getNewPassword()));
+
+        if (passwordEncoder.matches(newPassword, user.getPasswordHash())) {
+            throw new BadRequestException("Mật khẩu mới không được trùng với mật khẩu cũ");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
         userRepository.save(user);
         refreshTokenRepository.deleteByUserId(user.getId());
     }

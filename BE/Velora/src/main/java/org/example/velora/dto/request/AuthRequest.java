@@ -17,6 +17,7 @@ public class AuthRequest {
         @Size(min = 6, max = 100, message = "Mật khẩu từ 6–100 ký tự")
         private String password;
 
+        @NotBlank(message = "Họ và tên không được để trống")
         @Size(max = 100, message = "Tên tối đa 100 ký tự")
         private String fullName;
     }
