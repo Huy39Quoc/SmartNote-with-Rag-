@@ -17,7 +17,7 @@ import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
 import toast from 'react-hot-toast'
 
-export default function KienThuc() {
+export default function Knowledge() {
     const [danhSach, setDanhSach] = useState([])
     const [chon, setChon] = useState(null)
     const [chiTiet, setChiTiet] = useState(null)
@@ -331,7 +331,7 @@ export default function KienThuc() {
 
                                                 <div
                                                     style={{flex: 1, overflow: 'hidden', cursor: 'pointer'}}
-                                                    onClick={() => navigate(`/ghi-chu/${n.id}`)}
+                                                    onClick={() => navigate(`/notes/${n.id}`)}
                                                     title="Mở ghi chú"
                                                 >
                                                     <div

@@ -38,7 +38,7 @@ const initialForm = {
     features: []
 };
 
-export default function QuanLyGoi() {
+export default function PackageManagement() {
     const [packages, setPackages] = useState([]);
     const [loading, setLoading] = useState(false);
     const [editingId, setEditingId] = useState(null);

@@ -28,7 +28,7 @@ import toast from 'react-hot-toast'
 import useAuthStore from '../../service/authStore'
 import { hasFeature, getUpgradeMessage } from '../../utils/packageFeatures'
 
-export default function GhiChu() {
+export default function Notes() {
     const { id: idParam } = useParams()
     const navigate = useNavigate()
     const { nguoiDung } = useAuthStore()
@@ -114,7 +114,7 @@ export default function GhiChu() {
 
             setGhiChuHienTai(data.data)
             setKetQuaDongPanel()
-            navigate(`/ghi-chu/${id}`, { replace: true })
+            navigate(`/notes/${id}`, { replace: true })
         } catch {
             toast.error('Không thể mở ghi chú')
         }
@@ -137,7 +137,7 @@ export default function GhiChu() {
     const taiXuongGhiChu = async (format) => {
         if (!coTinhNang('EXPORT_FILE')) {
             toast.error(getUpgradeMessage('EXPORT_FILE'))
-            navigate('/goi-dich-vu')
+            navigate('/service-packages')
             return
         }
 
@@ -186,7 +186,7 @@ export default function GhiChu() {
     const handleTaoFlashcard = async () => {
         if (!coTinhNang('AI_FLASHCARD')) {
             toast.error(getUpgradeMessage('AI_FLASHCARD'))
-            navigate('/goi-dich-vu')
+            navigate('/service-packages')
             return
         }
 
@@ -213,7 +213,7 @@ export default function GhiChu() {
                     id: loadToast,
                 })
 
-                navigate(`/ghi-chu/${ghiChuHienTai.id}/flashcards`)
+                navigate(`/notes/${ghiChuHienTai.id}/flashcards`)
 } else {
     toast.error('AI chưa tìm thấy đủ thông tin cốt lõi để tạo bộ câu hỏi.', {
         id: loadToast,
@@ -240,7 +240,7 @@ const taoMoi = async () => {
 
         setDanhSach(p => [ghiChu, ...p])
         setGhiChuHienTai(ghiChu)
-        navigate(`/ghi-chu/${ghiChu.id}`, { replace: true })
+        navigate(`/notes/${ghiChu.id}`, { replace: true })
     } catch {
         toast.error('Không thể tạo ghi chú')
     }
@@ -279,7 +279,7 @@ const xoa = async () => {
 
         setDanhSach(p => p.filter(n => n.id !== ghiChuHienTai.id))
         setGhiChuHienTai(null)
-        navigate('/ghi-chu', { replace: true })
+        navigate('/notes', { replace: true })
 
         toast.success('Đã xoá')
     } catch {
@@ -316,7 +316,7 @@ const apDungAi = async (ketQua) => {
     if (ketQua.checklist?.length > 0) {
         if (!coTinhNang('CHECKLIST_BASIC')) {
             toast.error(getUpgradeMessage('CHECKLIST_BASIC'))
-            navigate('/goi-dich-vu')
+            navigate('/service-packages')
             return
         }
 
@@ -485,7 +485,7 @@ useEffect(() => {
 const chiaSeGhiChu = async () => {
     if (!coTinhNang('TEAM_WORK')) {
         toast.error(getUpgradeMessage('TEAM_WORK'))
-        navigate('/goi-dich-vu')
+        navigate('/service-packages')
         return
     }
 
@@ -576,7 +576,7 @@ useEffect(() => {
 const trichXuatLich = async () => {
     if (!coTinhNang('EXTRACT_SCHEDULE')) {
         toast.error(getUpgradeMessage('EXTRACT_SCHEDULE'))
-        navigate('/goi-dich-vu')
+        navigate('/service-packages')
         return
     }
 

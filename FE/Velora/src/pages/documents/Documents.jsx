@@ -196,7 +196,7 @@ export default function TaiLieu() {
             })
 
             if (result.noteId) {
-                navigate(`/ghi-chu/${result.noteId}/flashcards`)
+                navigate(`/notes/${result.noteId}/flashcards`)
             }
         } catch (error) {
             toast.error(error.response?.data?.message || 'Không thể tạo flashcard từ tài liệu', {

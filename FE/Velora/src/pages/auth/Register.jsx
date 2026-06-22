@@ -4,7 +4,7 @@ import { IconEye, IconEyeOff } from '@tabler/icons-react'
 import useAuthStore from '../../service/authStore'
 import logo from '../../assets/logo.svg'
 
-export default function DangKy() {
+export default function Register() {
   const [form, setForm] = useState({ hoTen: '', email: '', matKhau: '', xacNhan: '' })
   const [hienMatKhau, setHienMatKhau] = useState(false)
   const [loi, setLoi] = useState({})
@@ -39,8 +39,8 @@ export default function DangKy() {
           form.hoTen.trim()
       )
 
-      if (ok) {
-          navigate('/dang-nhap', {
+        if (ok) {
+          navigate('/login', {
               replace: true,
               state: {
                   email: form.email,
@@ -111,7 +111,7 @@ export default function DangKy() {
 
           <p style={{ textAlign: 'center', marginTop: 20, fontSize: 12, color: 'var(--text-muted)' }}>
             Đã có tài khoản?{' '}
-            <Link to="/dang-nhap" style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}>Đăng nhập</Link>
+            <Link to="/login" style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}>Đăng nhập</Link>
           </p>
         </div>
       </div>

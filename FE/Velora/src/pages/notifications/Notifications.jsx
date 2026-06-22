@@ -10,7 +10,7 @@ import toast from 'react-hot-toast'
 import notificationApi from '../../lib/api/notificationApi.js'
 import EmptyState from '../../components/ui/EmptyState'
 
-export default function ThongBao() {
+export default function Notifications() {
     const [items, setItems] = useState([])
     const [dangTai, setDangTai] = useState(true)
     const [chiChuaDoc, setChiChuaDoc] = useState(false)

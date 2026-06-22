@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 import useAuthStore from '../../service/authStore'
 import { hasFeature } from '../../utils/packageFeatures'
 
-export default function TrangFlashcardAI() {
+export default function FlashcardsAI() {
     const { nguoiDung } = useAuthStore()
 
     const duocDungFlashcard = hasFeature(nguoiDung, 'AI_FLASHCARD')
@@ -64,14 +64,14 @@ export default function TrangFlashcardAI() {
                 </p>
 
                 <button
-                    onClick={() => navigate('/goi-dich-vu')}
+                    onClick={() => navigate('/service-packages')}
                     className="btn-primary flex items-center gap-2"
                 >
                     Nâng cấp gói
                 </button>
 
                 <button
-                    onClick={() => navigate(`/ghi-chu/${id}`)}
+                    onClick={() => navigate(`/notes/${id}`)}
                     className="btn-ghost flex items-center gap-2 mt-3"
                 >
                     <IconArrowLeft size={16} /> Quay lại ghi chú
@@ -93,7 +93,7 @@ export default function TrangFlashcardAI() {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
                 <p className="text-gray-600 dark:text-gray-400 font-medium mb-4">Ghi chú này chưa được tạo bộ câu hỏi trắc nghiệm.</p>
-                <button onClick={() => navigate(`/ghi-chu/${id}`)} className="btn-primary flex items-center gap-2">
+                <button onClick={() => navigate(`/notes/${id}`)} className="btn-primary flex items-center gap-2">
                     <IconArrowLeft size={16} /> Quay lại ghi chú
                 </button>
             </div>
@@ -121,7 +121,7 @@ export default function TrangFlashcardAI() {
             {/* Header điều hướng quay lại */}
             <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center shadow-sm">
                 <button
-                    onClick={() => navigate(`/ghi-chu/${id}`)}
+                    onClick={() => navigate(`/notes/${id}`)}
                     className="flex items-center gap-2 text-sm font-semibold text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                 >
                     <IconArrowLeft size={16} /> Quay lại trình soạn thảo
