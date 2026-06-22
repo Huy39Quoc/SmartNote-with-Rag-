@@ -182,9 +182,14 @@ export default function GoiDichVu() {
     }
 
     const formatGia = (price) => {
-        if (price === null || price === undefined) return '$0'
-        if (Number(price) === 0) return '$0'
-        return `$${price}`
+        const value = Number(price || 0)
+
+        if (value === 0) return '0₫'
+
+        return value.toLocaleString('vi-VN', {
+            style: 'currency',
+            currency: 'VND',
+        })
     }
 
     const sapXepGoi = (packages) => {
