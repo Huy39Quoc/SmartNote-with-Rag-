@@ -17,6 +17,18 @@ public class UserResponse {
         private String fullName;
         private User.Role role;
         private LocalDateTime createdAt;
+
+        private String packageName;
+        private LocalDateTime packageExpiryDate;
+        private Integer aiUsedThisMonth;
+        private Integer maxAiFormatsPerMonth;
+        private Integer maxNotes;
+        private Integer storageGb;
+        private Integer maxDevices;
+        private String packageFeatures;
+
+        private Long noteCount;
+        private Long storageUsedBytes;
     }
 
     @Data

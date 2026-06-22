@@ -39,45 +39,76 @@ public class AuthServiceImpl implements AuthService {
     private final PackageServiceRepository packageServiceRepository;
     private final UserMapper userMapper;
 
-    @Value("${jwt.refresh-token-expiry}") private long refreshExpiry;
-    @Value("${jwt.access-token-expiry}") private long accessExpiry;
+    @Value("${jwt.refresh-token-expiry}")
+    private long refreshExpiry;
+
+    @Value("${jwt.access-token-expiry}")
+    private long accessExpiry;
 
     @Override
     public AuthResponse.TokenPair register(AuthRequest.Register request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
+        String email = request.getEmail() == null
+                ? null
+                : request.getEmail().trim().toLowerCase();
+
+        String fullName = request.getFullName() == null
+                ? null
+                : request.getFullName().trim();
+
+        String password = request.getPassword();
+
+        if (email == null || email.isBlank()) {
+            throw new BadRequestException("Email không được để trống");
+        }
+
+        if (fullName == null || fullName.isBlank()) {
+            throw new BadRequestException("Họ và tên không được để trống");
+        }
+
+        if (password == null || password.isBlank()) {
+            throw new BadRequestException("Mật khẩu không được để trống");
+        }
+
+        if (!password.equals(password.trim())) {
+            throw new BadRequestException("Mật khẩu không được bắt đầu hoặc kết thúc bằng khoảng trắng");
+        }
+
+        if (password.length() < 6 || password.length() > 100) {
+            throw new BadRequestException("Mật khẩu phải từ 6–100 ký tự");
+        }
+
+        if (userRepository.existsByEmail(email)) {
             throw new BadRequestException("Email đã được sử dụng!");
         }
 
         User user = new User();
-        user.setEmail(request.getEmail());
-        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
-        user.setFullName(request.getFullName());
+        user.setEmail(email);
+        user.setPasswordHash(passwordEncoder.encode(password));
+        user.setFullName(fullName);
         user.setRole(User.Role.USER);
         user.setAiUsedThisMonth(0);
 
         PackageService freePackage = packageServiceRepository.findByName("FREE")
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy cấu hình gói mặc định FREE trong hệ thống."));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Không tìm thấy cấu hình gói mặc định FREE trong hệ thống."
+                ));
 
         user.setCurrentPackage(freePackage);
         user.setPackageExpiryDate(LocalDateTime.now().plusYears(99));
 
         User savedUser = userRepository.save(user);
 
-        String accessToken = jwtTokenProvider.generateAccessToken(savedUser.getEmail(), savedUser.getRole().name());
-        String rawRefresh = jwtTokenProvider.generateRefreshToken();
-
-        RefreshToken rt = RefreshToken.builder()
-                .user(savedUser)
-                .token(rawRefresh)
-                .expiredAt(LocalDateTime.now().plusSeconds(refreshExpiry / 1000))
-                .build();
-        refreshTokenRepository.save(rt);
-
+        /*
+         * Sau khi register KHÔNG tạo accessToken / refreshToken.
+         * Lý do:
+         * - FE đang yêu cầu user tự đăng nhập lại.
+         * - Nếu vẫn lưu refresh token ở đây thì FREE sẽ bị tính là đã đăng nhập 1 thiết bị.
+         */
         return AuthResponse.TokenPair.builder()
-                .accessToken(accessToken)
-                .refreshToken(rawRefresh)
+                .accessToken(null)
+                .refreshToken(null)
                 .tokenType("Bearer")
-                .expiresIn(accessExpiry / 1000)
+                .expiresIn(0L)
                 .user(AuthResponse.UserInfo.builder()
                         .id(savedUser.getId())
                         .email(savedUser.getEmail())
@@ -90,31 +121,53 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public AuthResponse.TokenPair login(AuthRequest.Login req) {
+        String email = req.getEmail() == null
+                ? null
+                : req.getEmail().trim().toLowerCase();
+
+        String password = req.getPassword();
+
+        if (email == null || email.isBlank()) {
+            throw new BadRequestException("Email không được để trống");
+        }
+
+        if (password == null || password.isBlank()) {
+            throw new BadRequestException("Mật khẩu không được để trống");
+        }
+
         authenticationManager.authenticate(
-            new UsernamePasswordAuthenticationToken(req.getEmail(), req.getPassword())
+                new UsernamePasswordAuthenticationToken(email, password)
         );
-        User user = userRepository.findByEmail(req.getEmail())
-            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        refreshTokenRepository.deleteExpired();
+
         packageValidationService.validateMaxDevices(user);
+
         return buildTokenPair(user);
     }
 
     @Override
     public AuthResponse.TokenPair refreshToken(String refreshToken) {
         RefreshToken rt = refreshTokenRepository.findByToken(refreshToken)
-            .orElseThrow(() -> new UnauthorizedException("Refresh token không hợp lệ"));
+                .orElseThrow(() -> new UnauthorizedException("Refresh token không hợp lệ"));
+
         if (rt.getExpiredAt().isBefore(LocalDateTime.now())) {
             refreshTokenRepository.delete(rt);
             throw new UnauthorizedException("Refresh token đã hết hạn");
         }
+
         refreshTokenRepository.delete(rt);
+
         return buildTokenPair(rt.getUser());
     }
 
     @Override
     public void logout(String refreshToken) {
         refreshTokenRepository.findByToken(refreshToken)
-            .ifPresent(refreshTokenRepository::delete);
+                .ifPresent(refreshTokenRepository::delete);
     }
 
     @Override
@@ -151,20 +204,33 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private AuthResponse.TokenPair buildTokenPair(User user) {
-        String accessToken = jwtTokenProvider.generateAccessToken(user.getEmail(), user.getRole().name());
+        String accessToken = jwtTokenProvider.generateAccessToken(
+                user.getEmail(),
+                user.getRole().name()
+        );
+
         String rawRefresh = jwtTokenProvider.generateRefreshToken();
+
         RefreshToken rt = RefreshToken.builder()
-            .user(user).token(rawRefresh)
-            .expiredAt(LocalDateTime.now().plusSeconds(refreshExpiry / 1000))
-            .build();
+                .user(user)
+                .token(rawRefresh)
+                .expiredAt(LocalDateTime.now().plusSeconds(refreshExpiry / 1000))
+                .build();
+
         refreshTokenRepository.save(rt);
+
         return AuthResponse.TokenPair.builder()
-            .accessToken(accessToken).refreshToken(rawRefresh)
-            .tokenType("Bearer").expiresIn(accessExpiry / 1000)
-            .user(AuthResponse.UserInfo.builder()
-                .id(user.getId()).email(user.getEmail())
-                .fullName(user.getFullName()).role(user.getRole())
-                .createdAt(user.getCreatedAt()).build())
-            .build();
+                .accessToken(accessToken)
+                .refreshToken(rawRefresh)
+                .tokenType("Bearer")
+                .expiresIn(accessExpiry / 1000)
+                .user(AuthResponse.UserInfo.builder()
+                        .id(user.getId())
+                        .email(user.getEmail())
+                        .fullName(user.getFullName())
+                        .role(user.getRole())
+                        .createdAt(user.getCreatedAt())
+                        .build())
+                .build();
     }
 }

@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.UUID;
+import java.time.LocalDateTime;
 
 public interface NoteRepository extends JpaRepository<Note, UUID> {
 
@@ -25,4 +26,5 @@ public interface NoteRepository extends JpaRepository<Note, UUID> {
 
     long countByUserId(UUID userId);
     List<Note> findByUserIdOrderByUpdatedAtDesc(UUID userId);
+    long countByUserIdAndCreatedAtAfter(UUID userId, LocalDateTime from);
 }

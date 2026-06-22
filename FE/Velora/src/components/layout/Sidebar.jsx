@@ -21,6 +21,7 @@ const menu = [
     { to: '/tong-quan', label: 'Tổng quan', icon: IconLayoutDashboard },
     { to: '/goi-dich-vu', label: 'Gói Premium', icon: IconNotes },
     { to: '/ghi-chu', label: 'Ghi chú', icon: IconNotes },
+    { to: '/ghi-chu-duoc-chia-se', label: 'Được chia sẻ', icon: IconShare },
     { to: '/chat', label: 'Hỏi đáp AI', icon: IconMessages },
     { to: '/tai-lieu', label: 'Tài liệu', icon: IconFileText },
     { to: '/lich', label: 'Lịch & Deadline', icon: IconCalendar },
