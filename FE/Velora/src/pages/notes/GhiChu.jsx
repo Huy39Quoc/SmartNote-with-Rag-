@@ -34,13 +34,15 @@ export default function GhiChu() {
     const { nguoiDung } = useAuthStore()
 
     const coTinhNang = (featureCode) => hasFeature(nguoiDung, featureCode)
+
+    const [danhSach, setDanhSach] = useState([])
+    const [ghiChuHienTai, setGhiChuHienTai] = useState(null)
+
     const accessMode = ghiChuHienTai?.accessMode || 'OWNER'
     const laChuSoHuu = accessMode === 'OWNER'
     const coTheChinhSua = accessMode === 'OWNER' || accessMode === 'EDIT'
     const chiDuocXem = accessMode === 'VIEW'
 
-    const [danhSach, setDanhSach] = useState([])
-    const [ghiChuHienTai, setGhiChuHienTai] = useState(null)
     const [tags, setTags] = useState([])
     const [timKiem, setTimKiem] = useState('')
     const [dangTai, setDangTai] = useState(true)
