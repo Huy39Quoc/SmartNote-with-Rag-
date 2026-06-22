@@ -5,6 +5,7 @@ import useAuthStore from './service/authStore'
 import MainLayout from './components/layout/MainLayout'
 import { ProtectedRoute, AdminRoute, PublicOnlyRoute } from './components/layout/ProtectedRoute'
 import GhiChuDuocChiaSe from './pages/notes/GhiChuDuocChiaSe'
+import PaymentResult from './pages/payment/PaymentResult'
 // Pages
 import Landing    from './pages/landing/Landing'
 import DangNhap   from './pages/auth/DangNhap'
@@ -55,6 +56,7 @@ export default function App() {
                 {/* CHÈN VÀO ĐÂY: Quản lý và phân quyền Admin chỉ dành riêng cho Admin */}
                 <Route path="/quan-tri"            element={<AdminRoute><QuanTri /></AdminRoute>} />
                 <Route path="/quan-tri/goi-dich-vu" element={<AdminRoute><QuanLyGoi /></AdminRoute>} />
+                <Route path="/payment/result" element={<PaymentResult />} />
             </Route>
 
             {/* Fallback */}

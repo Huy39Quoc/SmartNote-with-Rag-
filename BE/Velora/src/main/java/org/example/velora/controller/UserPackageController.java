@@ -2,6 +2,7 @@ package org.example.velora.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.example.velora.entity.PackageService;
 import org.example.velora.entity.PackageTransaction;
@@ -189,6 +190,7 @@ public class UserPackageController {
     }
 
     @GetMapping("/api/packages/vnpay-callback")
+    @Transactional
     public ResponseEntity<Void> vnpayCallback(
             @RequestParam Map<String, String> params,
             HttpServletResponse response

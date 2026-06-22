@@ -15,12 +15,33 @@ public class UserMapper {
     public UserResponse.Profile toProfile(User u, Long noteCount, Long storageUsedBytes) {
         PackageService pkg = u.getCurrentPackage();
 
-        String packageName = pkg != null ? pkg.getName() : "FREE";
-        Integer maxAi = pkg != null ? pkg.getMaxAiFormatsPerMonth() : 10;
-        Integer maxNotes = pkg != null ? pkg.getMaxNotes() : 50;
-        Integer storageGb = pkg != null ? pkg.getStorageGb() : 1;
-        Integer maxDevices = pkg != null ? pkg.getMaxDevices() : 1;
-        String features = pkg != null ? pkg.getFeatures() : "";
+        String packageName = pkg != null && pkg.getName() != null
+                ? pkg.getName()
+                : "FREE";
+
+        Integer maxAi = normalizeLimit(
+                pkg != null ? pkg.getMaxAiFormatsPerMonth() : null,
+                10
+        );
+
+        Integer maxNotes = normalizeLimit(
+                pkg != null ? pkg.getMaxNotes() : null,
+                50
+        );
+
+        Integer storageGb = normalizeLimit(
+                pkg != null ? pkg.getStorageGb() : null,
+                1
+        );
+
+        Integer maxDevices = normalizeLimit(
+                pkg != null ? pkg.getMaxDevices() : null,
+                1
+        );
+
+        String features = pkg != null && pkg.getFeatures() != null
+                ? pkg.getFeatures()
+                : "";
 
         return UserResponse.Profile.builder()
                 .id(u.getId())
@@ -41,5 +62,17 @@ public class UserMapper {
                 .noteCount(noteCount != null ? noteCount : 0L)
                 .storageUsedBytes(storageUsedBytes != null ? storageUsedBytes : 0L)
                 .build();
+    }
+
+    /**
+     * Quy ước:
+     * - Nếu user chưa có package thì dùng defaultValue.
+     * - Nếu package có field null thì hiểu là vô hạn, trả về -1.
+     * - Nếu package có số âm thì cũng hiểu là vô hạn, trả về -1.
+     */
+    private Integer normalizeLimit(Integer value, Integer defaultValue) {
+        if (value == null) return -1;
+        if (value < 0) return -1;
+        return value;
     }
 }
