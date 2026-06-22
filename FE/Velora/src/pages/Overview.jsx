@@ -19,7 +19,7 @@ import scheduleApi from '../lib/api/scheduleApi'
 import dashboardApi from '../lib/api/dashboardApi'
 import Spinner from '../components/ui/Spinner'
 
-export default function TongQuan() {
+export default function Overview() {
     const { nguoiDung } = useAuthStore()
     const navigate = useNavigate()
 
@@ -85,28 +85,28 @@ export default function TongQuan() {
             value: dashboard?.totalNotes || 0,
             sub: `+${dashboard?.notesThisWeek || 0} trong 7 ngày`,
             icon: IconFileText,
-            path: '/ghi-chu',
+            path: '/notes',
         },
         {
             label: 'Tài liệu',
             value: dashboard?.totalDocuments || 0,
             sub: `+${dashboard?.documentsThisWeek || 0} trong 7 ngày`,
             icon: IconUpload,
-            path: '/tai-lieu',
+            path: '/documents',
         },
         {
             label: 'Flashcard',
             value: dashboard?.totalFlashcards || 0,
             sub: `+${dashboard?.flashcardsThisWeek || 0} trong 7 ngày`,
             icon: IconCards,
-            path: '/ghi-chu',
+            path: '/notes',
         },
         {
             label: 'Task hoàn thành',
             value: `${dashboard?.doneTasks || 0}/${dashboard?.totalTasks || 0}`,
             sub: `${dashboard?.taskCompletionRate || 0}% hoàn thành`,
             icon: IconChecklist,
-            path: '/lich',
+            path: '/schedule',
         },
     ]
 
@@ -136,7 +136,7 @@ export default function TongQuan() {
                     </p>
                 </div>
 
-                <button className="btn-primary" onClick={() => navigate('/ghi-chu')}>
+                        <button className="btn-primary" onClick={() => navigate('/notes')}>
                     <IconPlus size={14} /> Ghi chú mới
                 </button>
             </div>
@@ -218,10 +218,10 @@ export default function TongQuan() {
 
             <div style={styles.shortcutGrid}>
                 {[
-                    { icon: IconFileText, nhan: 'Ghi chú', mau: '#1e2d3d', duong: '/ghi-chu', desc: 'Tạo và quản lý ghi chú' },
-                    { icon: IconUpload, nhan: 'Tài liệu', mau: '#251e3d', duong: '/tai-lieu', desc: 'Upload PDF, DOCX, audio' },
-                    { icon: IconCalendar, nhan: 'Lịch', mau: '#2d1e0a', duong: '/lich', desc: 'Deadline & ưu tiên' },
-                    { icon: IconSitemap, nhan: 'Kiến thức', mau: '#1a2d1e', duong: '/kien-thuc', desc: 'Tổ chức theo chủ đề' },
+                    { icon: IconFileText, nhan: 'Ghi chú', mau: '#1e2d3d', duong: '/notes', desc: 'Tạo và quản lý ghi chú' },
+                    { icon: IconUpload, nhan: 'Tài liệu', mau: '#251e3d', duong: '/documents', desc: 'Upload PDF, DOCX, audio' },
+                    { icon: IconCalendar, nhan: 'Lịch', mau: '#2d1e0a', duong: '/schedule', desc: 'Deadline & ưu tiên' },
+                    { icon: IconSitemap, nhan: 'Kiến thức', mau: '#1a2d1e', duong: '/knowledge', desc: 'Tổ chức theo chủ đề' },
                 ].map(({ icon: Icon, nhan, mau, duong, desc }) => (
                     <div
                         key={duong}
@@ -248,7 +248,7 @@ export default function TongQuan() {
 
                         <button
                             className="btn-ghost"
-                            onClick={() => navigate('/ghi-chu')}
+                            onClick={() => navigate('/notes')}
                             style={{ fontSize: 11 }}
                         >
                             Xem tất cả →
@@ -262,7 +262,7 @@ export default function TongQuan() {
                             <div
                                 key={n.id}
                                 style={styles.noteRow}
-                                onClick={() => navigate(`/ghi-chu/${n.id}`)}
+                                onClick={() => navigate(`/notes/${n.id}`)}
                             >
                                 <div style={styles.noteTitle}>{n.title}</div>
                                 <div style={styles.notePreview}>{n.contentPreview || 'Không có nội dung'}</div>
@@ -275,9 +275,9 @@ export default function TongQuan() {
                     <div style={styles.panelHeader}>
                         <span style={{ fontWeight: 500 }}>Deadline sắp tới</span>
 
-                        <button
-                            className="btn-ghost"
-                            onClick={() => navigate('/lich')}
+                            <button
+                                className="btn-ghost"
+                                onClick={() => navigate('/schedule')}
                             style={{ fontSize: 11 }}
                         >
                             Xem tất cả →

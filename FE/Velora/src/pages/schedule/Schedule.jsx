@@ -13,7 +13,7 @@ const NHOM = [
   { key: 'low',     nhan: 'Thấp',        mau: 'var(--text-muted)' },
 ]
 
-export default function Lich() {
+export default function Schedule() {
   const [nhomTask, setNhomTask] = useState({})
   const [dangTai, setDangTai]   = useState(true)
   const [hienForm, setHienForm] = useState(false)

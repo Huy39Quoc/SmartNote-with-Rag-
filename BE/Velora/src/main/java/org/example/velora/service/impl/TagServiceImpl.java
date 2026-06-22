@@ -29,10 +29,23 @@ public class TagServiceImpl implements TagService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
 
-        packageValidationService.validateFeatureAccess(user, "TAG_MANAGEMENT");
-        if (tagRepository.existsByUserIdAndName(userId, req.getName()))
-            throw new BadRequestException("Tag '" + req.getName() + "' đã tồn tại");
-        Tag tag = Tag.builder().user(user).name(req.getName()).color(req.getColor()).build();
+        packageValidationService.validateFeatureAccess(user, "TAG_SUBJECT");
+
+        String name = req.getName().trim();
+        String color = req.getColor() == null || req.getColor().isBlank()
+                ? "#3B82F6"
+                : req.getColor();
+
+        if (tagRepository.existsByUserIdAndName(userId, name)) {
+            throw new BadRequestException("Tag '" + name + "' đã tồn tại");
+        }
+
+        Tag tag = Tag.builder()
+                .user(user)
+                .name(name)
+                .color(color)
+                .build();
+
         return toDetail(tagRepository.save(tag));
     }
 
