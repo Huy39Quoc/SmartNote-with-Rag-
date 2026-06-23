@@ -22,7 +22,7 @@ import Account from './pages/profile/Account'
 import Notifications from './pages/notifications/Notifications'
 import ServicePackages from './pages/packages/ServicePackages'
 import PaymentResult from './pages/payment/PaymentResult'
-
+import SharedDocuments from './pages/documents/SharedDocuments'
 // Admin pages
 import AdminPanel from './pages/admin/AdminPanel'
 import PackageManagement from './pages/admin/PackageManagement'
@@ -73,6 +73,7 @@ export default function App() {
 
                 <Route path="/chat" element={<Chat />} />
                 <Route path="/documents" element={<Documents />} />
+                <Route path="/shared-documents" element={<SharedDocuments />} />
                 <Route path="/schedule" element={<Schedule />} />
                 <Route path="/knowledge" element={<Knowledge />} />
                 <Route path="/account" element={<Account />} />

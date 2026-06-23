@@ -29,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-
+import org.example.velora.repository.DocumentShareRepository;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
@@ -46,7 +46,9 @@ public class DocumentServiceImpl implements DocumentService {
     private final AiService aiService;
     private final ChromaDbClient chromaDbClient;
     private final FileExtractor fileExtractor;
-    @Autowired private ApplicationContext applicationContext;
+    private final DocumentShareRepository documentShareRepository;
+    @Autowired
+    private ApplicationContext applicationContext;
 
     @Value("${upload.dir}") private String uploadDir;
 
@@ -248,7 +250,25 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     // ── Private helpers ───────────────────────────────────────────────────
+    private Document accessibleDocument(UUID userId, UUID docId) {
+        Document doc = documentRepository.findById(docId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tài liệu không tồn tại"));
 
+        if (doc.getUser() != null && doc.getUser().getId().equals(userId)) {
+            return doc;
+        }
+
+        boolean shared = documentShareRepository.existsByDocumentIdAndSharedWithId(
+                docId,
+                userId
+        );
+
+        if (!shared) {
+            throw new ResourceNotFoundException("Tài liệu không tồn tại");
+        }
+
+        return doc;
+    }
     /**
      * Ownership check: chỉ đúng owner mới được truy cập.
      * Admin KHÔNG bypass được — trả 404 thay vì 403
