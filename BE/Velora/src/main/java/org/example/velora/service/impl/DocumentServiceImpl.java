@@ -1,6 +1,7 @@
 package org.example.velora.service.impl;
 
 import org.example.velora.util.ChromaDbClient;
+import org.example.velora.dto.PackageValidationDto;
 import org.example.velora.dto.request.DocumentRequest;
 import org.example.velora.dto.response.DocumentResponse;
 import org.example.velora.entity.Document;
@@ -13,7 +14,6 @@ import org.example.velora.repository.NoteRepository;
 import org.example.velora.repository.UserRepository;
 import org.example.velora.service.AiService;
 import org.example.velora.service.DocumentService;
-import org.example.velora.service.PackageValidationService;
 import org.example.velora.util.FileExtractor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,14 +29,15 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+
 import java.io.IOException;
 import java.nio.file.*;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
-@Service @RequiredArgsConstructor @Transactional @Slf4j
+@Service
+@RequiredArgsConstructor
+@Transactional
+@Slf4j
 public class DocumentServiceImpl implements DocumentService {
 
     private final DocumentRepository documentRepository;
@@ -45,18 +46,23 @@ public class DocumentServiceImpl implements DocumentService {
     private final AiService aiService;
     private final ChromaDbClient chromaDbClient;
     private final FileExtractor fileExtractor;
-    private final PackageValidationService packageValidationService;
     @Autowired private ApplicationContext applicationContext;
 
     @Value("${upload.dir}") private String uploadDir;
 
-    // Định dạng audio hỗ trợ
     private static final Set<String> AUDIO_EXTENSIONS = Set.of(
-        ".mp3", ".wav", ".m4a", ".webm", ".ogg", ".flac", ".aac"
+            ".mp3", ".wav", ".m4a", ".webm", ".ogg", ".flac", ".aac"
     );
+
+    // ── Upload ────────────────────────────────────────────────────────────
 
     @Override
     public DocumentResponse.Summary upload(UUID userId, MultipartFile file) {
+        User user = getUser(userId);
+
+        // Validate storage TRƯỚC khi lưu — tránh file rác trên disk khi limit vượt
+        PackageValidationDto.validateStorageLimit(user, file.getSize());
+
         String originalName = file.getOriginalFilename();
         Document.FileType fileType = resolveFileType(originalName);
         String storedName = UUID.randomUUID() + "_" + originalName;
@@ -64,21 +70,13 @@ public class DocumentServiceImpl implements DocumentService {
 
         try {
             Files.createDirectories(storePath);
-            Files.copy(
-                    file.getInputStream(),
-                    storePath.resolve(storedName),
-                    StandardCopyOption.REPLACE_EXISTING
-            );
+            Files.copy(file.getInputStream(), storePath.resolve(storedName),
+                    StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
             throw new BadRequestException("Không thể lưu file: " + e.getMessage());
         }
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
-
-        packageValidationService.validateStorageLimit(user, file.getSize());
-
-        Document doc = Document.builder()
+        Document doc = documentRepository.save(Document.builder()
                 .user(user)
                 .fileName(storedName)
                 .originalName(originalName)
@@ -86,20 +84,15 @@ public class DocumentServiceImpl implements DocumentService {
                 .storagePath(storePath.resolve(storedName).toString())
                 .fileSize(file.getSize())
                 .status(Document.Status.PENDING)
-                .build();
-
-        doc = documentRepository.save(doc);
+                .build());
 
         UUID docId = doc.getId();
-
-        log.info("Document uploaded and saved: id={}, name={}, type={}",
-                docId, originalName, fileType);
+        log.info("Document uploaded: id={}, name={}, type={}", docId, originalName, fileType);
 
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    log.info("Upload transaction committed. Start async processing document: {}", docId);
                     applicationContext.getBean(DocumentServiceImpl.class).processAsync(docId);
                 }
             });
@@ -110,193 +103,168 @@ public class DocumentServiceImpl implements DocumentService {
         return toSummary(doc);
     }
 
+    // ── Async processing — internal only, không cần userId ───────────────
+
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void processAsync(UUID docId) {
         Document doc = documentRepository.findById(docId).orElse(null);
         if (doc == null) {
-            log.error("Async processing failed: document not found after commit. id={}", docId);
+            log.error("Async processing: document not found id={}", docId);
             return;
         }
 
         doc.setStatus(Document.Status.PROCESSING);
         documentRepository.save(doc);
 
-        log.info("Start processing document: id={}, name={}, type={}",
-                doc.getId(), doc.getOriginalName(), doc.getFileType());
-
         try {
-            boolean embedded = false;
+            boolean embedded;
 
             if (doc.getFileType() == Document.FileType.AUDIO) {
-                log.info("Transcribing audio document: {}", docId);
-
                 String transcript = aiService.transcribeAudioFile(doc.getStoragePath());
                 doc.setAudioTranscript(transcript);
-
-                log.info("Audio transcribed. Start embedding document: {}", docId);
-
-                embedded = chromaDbClient.embed(
-                        docId.toString(),
-                        transcript,
-                        doc.getUser().getId().toString(),
-                        "audio"
-                );
+                embedded = chromaDbClient.embed(docId.toString(), transcript,
+                        doc.getUser().getId().toString(), "audio");
             } else {
-                log.info("Extracting text document: {}", docId);
-
                 String text = fileExtractor.extract(doc.getStoragePath(), doc.getFileType());
                 doc.setExtractedText(text);
-
-                log.info("Text extracted. Length={}, Start embedding document: {}",
-                        text == null ? 0 : text.length(), docId);
-
-                embedded = chromaDbClient.embed(
-                        docId.toString(),
-                        text,
-                        doc.getUser().getId().toString(),
-                        "document"
-                );
+                log.info("Text extracted length={} for doc={}", text == null ? 0 : text.length(), docId);
+                embedded = chromaDbClient.embed(docId.toString(), text,
+                        doc.getUser().getId().toString(), "document");
             }
 
             doc.setIsEmbedded(embedded);
             doc.setStatus(embedded ? Document.Status.DONE : Document.Status.FAILED);
-
-            log.info("Document processed finished: id={}, status={}, embedded={}",
-                    docId, doc.getStatus(), embedded);
+            log.info("Document processed: id={}, status={}, embedded={}", docId, doc.getStatus(), embedded);
 
         } catch (Exception e) {
             doc.setStatus(Document.Status.FAILED);
             doc.setIsEmbedded(false);
-
             log.error("Document {} processing failed", docId, e);
         }
 
         documentRepository.save(doc);
     }
 
+    // ── Business methods — tất cả đi qua ownerOnly() ─────────────────────
+
     @Override
     public DocumentResponse.AudioResult transcribeAudio(UUID userId, UUID docId,
                                                         DocumentRequest.TranscribeAudio req) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
-        packageValidationService.validateAiUsage(user, "AI_AUDIO");
+        User user = getUser(userId);
+        PackageValidationDto.validateAiUsage(user, "AI_AUDIO", userRepository);
 
-        Document doc = getDoc(userId, docId);
+        Document doc = ownerOnly(userId, docId);
         if (doc.getFileType() != Document.FileType.AUDIO)
             throw new BadRequestException("File này không phải audio");
         if (doc.getStatus() != Document.Status.DONE)
             throw new BadRequestException("Audio chưa xử lý xong (trạng thái: " + doc.getStatus() + ")");
 
-        String raw = doc.getAudioTranscript() != null ? doc.getAudioTranscript()
-            : aiService.transcribeAudioFile(doc.getStoragePath());
+        String raw = doc.getAudioTranscript() != null
+                ? doc.getAudioTranscript()
+                : aiService.transcribeAudioFile(doc.getStoragePath());
 
-        // Dùng AI chuyển transcript thô → ghi chú có cấu trúc
         String structured = aiService.structureTranscript(raw, req.getTopic());
-        String title = req.getNoteTitle() != null ? req.getNoteTitle()
-            : aiService.suggestTitle(structured);
+        String title = req.getNoteTitle() != null ? req.getNoteTitle() : aiService.suggestTitle(structured);
 
         UUID createdNoteId = null;
         if (Boolean.TRUE.equals(req.getCreateNote())) {
-            Note note = Note.builder().user(user).title(title).content(structured).build();
-            note = noteRepository.save(note);
+            Note note = noteRepository.save(
+                    Note.builder().user(user).title(title).content(structured).build());
+            chromaDbClient.embed(note.getId().toString(), structured, userId.toString(), "note");
             createdNoteId = note.getId();
-            // Embed note mới vào ChromaDB
-            chromaDbClient.embed(note.getId().toString(), structured,
-                userId.toString(), "note");
         }
 
-        packageValidationService.incrementAiUsage(user);
+        PackageValidationDto.incrementAiUsage(user, userRepository);
 
         return DocumentResponse.AudioResult.builder()
-            .documentId(docId).rawTranscript(raw)
-            .structuredNote(structured).noteTitle(title)
-            .createdNoteId(createdNoteId).build();
+                .documentId(docId).rawTranscript(raw)
+                .structuredNote(structured).noteTitle(title)
+                .createdNoteId(createdNoteId).build();
     }
 
     @Override
     public DocumentResponse.AnalysisResult analyze(UUID userId, UUID docId,
-                                                    DocumentRequest.Analyze req) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
-        packageValidationService.validateAiUsage(user, "AI_ANALYZE");
+                                                   DocumentRequest.Analyze req) {
+        User user = getUser(userId);
+        PackageValidationDto.validateAiUsage(user, "AI_ANALYZE", userRepository);
 
-        Document doc = getDoc(userId, docId);
+        Document doc = ownerOnly(userId, docId);
         if (doc.getStatus() != Document.Status.DONE)
             throw new BadRequestException("Tài liệu chưa xử lý xong");
+
         String content = doc.getFileType() == Document.FileType.AUDIO
-            ? doc.getAudioTranscript() : doc.getExtractedText();
-        if (content == null) throw new BadRequestException("Không có nội dung để phân tích");
+                ? doc.getAudioTranscript() : doc.getExtractedText();
+        if (content == null)
+            throw new BadRequestException("Không có nội dung để phân tích");
 
         DocumentResponse.AnalysisResult result = aiService.analyzeDocument(content, req.getInstruction());
-
-        packageValidationService.incrementAiUsage(user);
-
+        PackageValidationDto.incrementAiUsage(user, userRepository);
         return result;
     }
 
     @Override
     public DocumentResponse.AskResult ask(UUID userId, UUID docId, DocumentRequest.Ask req) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
+        User user = getUser(userId);
+        PackageValidationDto.validateAiUsage(user, "AI_CHAT", userRepository);
 
-        packageValidationService.validateAiUsage(user, "AI_CHAT");
-        Document doc = getDoc(userId, docId);
-
-        if (doc.getStatus() != Document.Status.DONE || !Boolean.TRUE.equals(doc.getIsEmbedded())) {
+        Document doc = ownerOnly(userId, docId);
+        if (doc.getStatus() != Document.Status.DONE || !Boolean.TRUE.equals(doc.getIsEmbedded()))
             throw new BadRequestException("Tài liệu chưa xử lý xong hoặc chưa được embedding");
-        }
 
-        List<String> chunks = chromaDbClient.search(
-                req.getQuestion(),
-                userId.toString(),
-                docId.toString()
-        );
-
+        List<String> chunks = chromaDbClient.search(req.getQuestion(), userId.toString(), docId.toString());
         String answer = aiService.chatWithContext(req.getQuestion(), chunks);
 
-        user.setAiUsedThisMonth(user.getAiUsedThisMonth() + 1);
-        user.setLastAiUsageDate(LocalDateTime.now());
-        userRepository.save(user);
+        PackageValidationDto.incrementAiUsage(user, userRepository);
 
         return DocumentResponse.AskResult.builder()
-                .answer(answer)
-                .sourceParagraphs(chunks)
-                .confidence(chunks.isEmpty() ? 0.3 : 0.85)
-                .build();
+                .answer(answer).sourceParagraphs(chunks)
+                .confidence(chunks.isEmpty() ? 0.3 : 0.85).build();
     }
 
-    @Override @Transactional(readOnly = true)
+    @Override
+    @Transactional(readOnly = true)
     public DocumentResponse.Page getAll(UUID userId, Pageable pageable) {
         Page<Document> page = documentRepository.findByUserIdOrderByUploadedAtDesc(userId, pageable);
         return DocumentResponse.Page.builder()
-            .content(page.getContent().stream().map(this::toSummary).toList())
-            .pageNumber(page.getNumber()).pageSize(page.getSize())
-            .totalElements(page.getTotalElements())
-            .totalPages(page.getTotalPages()).last(page.isLast()).build();
+                .content(page.getContent().stream().map(this::toSummary).toList())
+                .pageNumber(page.getNumber()).pageSize(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages()).last(page.isLast()).build();
     }
 
-    @Override @Transactional(readOnly = true)
+    @Override
+    @Transactional(readOnly = true)
     public DocumentResponse.Detail getById(UUID userId, UUID docId) {
-        return toDetail(getDoc(userId, docId));
+        return toDetail(ownerOnly(userId, docId));
     }
 
     @Override
     public void delete(UUID userId, UUID docId) {
-        Document doc = getDoc(userId, docId);
+        Document doc = ownerOnly(userId, docId);
         try { Files.deleteIfExists(Paths.get(doc.getStoragePath())); } catch (IOException ignored) {}
         chromaDbClient.delete(docId.toString());
         documentRepository.delete(doc);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────
+    // ── Private helpers ───────────────────────────────────────────────────
 
-    private Document getDoc(UUID userId, UUID docId) {
+    /**
+     * Ownership check: chỉ đúng owner mới được truy cập.
+     * Admin KHÔNG bypass được — trả 404 thay vì 403
+     * để không lộ sự tồn tại của tài liệu (security by obscurity).
+     */
+    private Document ownerOnly(UUID userId, UUID docId) {
         Document doc = documentRepository.findById(docId)
-            .orElseThrow(() -> new ResourceNotFoundException("Tài liệu không tồn tại"));
+                .orElseThrow(() -> new ResourceNotFoundException("Tài liệu không tồn tại"));
         if (!doc.getUser().getId().equals(userId))
             throw new ResourceNotFoundException("Tài liệu không tồn tại");
         return doc;
+    }
+
+    private User getUser(UUID userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
     }
 
     private Document.FileType resolveFileType(String name) {
@@ -313,17 +281,17 @@ public class DocumentServiceImpl implements DocumentService {
 
     private DocumentResponse.Summary toSummary(Document d) {
         return DocumentResponse.Summary.builder()
-            .id(d.getId()).originalName(d.getOriginalName()).fileType(d.getFileType())
-            .fileSize(d.getFileSize()).status(d.getStatus())
-            .isEmbedded(d.getIsEmbedded()).uploadedAt(d.getUploadedAt()).build();
+                .id(d.getId()).originalName(d.getOriginalName()).fileType(d.getFileType())
+                .fileSize(d.getFileSize()).status(d.getStatus())
+                .isEmbedded(d.getIsEmbedded()).uploadedAt(d.getUploadedAt()).build();
     }
 
     private DocumentResponse.Detail toDetail(Document d) {
         return DocumentResponse.Detail.builder()
-            .id(d.getId()).originalName(d.getOriginalName()).fileType(d.getFileType())
-            .fileSize(d.getFileSize()).status(d.getStatus()).isEmbedded(d.getIsEmbedded())
-            .aiSummary(d.getAiSummary()).audioTranscript(d.getAudioTranscript())
-            .audioDurationSeconds(d.getAudioDurationSeconds())
-            .uploadedAt(d.getUploadedAt()).updatedAt(d.getUpdatedAt()).build();
+                .id(d.getId()).originalName(d.getOriginalName()).fileType(d.getFileType())
+                .fileSize(d.getFileSize()).status(d.getStatus()).isEmbedded(d.getIsEmbedded())
+                .aiSummary(d.getAiSummary()).audioTranscript(d.getAudioTranscript())
+                .audioDurationSeconds(d.getAudioDurationSeconds())
+                .uploadedAt(d.getUploadedAt()).updatedAt(d.getUpdatedAt()).build();
     }
 }

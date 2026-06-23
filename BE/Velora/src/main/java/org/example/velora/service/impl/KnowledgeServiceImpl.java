@@ -1,5 +1,6 @@
 package org.example.velora.service.impl;
 
+import org.example.velora.dto.PackageValidationDto;
 import org.example.velora.dto.request.KnowledgeGroupRequest;
 import org.example.velora.dto.response.KnowledgeGroupResponse;
 import org.example.velora.dto.response.NoteResponse;
@@ -14,14 +15,15 @@ import org.example.velora.repository.UserRepository;
 import org.example.velora.service.AiService;
 import org.example.velora.service.KnowledgeService;
 import lombok.RequiredArgsConstructor;
-import org.example.velora.service.PackageValidationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
 
-@Service @RequiredArgsConstructor @Transactional
+@Service
+@RequiredArgsConstructor
+@Transactional
 public class KnowledgeServiceImpl implements KnowledgeService {
 
     private final KnowledgeGroupRepository groupRepository;
@@ -29,17 +31,19 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     private final UserRepository userRepository;
     private final AiService aiService;
     private final NoteMapper noteMapper;
-    private final PackageValidationService packageValidationService;
 
     @Override
     public KnowledgeGroupResponse.Detail create(UUID userId, KnowledgeGroupRequest.Create req) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
-        packageValidationService.validateFeatureAccess(user, "GROUP_MANAGEMENT");
+        User user = getUser(userId);
+
+        PackageValidationDto.validateFeatureAccess(user, "GROUP_MANAGEMENT");
+
         List<Note> notes = req.getNoteIds() != null
-            ? noteRepository.findAllById(req.getNoteIds()) : List.of();
+                ? noteRepository.findAllById(req.getNoteIds()) : List.of();
+
         KnowledgeGroup group = KnowledgeGroup.builder()
-            .user(user).groupName(req.getGroupName()).notes(notes).build();
+                .user(user).groupName(req.getGroupName()).notes(notes).build();
+
         return toDetail(groupRepository.save(group));
     }
 
@@ -47,7 +51,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     public KnowledgeGroupResponse.Detail update(UUID userId, UUID groupId, KnowledgeGroupRequest.Update req) {
         KnowledgeGroup g = getGroup(userId, groupId);
         if (req.getGroupName() != null) g.setGroupName(req.getGroupName());
-        if (req.getNoteIds() != null) g.setNotes(noteRepository.findAllById(req.getNoteIds()));
+        if (req.getNoteIds() != null)   g.setNotes(noteRepository.findAllById(req.getNoteIds()));
         return toDetail(groupRepository.save(g));
     }
 
@@ -56,13 +60,15 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         groupRepository.delete(getGroup(userId, groupId));
     }
 
-    @Override @Transactional(readOnly = true)
+    @Override
+    @Transactional(readOnly = true)
     public List<KnowledgeGroupResponse.Summary> getAll(UUID userId) {
         return groupRepository.findByUserIdOrderByCreatedAtDesc(userId)
-            .stream().map(this::toSummary).toList();
+                .stream().map(this::toSummary).toList();
     }
 
-    @Override @Transactional(readOnly = true)
+    @Override
+    @Transactional(readOnly = true)
     public KnowledgeGroupResponse.Detail getById(UUID userId, UUID groupId) {
         return toDetail(getGroup(userId, groupId));
     }
@@ -75,23 +81,18 @@ public class KnowledgeServiceImpl implements KnowledgeService {
     @Override
     public List<KnowledgeGroupResponse.Summary> reclassifyAll(UUID userId) {
         List<Note> notes = noteRepository.findByUserIdOrderByUpdatedAtDesc(userId);
-
         List<KnowledgeGroup> existingGroups = groupRepository.findByUserIdOrderByCreatedAtDesc(userId);
 
         for (Note note : notes) {
-            if (note.getContent() == null || note.getContent().isBlank()) {
-                continue;
-            }
+            if (note.getContent() == null || note.getContent().isBlank()) continue;
 
             KnowledgeGroupResponse.ClassifyResult result = aiService.classifyContent(
-                    "# " + note.getTitle() + "\n\n" + note.getContent()
-            );
+                    "# " + note.getTitle() + "\n\n" + note.getContent());
 
-            String groupName = result.getSuggestedGroupName();
-
-            if (groupName == null || groupName.isBlank()) {
-                groupName = "Chung";
-            }
+            String groupName = (result.getSuggestedGroupName() == null
+                    || result.getSuggestedGroupName().isBlank())
+                    ? "Chung"
+                    : result.getSuggestedGroupName();
 
             final String finalGroupName = groupName;
 
@@ -106,7 +107,6 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                                 .aiReasoning(result.getReasoning())
                                 .notes(new java.util.ArrayList<>())
                                 .build();
-
                         KnowledgeGroup saved = groupRepository.save(ng);
                         existingGroups.add(saved);
                         return saved;
@@ -121,9 +121,11 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         return getAll(userId);
     }
 
+    // ── Private helpers ───────────────────────────────────────────────────
+
     private KnowledgeGroup getGroup(UUID userId, UUID groupId) {
         KnowledgeGroup g = groupRepository.findById(groupId)
-            .orElseThrow(() -> new ResourceNotFoundException("Nhóm không tồn tại"));
+                .orElseThrow(() -> new ResourceNotFoundException("Nhóm không tồn tại"));
         if (!g.getUser().getId().equals(userId))
             throw new ResourceNotFoundException("Nhóm không tồn tại");
         return g;
@@ -131,21 +133,21 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
     private User getUser(UUID userId) {
         return userRepository.findById(userId)
-            .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
+                .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
     }
 
     private KnowledgeGroupResponse.Summary toSummary(KnowledgeGroup g) {
         return KnowledgeGroupResponse.Summary.builder()
-            .id(g.getId()).groupName(g.getGroupName()).suggestedByAi(g.getSuggestedByAi())
-            .noteCount(g.getNotes().size()).createdAt(g.getCreatedAt()).build();
+                .id(g.getId()).groupName(g.getGroupName()).suggestedByAi(g.getSuggestedByAi())
+                .noteCount(g.getNotes().size()).createdAt(g.getCreatedAt()).build();
     }
 
     private KnowledgeGroupResponse.Detail toDetail(KnowledgeGroup g) {
         List<NoteResponse.Summary> notes = g.getNotes().stream()
-            .map(noteMapper::toSummary).toList();
+                .map(noteMapper::toSummary).toList();
         return KnowledgeGroupResponse.Detail.builder()
-            .id(g.getId()).groupName(g.getGroupName()).suggestedByAi(g.getSuggestedByAi())
-            .aiReasoning(g.getAiReasoning()).notes(notes)
-            .createdAt(g.getCreatedAt()).updatedAt(g.getUpdatedAt()).build();
+                .id(g.getId()).groupName(g.getGroupName()).suggestedByAi(g.getSuggestedByAi())
+                .aiReasoning(g.getAiReasoning()).notes(notes)
+                .createdAt(g.getCreatedAt()).updatedAt(g.getUpdatedAt()).build();
     }
 }

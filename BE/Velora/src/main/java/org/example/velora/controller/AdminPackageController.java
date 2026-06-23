@@ -5,7 +5,6 @@ import org.example.velora.dto.request.PackageServiceRequest;
 import org.example.velora.dto.response.ApiResponse;
 import org.example.velora.entity.PackageService;
 import org.example.velora.service.AdminService;
-import org.example.velora.service.UserPackageService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -15,18 +14,9 @@ import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
-public class PackageController {
+public class AdminPackageController {
 
-    private final UserPackageService userPackageService;
     private final AdminService adminService;
-
-    @GetMapping("/api/packages/active")
-    public ResponseEntity<ApiResponse<List<PackageService>>> getActivePackages() {
-        return ResponseEntity.ok(ApiResponse.ok(
-                "Lấy danh sách gói dịch vụ thành công",
-                userPackageService.getActivePackages()
-        ));
-    }
 
     @GetMapping("/api/admin/packages")
     @PreAuthorize("hasRole('ADMIN')")

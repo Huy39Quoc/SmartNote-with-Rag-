@@ -1,5 +1,6 @@
 package org.example.velora.service.impl;
 
+import org.example.velora.dto.PackageValidationDto;
 import org.example.velora.dto.request.TagRequest;
 import org.example.velora.dto.response.TagResponse;
 import org.example.velora.entity.Tag;
@@ -8,7 +9,6 @@ import org.example.velora.exception.BadRequestException;
 import org.example.velora.exception.ResourceNotFoundException;
 import org.example.velora.repository.TagRepository;
 import org.example.velora.repository.UserRepository;
-import org.example.velora.service.PackageValidationService;
 import org.example.velora.service.TagService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -22,14 +22,13 @@ public class TagServiceImpl implements TagService {
 
     private final TagRepository tagRepository;
     private final UserRepository userRepository;
-    private final PackageValidationService packageValidationService;
 
     @Override
     public TagResponse.Detail create(UUID userId, TagRequest.Create req) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
 
-        packageValidationService.validateFeatureAccess(user, "TAG_SUBJECT");
+        PackageValidationDto.validateFeatureAccess(user, "TAG_SUBJECT");
 
         String name = req.getName().trim();
         String color = req.getColor() == null || req.getColor().isBlank()

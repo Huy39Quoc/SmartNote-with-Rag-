@@ -66,7 +66,7 @@ public class PaymentServiceImpl implements PaymentService {
                     "packageName",  pkg.getName(),
                     "message",      "Đã kích hoạt gói " + pkg.getName()
             );
-            return ApiResponse.success(data);
+            return ApiResponse.ok(data);
         }
 
         // Tạo transaction pending
@@ -90,7 +90,7 @@ public class PaymentServiceImpl implements PaymentService {
                 "packageName",  pkg.getName(),
                 "billingType",  normalizedType
         );
-        return ApiResponse.success(data);
+        return ApiResponse.ok(data);
     }
 
     @Override

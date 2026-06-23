@@ -1,0 +1,148 @@
+package org.example.velora.service.impl;
+
+import lombok.RequiredArgsConstructor;
+import org.example.velora.dto.PackageValidationDto;
+import org.example.velora.dto.response.FlashcardResponse;
+import org.example.velora.entity.Document;
+import org.example.velora.entity.Flashcard;
+import org.example.velora.entity.Note;
+import org.example.velora.entity.User;
+import org.example.velora.exception.BadRequestException;
+import org.example.velora.exception.ResourceNotFoundException;
+import org.example.velora.repository.DocumentRepository;
+import org.example.velora.repository.FlashcardRepository;
+import org.example.velora.repository.NoteRepository;
+import org.example.velora.repository.UserRepository;
+import org.example.velora.service.AiService;
+import org.example.velora.service.FlashcardService;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class FlashcardServiceImpl implements FlashcardService {
+
+    private final NoteRepository noteRepository;
+    private final FlashcardRepository flashcardRepository;
+    private final UserRepository userRepository;
+    private final DocumentRepository documentRepository;
+    private final AiService aiService;
+
+    @Override
+    public List<FlashcardResponse> generateFromNote(UUID userId, UUID noteId) {
+        User user = getUser(userId);
+        Note note = ownerOnlyNote(noteId, user);
+
+        PackageValidationDto.validateAiUsage(user, "AI_FLASHCARD", userRepository);
+
+        flashcardRepository.deleteByNoteId(note.getId());
+
+        List<Flashcard> saved = flashcardRepository.saveAll(
+                aiService.generateFlashcardsFromNote(note));
+
+        PackageValidationDto.incrementAiUsage(user, userRepository);
+
+        return saved.stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    public Map<String, Object> generateFromDocument(UUID userId, UUID documentId) {
+        User user = getUser(userId);
+
+        PackageValidationDto.validateAiUsage(user, "AI_FLASHCARD", userRepository);
+
+        Document document = documentRepository.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tài liệu không tồn tại"));
+
+        // Ownership check — chỉ owner mới được dùng, trả 404 để không lộ sự tồn tại
+        if (document.getUser() == null || !document.getUser().getId().equals(userId))
+            throw new ResourceNotFoundException("Tài liệu không tồn tại");
+
+        if (document.getStatus() != Document.Status.DONE && document.getStatus() != Document.Status.SUCCESS)
+            throw new BadRequestException("Tài liệu chưa xử lý xong, chưa thể tạo flashcard");
+
+        String sourceContent = pickContent(document);
+        if (sourceContent == null || sourceContent.isBlank())
+            throw new BadRequestException("Tài liệu chưa có nội dung để tạo flashcard");
+
+        if (sourceContent.length() > 12000)
+            sourceContent = sourceContent.substring(0, 12000);
+
+        Note generatedNote = noteRepository.save(Note.builder()
+                .user(user)
+                .title(buildNoteTitle(document))
+                .content(sourceContent)
+                .isBookmarked(false)
+                .isEmbedded(false)
+                .build());
+
+        List<Flashcard> saved = flashcardRepository.saveAll(
+                aiService.generateFlashcardsFromNote(generatedNote));
+
+        PackageValidationDto.incrementAiUsage(user, userRepository);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("noteId",     generatedNote.getId());
+        data.put("documentId", document.getId());
+        data.put("total",      saved.size());
+        data.put("cards",      saved.stream().map(this::toResponse).collect(Collectors.toList()));
+        return data;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<FlashcardResponse> getByNote(UUID userId, UUID noteId) {
+        User user = getUser(userId);
+        Note note = ownerOnlyNote(noteId, user);
+        return flashcardRepository.findByNoteId(note.getId())
+                .stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    // ── Private helpers ───────────────────────────────────────────────────
+
+    private User getUser(UUID userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
+    }
+
+    private Note ownerOnlyNote(UUID noteId, User user) {
+        Note note = noteRepository.findById(noteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ghi chú không tồn tại"));
+        if (note.getUser() == null || !note.getUser().getId().equals(user.getId()))
+            throw new ResourceNotFoundException("Ghi chú không tồn tại");
+        return note;
+    }
+
+    private String pickContent(Document document) {
+        if (document.getExtractedText() != null && !document.getExtractedText().isBlank())
+            return document.getExtractedText();
+        if (document.getAudioTranscript() != null && !document.getAudioTranscript().isBlank())
+            return document.getAudioTranscript();
+        if (document.getAiSummary() != null && !document.getAiSummary().isBlank())
+            return document.getAiSummary();
+        return "";
+    }
+
+    private String buildNoteTitle(Document document) {
+        String name = document.getOriginalName() == null ? "tài liệu" : document.getOriginalName().trim();
+        String title = "Flashcard từ tài liệu: " + name;
+        return title.length() > 240 ? title.substring(0, 240) : title;
+    }
+
+    private FlashcardResponse toResponse(Flashcard c) {
+        return FlashcardResponse.builder()
+                .id(c.getId())
+                .question(c.getQuestion())
+                .answer(c.getAnswer())
+                .noteId(c.getNote() != null ? String.valueOf(c.getNote().getId()) : null)
+                .createdAt(c.getCreatedAt())
+                .build();
+    }
+}
