@@ -22,7 +22,7 @@ export default function PaymentResult() {
                 desc: 'Gói dịch vụ của bạn đã được kích hoạt. Bạn có thể quay lại hệ thống để sử dụng các tính năng mới.',
                 color: 'var(--accent-green)',
                 actionText: 'Về gói dịch vụ',
-                actionPath: '/goi-dich-vu',
+                actionPath: '/service-packages'
             }
         }
 
@@ -33,7 +33,7 @@ export default function PaymentResult() {
                 desc: 'Bạn đã hủy giao dịch hoặc ngân hàng từ chối thanh toán. Gói dịch vụ chưa được kích hoạt.',
                 color: 'var(--accent-red)',
                 actionText: 'Thử thanh toán lại',
-                actionPath: '/goi-dich-vu',
+                actionPath: '/service-packages'
             }
         }
 
@@ -44,7 +44,7 @@ export default function PaymentResult() {
                 desc: 'VNPay trả về giao dịch nhưng hệ thống không xác thực được chữ ký. Vui lòng kiểm tra lại cấu hình TMN Code và Hash Secret.',
                 color: 'var(--accent-amber)',
                 actionText: 'Về gói dịch vụ',
-                actionPath: '/goi-dich-vu',
+                actionPath: '/service-packages'
             }
         }
 
@@ -55,7 +55,7 @@ export default function PaymentResult() {
                 desc: 'Hệ thống không tìm thấy mã giao dịch tương ứng. Vui lòng tạo giao dịch mới.',
                 color: 'var(--accent-amber)',
                 actionText: 'Tạo giao dịch mới',
-                actionPath: '/goi-dich-vu',
+                actionPath: '/service-packages'
             }
         }
 
@@ -65,7 +65,7 @@ export default function PaymentResult() {
             desc: 'Vui lòng quay lại trang gói dịch vụ và kiểm tra lại trạng thái tài khoản.',
             color: 'var(--accent-amber)',
             actionText: 'Về gói dịch vụ',
-            actionPath: '/goi-dich-vu',
+            actionPath: '/service-packages'
         }
     }, [status])
 
@@ -102,7 +102,7 @@ export default function PaymentResult() {
 
                     <button
                         className="btn-ghost"
-                        onClick={() => navigate('/tong-quan')}
+                        onClick={() => navigate('/overview')}
                     >
                         <IconArrowLeft size={14} />
                         Về tổng quan

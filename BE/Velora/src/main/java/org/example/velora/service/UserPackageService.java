@@ -9,7 +9,4 @@ public interface UserPackageService {
 
     List<PackageService> getActivePackages();
 
-    Map<String, Object> checkoutPackage(UUID packageId, String type, String email, String clientIp);
-
-    String handleVNPayCallback(Map<String, String> params);
 }
