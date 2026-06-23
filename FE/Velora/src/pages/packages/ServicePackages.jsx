@@ -263,7 +263,112 @@ export default function ServicePackages() {
             </div>
         )
     }
+    const getPackageByName = (name) => {
+        return danhSachGoi.find(
+            goi => goi.name?.toUpperCase() === name.toUpperCase()
+        )
+    }
 
+    const packageHasFeature = (goi, featureCode) => {
+        if (!goi?.features) return false
+
+        return goi.features
+            .split(',')
+            .map(item => item.trim())
+            .filter(Boolean)
+            .includes(featureCode)
+    }
+
+    const renderPackageFeatureValue = (goi, featureCode) => {
+        if (!goi) return false
+
+        if (featureCode === 'AI_NOTE_FORMAT') {
+            return hienThiGioiHan(goi.maxAiFormatsPerMonth, ' lần/tháng')
+        }
+
+        if (featureCode === 'DOCUMENT_UPLOAD') {
+            return hienThiGioiHan(goi.storageGb, ' GB')
+        }
+
+        if (featureCode === 'NOTE_LIMIT') {
+            return hienThiGioiHan(goi.maxNotes, ' ghi chú')
+        }
+
+        if (featureCode === 'DEVICE_LIMIT') {
+            return hienThiGioiHan(goi.maxDevices, ' thiết bị')
+        }
+
+        return packageHasFeature(goi, featureCode)
+    }
+
+    const buildDynamicCompareRows = () => {
+        const free = getPackageByName('FREE')
+        const pro = getPackageByName('PRO')
+        const plus = getPackageByName('PLUS')
+
+        const featureCodes = [
+            'NOTE_LIMIT',
+            'AI_NOTE_FORMAT',
+            'DOCUMENT_UPLOAD',
+            'DEVICE_LIMIT',
+            'TAG_SUBJECT',
+            'CHECKLIST_BASIC',
+            'AI_SUMMARY_BASIC',
+            'AI_SUMMARY_ADVANCED',
+            'AI_CHAT',
+            'AI_ANALYZE',
+            'EXTRACT_SCHEDULE',
+            'DEADLINE_MANAGEMENT',
+            'PRIORITY_SUGGESTION',
+            'AI_FLASHCARD',
+            'EXPORT_FILE',
+            'TEAM_WORK',
+            'AI_PROGRESS_ANALYTICS',
+            'TEAM_DASHBOARD',
+            'GOOGLE_CALENDAR',
+            'MANAGE_MEMBERS',
+            'CUSTOM_WORKSPACE',
+            'PRIORITY_SUPPORT',
+        ]
+
+        const customLabels = {
+            NOTE_LIMIT: 'Số ghi chú',
+            DEVICE_LIMIT: 'Số thiết bị',
+        }
+
+        return featureCodes.map(code => ({
+            id: code,
+            label: customLabels[code] || getFeatureLabel(code),
+            free: renderPackageFeatureValue(free, code),
+            pro: renderPackageFeatureValue(pro, code),
+            plus: renderPackageFeatureValue(plus, code),
+        }))
+    }
+    const PACKAGE_RANK = {
+        FREE: 0,
+        PRO: 1,
+        PLUS: 2,
+    }
+
+    const getPackageActionLabel = (goi, current, isFree) => {
+        const currentName = currentPackageName?.toUpperCase() || 'FREE'
+        const targetName = goi.name?.toUpperCase() || 'FREE'
+
+        const currentRank = PACKAGE_RANK[currentName] ?? 0
+        const targetRank = PACKAGE_RANK[targetName] ?? 0
+
+        if (current) return 'Gói hiện tại'
+
+        if (targetRank < currentRank) {
+            return `Hạ cấp xuống ${targetName}`
+        }
+
+        if (targetRank > currentRank) {
+            return isFree ? 'Kích hoạt miễn phí' : `Nâng cấp lên ${targetName}`
+        }
+
+        return isFree ? 'Kích hoạt miễn phí' : 'Đăng ký ngay'
+    }
     return (
         <div style={styles.page}>
             <h2 style={styles.title}>Nâng cấp Velora Premium</h2>
@@ -423,13 +528,9 @@ export default function ServicePackages() {
                                 disabled={buyingId === goi.id || current}
                                 onClick={() => handleMuaGoi(goi.id)}
                             >
-                                {current
-                                    ? 'Gói hiện tại'
-                                    : buyingId === goi.id
-                                        ? 'Đang chuyển hướng...'
-                                        : isFree
-                                            ? 'Kích hoạt miễn phí'
-                                            : 'Đăng ký ngay'}
+                                {buyingId === goi.id
+                                    ? 'Đang chuyển hướng...'
+                                    : getPackageActionLabel(goi, current, isFree)}
                             </button>
                         </div>
                     )
@@ -451,7 +552,7 @@ export default function ServicePackages() {
                         </thead>
 
                         <tbody>
-                        {FEATURE_ROWS.map(row => (
+                        {buildDynamicCompareRows().map(row => (
                             <tr key={row.id}>
                                 <td style={styles.compareTdFeature}>{row.label}</td>
                                 <td style={styles.compareTd}>{renderCompareValue(row.free)}</td>

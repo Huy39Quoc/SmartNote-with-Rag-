@@ -159,7 +159,16 @@ export default function PackageManagement() {
         const found = AVAILABLE_FEATURES.find(f => f.id === id);
         return found ? found.label : id;
     };
+    const formatVnd = (value) => {
+        const number = Number(value || 0)
 
+        if (number === 0) return '0₫'
+
+        return number.toLocaleString('vi-VN', {
+            style: 'currency',
+            currency: 'VND',
+        })
+    }
     return (
         <div style={styles.page}>
             {/* Header Section */}
@@ -203,25 +212,35 @@ export default function PackageManagement() {
                                 />
                             </div>
                             <div style={styles.formGroup}>
-                                <label style={styles.label}>Giá / Tháng ($)</label>
+                                <label style={styles.label}>Giá / Tháng (VND)</label>
                                 <input
                                     type="number"
-                                    step="0.01"
+                                    step="1000"
+                                    min="0"
                                     required
                                     style={styles.input}
+                                    placeholder="Ví dụ: 49000"
                                     value={formData.priceMonthly}
-                                    onChange={e => setFormData({...formData, priceMonthly: parseFloat(e.target.value) || 0})}
+                                    onChange={e => setFormData({
+                                        ...formData,
+                                        priceMonthly: Number(e.target.value) || 0
+                                    })}
                                 />
                             </div>
                             <div style={styles.formGroup}>
-                                <label style={styles.label}>Giá / Năm ($)</label>
+                                <label style={styles.label}>Giá / Năm (VND)</label>
                                 <input
                                     type="number"
-                                    step="0.01"
+                                    step="1000"
+                                    min="0"
                                     required
                                     style={styles.input}
+                                    placeholder="Ví dụ: 390000"
                                     value={formData.priceYearly}
-                                    onChange={e => setFormData({...formData, priceYearly: parseFloat(e.target.value) || 0})}
+                                    onChange={e => setFormData({
+                                        ...formData,
+                                        priceYearly: Number(e.target.value) || 0
+                                    })}
                                 />
                             </div>
                         </div>
@@ -340,8 +359,12 @@ export default function PackageManagement() {
                                             <p style={styles.packageDesc}>{pkg.description || 'Không có mô tả chi tiết cho gói này.'}</p>
                                         </td>
                                         <td style={styles.tableCell}>
-                                            <div style={styles.priceMonthly}>${pkg.priceMonthly} / thg</div>
-                                            <div style={styles.priceYearly}>${pkg.priceYearly} / năm</div>
+                                            <div style={styles.priceMonthly}>
+                                                {formatVnd(pkg.priceMonthly)} / tháng
+                                            </div>
+                                            <div style={styles.priceYearly}>
+                                                {formatVnd(pkg.priceYearly)} / năm
+                                            </div>
                                         </td>
                                         <td style={styles.tableCell}>
                                             <div style={styles.specItem}>📄 Ghi chú: <span style={styles.specValue}>{pkg.maxNotes === -1 ? 'Vô hạn' : `${pkg.maxNotes} file`}</span></div>
