@@ -1,0 +1,241 @@
+    +-------------------+                                      +-------------------+
+    |   :TeamLeader     | ==================================== |      :System      |
+    +-------------------+                                      +-------------------+
+                            1. login()                              ||   ||   ||
+                            1.1 navigateToSubmissionForm(round_id)  ||   ||   ||
+                            1.2 [Return] displaySubmissionForm()    ||   ||   || 1.3 [deadline not passed]:
+                            2. submitEntry(repo_url, ...)           ||   ||   ||     validateDeadline()
+                            2.3 [Return] displayConfirmation()      ||   ||   +----------------+
+                            2.1 [deadline passed]: displayError()   ||   ||                    |
+                                                                    ||   ||   (Self-Loop)<-----+
+                                                                    ||   ||
+       +------------------------------------------------------------+    ||
+       |                                                                 ||
+       | 2.1 saveSubmission(team_id, round_id, status=SUBMITTED)         ||
+       | 2.2 [Return] confirmSaved()                                     ||
+       v                                                                 ||
+    +-------------------+                                                ||
+    |   :Submission     |                                                ||
+    +-------------------+                                                ||
+                                                                         ||
+       +-----------------------------------------------------------------+
+       |
+       +-------------------------------+-------------------------------+
+       |                               |
+       | B1 [repo_url valid]:          | A1 [submission saved]:
+       |    fetchAndSaveMetadata()     |    sendConfirmationEmail()
+       | B2 [retry_count < 3]:         |
+       |    retryFetch()               |
+       v                               v
+    +-------------------------+    +---------------------+
+    | :RepositoryMetadata     |    | :NotificationService|
+    +-------------------------+    +---------------------+
+
+
+
+
+
+
+
+
+1. login()
+1.1 getScoringRoster(round_id) / 1.3 selectSubmission(submission_id) / 2. submitScore()
+             +-----------------------------------------------------------------------+
+             | 1.2 [Return] returnAuthToken()                                        |
+             | 1.4 [Return] displayScoringRoster(submissions[])                      |
+             | 1.6 [Return] displaySubmissionDetails(urls, metadata, criteria[])     |
+             | 2.1 [score > max_score]: displayError("Score exceeds maximum")        |
+             | 2.2 [team disqualified]: lockInputs(), displayWarning()               |
+             v                                                                       |
+   +------------------+                                                    +-------------------+
+   |      :Judge      | ================================================== |      :System      |
+   +------------------+                                                    +-------------------+
+                                                                            ||   ||   ||   ||
+         +-------------------------------------------------------------------+   ||   ||   ||
+         |                                                                       ||   ||   ||
+         | 1.1.1 queryAssignments(judge_id, round_id)                            ||   ||   ||
+         | 1.1.2 [Return] returnAssignedSubmissions()                            ||   ||   ||
+         v                                                                       ||   ||   ||
+   +-------------------------+                                                   ||   ||   ||
+   | :JudgeAssignment        |                                                   ||   ||   ||
+   +-------------------------+                                                   ||   ||   ||
+                                                                                 ||   ||   ||
+         +-----------------------------------------------------------------------+    ||   ||
+         |                                                                            ||   ||
+         | 1.3.1 loadSubmissionDetails(submission_id)                                 ||   ||
+         | 1.3.2 loadRepositoryMetadata(submission_id)                                ||   ||
+         | 1.3.3 loadScoringCriteria(event_id)                                        ||   ||
+         | 1.3.4 [Return] returnDetails(urls, metadata, criteria[])                   ||   ||
+         v                                                                            ||   ||
+   +-------------------------+                                                        ||   ||
+   |      :Submission        |                                                        ||   ||
+   +-------------------------+                                                        ||   ||
+                                                                                      ||   ||
+         +----------------------------------------------------------------------------+    ||
+         |                                                                                 ||
+         | 2.1 [score > max_score]: validateScoreRange(score_value, max_score)             ||
+         | 2.2 [team in Disqualification]: checkDisqualification(team_id)                  ||
+         | 2.5 checkCalibrationRound(round_id)                                             ||
+         v                                                                                 ||
+      (Self-Loop)                                                                          ||
+                                                                                           ||
+         +---------------------------------------------------------------------------------+
+         |
+         | [all validations passed]
+         |
+         +--------+-------------------+-------------------+
+         | (A)    | (B)               | (C)               | (D)                       
+         v        v                   v                   v                           
+   +------------+ +----------+ +----------+ +--------------------------------+
+   | :Evaluation| | :Score   | | :AuditLog| | :RankingAdvancement Service    |
+   +------------+ +----------+ +----------+ +--------------------------------+
+   2.3 save       2.3.1 save   2.4 write     2.4.1 triggerRankingComputation()
+   Evaluation()   ScoreRows()  AuditLog      2.4.2 [Return] returnUpdatedRankings()
+                               (action=               |
+                               SCORE_                 |
+                               SUBMITTED)             +------------------+
+                                                      | (D1)             | (D2)
+                                                      v                  v
+                                             +----------------+  +--------------------+
+                                             | :CoordDashboard|  | :CalibrationModule |
+                                             +----------------+  +--------------------+
+                                             2.4.3 update        2.5.1 [is CalibrationRound]:
+                                             Leaderboard()             computeStats(round_id)
+                                                                  2.5.2 [Return] returnStats(
+                                                                        mean, std_dev,
+                                                                        ICC, alpha)
+                                                                        |
+                                                                        v
+                                                                 +----------------+
+                                                                 | :CoordDashboard|
+                                                                 +----------------+
+                                                                 2.5.3 [is CalibrationRound]:
+                                                                       renderCalibration
+                                                                       Chart(stats)
+
+
+
+
+
+
+
+
+1. login()
+1.1 navigateToRankingPanel()
+                               1.4 clickFinalizeRound()
+                               1.3.1 [incomplete evaluations]: chooseFinalizeAnyway()
+                               1.2.1 [tie detected]: resolveManually(winner_id)
+             +------------------------------------------------------------------------------------+
+             | 1.2 [Return] displayLeaderboard()                                                  |
+             | 1.3 [pending judges exist]: warn("Pending judges")                                 |
+             | 1.4.1 [no rule configured]: error("No AdvancementRule configured")                 |
+             | 1.2.1 [tie at cutoff]: flagTie("Teams X and Y share rank N")                       |
+             v                                                                                    |
+   +--------------------+                                                               +-------------------+
+   |  :EventCoordinator | ============================================================= |      :System      |
+   +--------------------+                                                               +-------------------+
+                                                                              ||   ||   ||   ||
+         +---------------------------------------------------------------------+   ||   ||   ||
+         |                                                                         ||   ||   ||
+         | 1.1.1 checkAllEvaluationsSubmitted(round_id)                            ||   ||   ||
+         | 1.1.2 [Return] returnPendingJudges()                                    ||   ||   ||
+         v                                                                         ||   ||   ||
+   +--------------------+                                                          ||   ||   ||
+   |    :Evaluation     |                                                          ||   ||   ||
+   +--------------------+                                                          ||   ||   ||
+                                                                                   ||   ||   ||
+         +-------------------------------------------------------------------------+    ||   ||
+         |                                                                              ||   ||
+         | 1.4.2 readAdvancementRule(round_id, track_id)                                ||   ||
+         | 1.4.3 [Return] returnTopNTeams()                                             ||   ||
+         v                                                                              ||   ||
+   +--------------------+                                                               ||   ||
+   | :AdvancementRule   |                                                               ||   ||
+   +--------------------+                                                               ||   ||
+                                                                                        ||   ||
+         +------------------------------------------------------------------------------+    ||
+         |                                                                                   ||
+         +--------+-------------------+-------------------+------------------------------+   ||
+         | (A)    | (B)               | (C)               | (D)                          |   ||
+         v        v                   v                   v                              v   ||
+   +--------------------+ +------------------+ +------------------+ +--------------------+   ||
+   | :RoundParticipation| | :Ranking         | | :AuditLog        | | :NotificationService|  ||
+   +--------------------+ +------------------+ +------------------+ +--------------------+   ||
+   1.4.4 * [for each team  1.4.6 finalizeRanking  1.4.7 * [per team]:  1.4.8 sendAdvancement
+   in round]:              (round_id,              writeAuditLog()      Notification()
+   setStatus(ADVANCED)     is_finalized=true)                       1.4.9 sendElimination
+   1.4.5 * [for each team                                                Notification()
+   in round]:
+   setStatus(ELIMINATED)
+
+
+
+
+
+
+
+
+1. navigateToPrizePanel()
+1.5 confirmPrizeAssignment()
+                               1.6 [export requested]: requestAnonymizedExport()
+                               1.4.1 [tie / override]: overridePrizeAssignment()
+             +------------------------------------------------------------------------------------+
+             | 1.3 [Return] displayLeaderboard(teams[], prize_mapping[])                          |
+             | 1.6.4 [Return] returnDownloadURL(file_url)                                         |
+             | 1.1.1 [ranking not finalized]: error("Ranking not finalized")                      |
+             | 1.2.1 [no prizes configured]: error("No prizes configured")                        |
+             v                                                                                    |
+   +--------------------+                                                               +-------------------+
+   |  :EventCoordinator | ============================================================= |      :System      |
+   +--------------------+                                                               +-------------------+
+                                                                              ||   ||   ||   ||
+         +---------------------------------------------------------------------+   ||   ||   ||
+         |                                                                         ||   ||   ||
+         | 1.1 checkFinalized(event_id)                                            ||   ||   ||
+         | 1.1.2 [Return] returnFinalizedStatus()                                  ||   ||   ||
+         | 1.2.2 loadFinalLeaderboard(event_id)                                    ||   ||   ||
+         | 1.2.3 [Return] returnLeaderboard()                                      ||   ||   ||
+         v                                                                         ||   ||   ||
+   +--------------------+                                                          ||   ||   ||
+   |     :Ranking       |                                                          ||   ||   ||
+   +--------------------+                                                          ||   ||   ||
+                                                                                   ||   ||   ||
+         +-------------------------------------------------------------------------+    ||   ||
+         |                                                                              ||   ||
+         | 1.2 checkPrizesConfigured(event_id)                                          ||   ||
+         | 1.2.4 [Return] returnPrizeRecords()                                          ||   ||
+         | 1.5.1 updatePrize(awarded_to_team_id, awarded_at)                            ||   ||
+         v                                                                              ||   ||
+   +--------------------+                                                               ||   ||
+   |      :Prize        |                                                               ||   ||
+   +--------------------+                                                               ||   ||
+                                                                                        ||   ||
+         +------------------------------------------------------------------------------+    ||
+         |                                                                                   ||
+         +---------------------------+                                                       ||
+         |                           |                                                       ||
+         | 1.3.1 autoMapPrizes()     | 1.5.2 publishResults()                                ||
+         v (Self-Loop)               v (Self-Loop)                                           ||
+                                                                                             ||
+         +-----------------------------------------------------------------------------------+
+         |
+         +--------+-------------------+-------------------+-------------------+
+         | (F)    | (G)               | (H)               | (I)
+         v        v                   v                   v
+   +------------------+ +-------------------+ +------------------+ +--------------------+
+   |   :AuditLog      | |:NotificationService| |:AnonymizedExport | |   :ExportLog       |
+   +------------------+ +-------------------+ +------------------+ +--------------------+
+   1.4.1 [override]:     1.5.3 sendPrize        1.6.1 generateCSV()  1.6.3 saveExportLog()
+   writeAuditLog()       Notification()         1.6.2 [Return]
+                         1.5.4 sendRanking           returnCSV()
+                         Announcement()
+
+
+
+
+
+
+
+
+
+

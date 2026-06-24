@@ -203,7 +203,7 @@ export default function PackageManagement() {
                                 />
                             </div>
                             <div style={styles.formGroup}>
-                                <label style={styles.label}>Giá / Tháng ($)</label>
+                                <label style={styles.label}>Giá / Tháng (đ)</label>
                                 <input
                                     type="number"
                                     step="0.01"
@@ -214,7 +214,7 @@ export default function PackageManagement() {
                                 />
                             </div>
                             <div style={styles.formGroup}>
-                                <label style={styles.label}>Giá / Năm ($)</label>
+                                <label style={styles.label}>Giá / Năm (đ)</label>
                                 <input
                                     type="number"
                                     step="0.01"
@@ -340,8 +340,8 @@ export default function PackageManagement() {
                                             <p style={styles.packageDesc}>{pkg.description || 'Không có mô tả chi tiết cho gói này.'}</p>
                                         </td>
                                         <td style={styles.tableCell}>
-                                            <div style={styles.priceMonthly}>${pkg.priceMonthly} / thg</div>
-                                            <div style={styles.priceYearly}>${pkg.priceYearly} / năm</div>
+                                            <div style={styles.priceMonthly}>đ{pkg.priceMonthly} / thg</div>
+                                            <div style={styles.priceYearly}>đ{pkg.priceYearly} / năm</div>
                                         </td>
                                         <td style={styles.tableCell}>
                                             <div style={styles.specItem}>📄 Ghi chú: <span style={styles.specValue}>{pkg.maxNotes === -1 ? 'Vô hạn' : `${pkg.maxNotes} file`}</span></div>

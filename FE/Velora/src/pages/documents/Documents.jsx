@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
     IconFileText,
@@ -23,6 +23,7 @@ const TRANG_THAI = {
     PENDING: { nhan: 'Chờ xử lý', mau: 'var(--text-muted)' },
     PROCESSING: { nhan: 'Đang xử lý', mau: 'var(--accent-amber)' },
     DONE: { nhan: 'Hoàn tất', mau: 'var(--accent-green)' },
+    SUCCESS: { nhan: 'Hoàn tất', mau: 'var(--accent-green)' },
     FAILED: { nhan: 'Lỗi', mau: 'var(--accent-red)' },
 }
 
@@ -37,8 +38,10 @@ export default function TaiLieu() {
     const [dangXuLyAi, setDangXuLyAi] = useState(false)
     const [cauHoi, setCauHoi] = useState('')
     const [phanHoiChat, setPhanHoiChat] = useState(null)
+    const [lichSuChatTaiLieu, setLichSuChatTaiLieu] = useState([])
     const [lichGoiY, setLichGoiY] = useState(false)
     const [dangTrichLich, setDangTrichLich] = useState(false)
+    const dangHoiTaiLieuRef = useRef(false)
 
     const coUploadTaiLieu = hasFeature(nguoiDung, 'DOCUMENT_UPLOAD')
     const coAiAnalyze = hasFeature(nguoiDung, 'AI_ANALYZE')
@@ -46,6 +49,10 @@ export default function TaiLieu() {
     const coExtractSchedule = hasFeature(nguoiDung, 'EXTRACT_SCHEDULE')
     const coAiFlashcard = hasFeature(nguoiDung, 'AI_FLASHCARD')
     const [dangTaoFlashcard, setDangTaoFlashcard] = useState(false)
+    const coDangTraLoiTaiLieu =
+    dangXuLyAi ||
+    dangHoiTaiLieuRef.current ||
+    lichSuChatTaiLieu.some(item => item.loading)
 
     const tai = async () => {
         setDangTai(true)
@@ -60,9 +67,48 @@ export default function TaiLieu() {
         }
     }
 
+    const getDocumentChatStorageKey = (documentId = chon?.id) => {
+        const userKey = nguoiDung?.userId || nguoiDung?.id || 'me'
+        return `velora_document_chat_${userKey}_${documentId}`
+    }
+
+    const xoaLichSuChatTaiLieu = () => {
+        if (!chon?.id) return
+
+        localStorage.removeItem(getDocumentChatStorageKey(chon.id))
+        setLichSuChatTaiLieu([])
+        setPhanHoiChat(null)
+        toast.success('Đã xóa lịch sử hỏi đáp')
+    }
+
     useEffect(() => {
         tai()
     }, [])
+
+    useEffect(() => {
+        if (!chon?.id) {
+            setLichSuChatTaiLieu([])
+            return
+        }
+
+        try {
+            const raw = localStorage.getItem(getDocumentChatStorageKey(chon.id))
+            const saved = raw ? JSON.parse(raw) : []
+
+            setLichSuChatTaiLieu(Array.isArray(saved) ? saved : [])
+        } catch {
+            setLichSuChatTaiLieu([])
+        }
+    }, [chon?.id, nguoiDung?.userId, nguoiDung?.id])
+
+    useEffect(() => {
+        if (!chon?.id) return
+
+        localStorage.setItem(
+            getDocumentChatStorageKey(chon.id),
+            JSON.stringify(lichSuChatTaiLieu)
+        )
+    }, [lichSuChatTaiLieu, chon?.id, nguoiDung?.userId, nguoiDung?.id])
 
     useEffect(() => {
         const xuLy = danhSach.filter(
@@ -115,7 +161,7 @@ export default function TaiLieu() {
             return
         }
 
-        if (!chon || chon.status !== 'DONE') return
+        if (!chon || !isDocumentReady(chon)) return
 
         setDangXuLyAi(true)
         setKetQuaAi(null)
@@ -137,7 +183,7 @@ export default function TaiLieu() {
             return
         }
 
-        if (!chon || chon.status !== 'DONE') return
+        if (!chon || !isDocumentReady(chon)) return
 
         setDangXuLyAi(true)
         setKetQuaAi(null)
@@ -169,7 +215,7 @@ export default function TaiLieu() {
             return
         }
 
-        if (!chon || chon.status !== 'DONE') {
+        if (!chon || !isDocumentReady(chon)) {
             toast.error('Tài liệu chưa xử lý xong')
             return
         }
@@ -208,28 +254,81 @@ export default function TaiLieu() {
     }
 
     const hoiDap = async () => {
-        if (!coAiChat) {
-            toast.error(getUpgradeMessage('AI_CHAT'))
-            return
-        }
-
-        if (!chon || !cauHoi.trim()) return
-
-        setDangXuLyAi(true)
-
-        try {
-            const { data } = await documentApi.hoiDap(chon.id, {
-                question: cauHoi.trim(),
-            })
-
-            setPhanHoiChat(data.data)
-            setCauHoi('')
-        } catch (error) {
-            toast.error(error.response?.data?.message || 'AI không phản hồi')
-        } finally {
-            setDangXuLyAi(false)
-        }
+    if (!coAiChat) {
+        toast.error(getUpgradeMessage('AI_CHAT'))
+        return
     }
+
+    if (dangHoiTaiLieuRef.current || lichSuChatTaiLieu.some(item => item.loading)) {
+        toast.error('Vui lòng đợi AI trả lời xong câu trước')
+        return
+    }
+
+    if (!chon || !cauHoi.trim()) return
+
+    dangHoiTaiLieuRef.current = true
+
+    const question = cauHoi.trim()
+    const tempId = `${Date.now()}-${Math.random()}`
+
+    const pendingMessage = {
+        id: tempId,
+        question,
+        answer: '',
+        loading: true,
+        error: false,
+        createdAt: new Date().toISOString(),
+    }
+
+    setLichSuChatTaiLieu(prev => [...prev, pendingMessage])
+    setCauHoi('')
+    setDangXuLyAi(true)
+
+    try {
+        const { data } = await documentApi.hoiDap(chon.id, {
+            question,
+        })
+
+        const result = data.data || data
+
+        setPhanHoiChat(result)
+
+        setLichSuChatTaiLieu(prev =>
+            prev.map(item =>
+                item.id === tempId
+                    ? {
+                        ...item,
+                        answer: result.answer || 'AI chưa có câu trả lời',
+                        sourceParagraphs: result.sourceParagraphs || [],
+                        confidence: result.confidence,
+                        loading: false,
+                        error: false,
+                    }
+                    : item
+            )
+        )
+    } catch (error) {
+        const message = error.response?.data?.message || 'AI không phản hồi'
+
+        setLichSuChatTaiLieu(prev =>
+            prev.map(item =>
+                item.id === tempId
+                    ? {
+                        ...item,
+                        answer: message,
+                        loading: false,
+                        error: true,
+                    }
+                    : item
+            )
+        )
+
+        toast.error(message)
+    } finally {
+        dangHoiTaiLieuRef.current = false
+        setDangXuLyAi(false)
+    }
+}
 
     const coTheTrichLich = (text) => {
         if (!text) return false
@@ -302,6 +401,10 @@ export default function TaiLieu() {
         return `${(bytes / 1024 / 1024).toFixed(1)} MB`
     }
 
+    const isDocumentReady = (doc) => {
+        return doc?.status === 'DONE' || doc?.status === 'SUCCESS'
+    }
+
     return (
         <div style={styles.wrap}>
             <div style={styles.left}>
@@ -343,6 +446,7 @@ export default function TaiLieu() {
                                         setChon(d)
                                         setKetQuaAi(null)
                                         setPhanHoiChat(null)
+                                        setLichSuChatTaiLieu([])
                                         setLichGoiY(false)
                                     }}
                                     style={{
@@ -369,8 +473,8 @@ export default function TaiLieu() {
                                             <span style={{ color: tt.mau }}>{tt.nhan}</span>
                                             {d.fileSize && (
                                                 <span style={{ color: 'var(--text-faint)' }}>
-                          {dungLuong(d.fileSize)}
-                        </span>
+                                                    {dungLuong(d.fileSize)}
+                                                </span>
                                             )}
                                         </div>
                                     </div>
@@ -418,7 +522,7 @@ export default function TaiLieu() {
                                 </div>
                             </div>
 
-                            {chon.status === 'DONE' && coAiAnalyze && (
+                            {isDocumentReady(chon) && coAiAnalyze && (
                                 <div style={{ display: 'flex', gap: 6 }}>
                                     {chon.fileType === 'AUDIO' ? (
                                         <button
@@ -506,8 +610,8 @@ export default function TaiLieu() {
                                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                                                 {ketQuaAi.keywords.map((k, i) => (
                                                     <span key={i} className="tag tag-blue">
-                            {k}
-                          </span>
+                                                        {k}
+                                                    </span>
                                                 ))}
                                             </div>
                                         </div>
@@ -562,41 +666,116 @@ export default function TaiLieu() {
                                 </div>
                             )}
 
-                            {phanHoiChat && (
-                                <div style={{ ...styles.aiResult, marginTop: 12 }}>
-                                    <div style={styles.aiLabel}>
-                                        <IconMessages size={12} style={{ color: 'var(--accent-blue-dim)' }} />
-                                        Câu trả lời
+                            {lichSuChatTaiLieu.length > 0 && (
+                                <div style={styles.chatHistoryBox}>
+                                    <div style={styles.chatHistoryHeader}>
+                                        <div style={styles.aiLabel}>
+                                            <IconMessages size={12} style={{ color: 'var(--accent-blue-dim)' }} />
+                                            Lịch sử hỏi đáp
+                                        </div>
+
+                                        <button
+                                            className="btn-ghost"
+                                            onClick={xoaLichSuChatTaiLieu}
+                                            style={{ padding: '4px 8px', fontSize: 11 }}
+                                        >
+                                            Xóa lịch sử
+                                        </button>
                                     </div>
 
-                                    <p style={{ lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
-                                        {phanHoiChat.answer}
-                                    </p>
+                                    <div style={styles.chatHistoryList}>
+                                        {lichSuChatTaiLieu.map(item => (
+                                            <div key={item.id} style={styles.chatTurn}>
+                                                <div style={styles.questionBubble}>
+                                                    <div style={styles.bubbleLabel}>Bạn hỏi</div>
+                                                    <div style={styles.bubbleText}>
+                                                        {item.question}
+                                                    </div>
+                                                </div>
+
+                                                <div
+                                                    style={{
+                                                        ...styles.answerBubble,
+                                                        ...(item.error ? styles.answerBubbleError : {}),
+                                                    }}
+                                                >
+                                                    <div style={styles.bubbleLabel}>
+                                                        AI trả lời
+                                                    </div>
+
+                                                    <div style={styles.bubbleText}>
+                                                        {item.loading ? (
+                                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                                                <Spinner size={12} />
+                                                                Đang suy nghĩ...
+                                                            </span>
+                                                        ) : (
+                                                            item.answer
+                                                        )}
+                                                    </div>
+
+                                                    {!item.loading && item.sourceParagraphs?.length > 0 && (
+                                                        <details style={styles.sourceDetails}>
+                                                            <summary style={styles.sourceSummary}>
+                                                                Xem đoạn tài liệu liên quan
+                                                            </summary>
+
+                                                            <div style={styles.sourceList}>
+                                                                {item.sourceParagraphs.map((source, index) => (
+                                                                    <p key={index} style={styles.sourceItem}>
+                                                                        {source}
+                                                                    </p>
+                                                                ))}
+                                                            </div>
+                                                        </details>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
                         </div>
 
                         {chon.status === 'DONE' && coAiChat && (
                             <div style={styles.chatInput}>
-                                <input
-                                    value={cauHoi}
-                                    onChange={e => setCauHoi(e.target.value)}
-                                    onKeyDown={e => e.key === 'Enter' && hoiDap()}
-                                    placeholder={`Hỏi về "${chon.originalName}"...`}
-                                    style={{ fontSize: 12 }}
-                                />
+                                <textarea
+    value={cauHoi}
+    onChange={e => setCauHoi(e.target.value)}
+    onKeyDown={e => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault()
+
+            if (dangHoiTaiLieuRef.current || lichSuChatTaiLieu.some(item => item.loading)) {
+                toast.error('Vui lòng đợi AI trả lời xong câu trước')
+                return
+            }
+
+            hoiDap()
+        }
+    }}
+    placeholder={
+        coDangTraLoiTaiLieu
+            ? 'Đợi AI trả lời xong rồi hỏi tiếp...'
+            : `Hỏi về "${chon.originalName}"...`
+    }
+    disabled={coDangTraLoiTaiLieu}
+    rows={3}
+    style={styles.chatTextarea}
+/>
 
                                 <button
-                                    className="btn-primary"
-                                    onClick={hoiDap}
-                                    disabled={!cauHoi.trim() || dangXuLyAi}
-                                    style={{
-                                        padding: '6px 12px',
-                                        flexShrink: 0,
-                                    }}
-                                >
-                                    {dangXuLyAi ? <Spinner size={12} /> : 'Hỏi'}
-                                </button>
+    className="btn-primary"
+    onClick={hoiDap}
+    disabled={!cauHoi.trim() || coDangTraLoiTaiLieu}
+    style={{
+        padding: '8px 14px',
+        flexShrink: 0,
+        alignSelf: 'flex-end',
+    }}
+>
+    {coDangTraLoiTaiLieu ? <Spinner size={12} /> : 'Hỏi'}
+</button>
                             </div>
                         )}
                     </div>
@@ -711,10 +890,26 @@ const styles = {
     },
     chatInput: {
         display: 'flex',
-        gap: 8,
-        padding: '10px 16px',
+        gap: 10,
+        padding: '12px 16px',
         borderTop: '.5px solid var(--border)',
         background: 'var(--bg-surface)',
+        alignItems: 'flex-end',
+    },
+    chatTextarea: {
+        flex: 1,
+        minHeight: 72,
+        maxHeight: 150,
+        resize: 'vertical',
+        borderRadius: 10,
+        border: '.5px solid var(--border)',
+        background: 'var(--bg-elevated)',
+        color: 'var(--text-primary)',
+        padding: '10px 12px',
+        fontSize: 13,
+        lineHeight: 1.5,
+        outline: 'none',
+        fontFamily: 'inherit',
     },
     lockedBox: {
         background: 'var(--bg-elevated)',
@@ -745,5 +940,83 @@ const styles = {
         fontSize: 12,
         textAlign: 'center',
         padding: '20px 0',
+    }, chatHistoryBox: {
+        background: 'var(--bg-elevated)',
+        border: '.5px solid var(--border)',
+        borderRadius: 10,
+        padding: 12,
+        marginTop: 12,
+    },
+    chatHistoryHeader: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 10,
+        marginBottom: 10,
+    },
+    chatHistoryList: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+    },
+    chatTurn: {
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+    },
+    questionBubble: {
+        alignSelf: 'flex-end',
+        maxWidth: '78%',
+        background: 'var(--accent-blue)',
+        color: '#fff',
+        borderRadius: '12px 12px 4px 12px',
+        padding: '9px 11px',
+        fontSize: 13,
+    },
+    answerBubble: {
+        alignSelf: 'flex-start',
+        maxWidth: '86%',
+        background: 'var(--bg-surface)',
+        border: '.5px solid var(--border)',
+        borderRadius: '12px 12px 12px 4px',
+        padding: '9px 11px',
+        fontSize: 13,
+        color: 'var(--text-primary)',
+    },
+    answerBubbleError: {
+        borderColor: 'var(--accent-red)',
+        color: 'var(--accent-red)',
+    },
+    bubbleLabel: {
+        fontSize: 10,
+        opacity: 0.75,
+        marginBottom: 4,
+        fontWeight: 600,
+    },
+    bubbleText: {
+        lineHeight: 1.6,
+        whiteSpace: 'pre-wrap',
+    },
+    sourceDetails: {
+        marginTop: 8,
+        fontSize: 11,
+    },
+    sourceSummary: {
+        cursor: 'pointer',
+        color: 'var(--accent-blue-dim)',
+    },
+    sourceList: {
+        marginTop: 6,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 6,
+    },
+    sourceItem: {
+        margin: 0,
+        padding: 8,
+        borderRadius: 6,
+        background: 'var(--bg-elevated)',
+        color: 'var(--text-muted)',
+        lineHeight: 1.5,
     },
 }

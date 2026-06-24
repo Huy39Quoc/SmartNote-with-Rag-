@@ -1,0 +1,198 @@
+    +-------------------+                                      +-------------------+
+    |   :TeamLeader     | ==================================== |      :System      |
+    +-------------------+   1. login()                         +-------------------+
+                            2. navigateToSubmissionForm(rd_id)      ||   ||   || 
+                            3. [Return]displaySubmissionForm()      ||   ||   || 5. validateDeadline()
+                            4. submitEntry(repo_url, ...)           ||   ||   +----------------+
+                            8. displayConfirmation()                ||   ||                    |
+                            5.E1 displayError("HTTP 403")           ||   ||   (Self-Loop)<-----+
+                                                                    ||   ||
+       +------------------------------------------------------------+    ||
+       | 6. saveSubmission(team_id, round_id, status=SUBMITTED)          ||
+       | 7. [Return]confirmSaved()                                       ||
+       v                                                                 ||
+    +-------------------+                                                ||
+    |   :SubmissionDB   |                                                ||
+    +-------------------+                                                ||
+                                                                         ||
+       +-----------------------------------------------------------------+
+       |
+       +-------------------------------+-------------------------------+
+       | 9. [async] fetchAndSaveMetadata(repo_url)                     | 10. [async] sendConfirmationEmail(...)
+       | 9.E1 retryFetch(..., retry_count++) [max 3]                   |
+       v                                                               v
+    +-----------------------+                               +---------------------+
+    | :RepositoryMetadataDB |                               | :NotificationModule |
+    +-----------------------+                               +---------------------+
+
+
+
+
+
+
+
+
+
+
+
+1. login() / 3. getScoringRoster()
+                               7. selectSubmission() / 11. submitScore()
+             +-----------------------------------------------------------------------+
+             | 2. [Return]returnAuthToken() / 6.[Return]displayScoringRoster()       |
+             | 10.[Return]displaySubmissionDetails()                                 |
+             | 12.E1 [Exception] displayError() / 13.E2 [Exception] lockInputs()     |
+             v                                                                       |
+   +------------------+                                                    +-------------------+
+   |      :Judge      | ================================================== |      :System      |
+   +------------------+                                                    +-------------------+
+                                                                            ||   ||   ||   ||
+         +-------------------------------------------------------------------+   ||   ||   ||
+         |                                                                       ||   ||   ||
+         | 4. queryAssignments()                                                 ||   ||   ||
+         | 5. [Return] returnAssignedSubmissions()                               ||   ||   ||
+         v                                                                       ||   ||   ||
+   +-----------------------+                                                     ||   ||   ||
+   | :JudgeAssignmentDB    |                                                     ||   ||   ||
+   +-----------------------+                                                     ||   ||   ||
+                                                                                 ||   ||   ||
+         +-----------------------------------------------------------------------+    ||   ||
+         |                                                                            ||   ||
+         | 8. loadSubmissionDetails()                                                 ||   ||
+         | 9. [Return] returnDetails()                                                ||   ||
+         v                                                                            ||   ||
+   +-----------------------+                                                          ||   ||
+   |      :SubmissionDB    |                                                          ||   ||
+   +-----------------------+                                                          ||   ||
+                                                                                      ||   ||
+         +----------------------------------------------------------------------------+    ||
+         |                                                                                 ||
+         | 12. validateScoreRange()                                                        ||
+         | 13. checkDisqualification()                                                     ||
+         | 20. checkCalibrationRound()                                                     ||
+         v                                                                                 ||
+      (Self-Loop)                                                                          ||
+                                                                                           ||
+         +---------------------------------------------------------------------------------+
+         |
+         +--------+------------------------+------------------------+-----------------------+
+         |        |                        |                        |                       |
+         | (A)    | (B)                    | (C)                    | (D)                   | (E)
+         v        v                        v                        v                       v
+   +------------------+      +------------------+      +------------------+      +--------------------+
+   |  :EvaluationDB   |      |     :ScoreDB     |      |   :AuditLogDB    |      |   :RankingModule   |
+   +------------------+      +------------------+      +------------------+      +--------------------+
+    14. saveEvaluation()      15. saveScoreRows()       16. writeAuditLog()       17. triggerRankingComputation
+                                                                                  18. updateLeaderboard
+         +---------------------------------------------------------------------------------+
+         |
+         +--------+-------------------------------------------------+
+         |        |                                                 |
+         v (F)    v (G)                                             v (H)
+   +--------------------+                                     +-----------------------+
+   | :CalibrationModule |                                     | :CoordinatorDashboard |
+   +--------------------+                                     +-----------------------+
+     21. computeStats() [if True]                               19.[Return] returnUpdatedRankings()
+     22. [Return]returnStats()                                  23.[Return] renderCalibrationChart()
+
+
+
+
+
+
+
+
+
+
+1. login() / 2. navigateToRankingPanel()
+                               6. clickFinalizeRound()
+                               [Exception 3.E1 / Alt 5.A1] chooseFinalizeAnyway() / resolveManually()
+             +------------------------------------------------------------------------------------+
+             | 5. displayLeaderboard()                                                            |
+             | [Exception 3.E1 / 7.E1] warn("Pending judges") / error("No AdvancementRule...")    |
+             | [Alternative 5.A1] flagTie("Teams X and Y share rank N")                           |
+             v                                                                                    |
+   +--------------------+                                                               +-------------------+
+   |  :EventCoordinator | ============================================================= |      :System      |
+   +--------------------+                                                               +-------------------+
+                                                                              ||   ||   ||   ||
+         +---------------------------------------------------------------------+   ||   ||   ||
+         |                                                                         ||   ||   ||
+         | 3. checkAllEvaluationsSubmitted(round_id)                               ||   ||   ||
+         | 4. [Return] returnPendingJudges()                                       ||   ||   ||
+         v                                                                         ||   ||   ||
+   +--------------------+                                                          ||   ||   ||
+   |    :EvaluationDB   |                                                          ||   ||   ||
+   +--------------------+                                                          ||   ||   ||
+                                                                                   ||   ||   ||
+         +-------------------------------------------------------------------------+    ||   ||
+         |                                                                              ||   ||
+         | 7. readAdvancementRule(round_id, track_id)                                   ||   ||
+         | 8. [Return] returnTopNTeams()                                                ||   ||
+         v                                                                              ||   ||
+   +--------------------+                                                               ||   ||
+   | :AdvancementRuleDB |                                                               ||   ||
+   +--------------------+                                                               ||   ||
+                                                                                        ||   ||
+         +------------------------------------------------------------------------------+    |
+         |                                                                                   |
+         +--------+------------------------+------------------------+-----------------------+
+         |        |                        |                        |                       |
+         | (A)    | (B)                    | (C)                    | (D)                   | (E)
+         v        v                        v                        v                       v
+   +--------------------+      +------------------+      +------------------+      +--------------------+
+   |:RoundParticipation |      |    :RankingDB    |      |   :AuditLogDB    |      | :NotificationModule|
+   +--------------------+      +------------------+      +------------------+      +--------------------+
+    9. setStatus(ADVANCED)      11. finalizeRanking()     12. writeAuditLog()       13. sendAdvancementNotification
+    10. setStatus(ELIMINATED)                                                       14. sendEliminationNotification
+
+
+
+
+1. navigateToPrizePanel() / 10. confirmPrizeAssignment()
+                               15. requestAnonymizedExport() / [Alt 9.A1] overridePrizeAssignment()
+             +------------------------------------------------------------------------------------+
+             | 8. displayLeaderboard(teams[], prize_mapping[])                                    |
+             | 19. returnDownloadURL(file_url)                                                    |
+             | [Exception 2.E1 / 4.E1] error("Ranking not finalized") / error("No prizes...")     |
+             v                                                                                    |
+   +--------------------+                                                               +-------------------+
+   |  :EventCoordinator | ============================================================= |      :System      |
+   +--------------------+                                                               +-------------------+
+                                                                              ||   ||   ||   ||
+         +---------------------------------------------------------------------+   ||   ||   ||
+         |                                                                         ||   ||   ||
+         | 2. checkFinalized()  / 6. loadFinalLeaderboard()                        ||   ||   ||
+         | 3. [Return] returnFinalizedStatus() / 7. [Return] returnLeaderboard()   ||   ||   ||
+         v                                                                         ||   ||   ||
+   +--------------------+                                                          ||   ||   ||
+   |     :RankingDB     |                                                          ||   ||   ||
+   +--------------------+                                                          ||   ||   ||
+                                                                                   ||   ||   ||
+         +-------------------------------------------------------------------------+    ||   ||
+         |                                                                              ||   ||
+         | 4. checkPrizesConfigured() / 11. updatePrize(awarded_to_team_id, awarded_at) ||   ||
+         | 5. [Return] returnPrizeRecords()                                             ||   ||
+         v                                                                              ||   ||
+   +--------------------+                                                               ||   ||
+   |      :PrizeDB      |                                                               ||   ||
+   +--------------------+                                                               ||   ||
+                                                                                        ||   ||
+         +------------------------------------------------------------------------------+    |
+         |                                                                                   |
+         +---------------------------+                                                       |
+         |                           |                                                       |
+         | 9. autoMapPrizes()        | 12. publishResults()                                  |
+         v                           v                                                       |
+      (Self-Loop)                 (Self-Loop)                                                |
+                                                                                             |
+         +-----------------------------------------------------------------------------------+
+         |
+         +--------+------------------------+------------------------+-----------------------+
+         |        |                        |                        |                       |
+         | (F)    | (G)                    | (H)                    | (I)                   | (J)
+         v        v                        v                        v                       v
+   +------------------+      +-------------------+     +------------------+      +--------------------+
+   |   :AuditLogDB    |      |:NotificationModule|     |:AnonymizedExport |      |   :ExportLogDB     |
+   +------------------+      +-------------------+     +------------------+      +--------------------+
+    [9.A1 Override]        13.sendPrizeNotification    16. generateCSV()         18. saveExportLog()
+    writeOverrideLog()     14.sendRankingAnnouncement  17. [Return]returnCSV()

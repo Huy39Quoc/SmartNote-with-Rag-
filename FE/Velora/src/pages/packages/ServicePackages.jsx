@@ -181,6 +181,56 @@ export default function ServicePackages() {
         return currentPackage.toUpperCase() === goi.name?.toUpperCase()
     }
 
+const PACKAGE_RANK = {
+    FREE: 0,
+    PRO: 1,
+    PLUS: 2,
+}
+
+const getPackageName = (goi) => {
+    return goi?.name?.toUpperCase() || 'FREE'
+}
+
+const getCurrentPackageName = () => {
+    return currentPackageName?.toUpperCase() || 'FREE'
+}
+
+const getPackageRank = (packageName) => {
+    return PACKAGE_RANK[packageName?.toUpperCase()] ?? 0
+}
+
+const isHigherPackage = (goi) => {
+    const currentRank = getPackageRank(getCurrentPackageName())
+    const targetRank = getPackageRank(getPackageName(goi))
+
+    return targetRank > currentRank
+}
+
+const isLowerPackage = (goi) => {
+    const currentRank = getPackageRank(getCurrentPackageName())
+    const targetRank = getPackageRank(getPackageName(goi))
+
+    return targetRank < currentRank
+}
+
+const getPackageActionLabel = (goi) => {
+    const targetName = getPackageName(goi)
+
+    return `Nâng cấp lên ${targetName}`
+}
+
+const getUnavailablePackageText = (goi) => {
+    if (laGoiHienTai(goi)) {
+        return 'Gói hiện tại'
+    }
+
+    if (isLowerPackage(goi)) {
+        return `Đã bao gồm trong gói ${getCurrentPackageName()}`
+    }
+
+    return 'Không khả dụng'
+}
+
     const formatGia = (price) => {
         const value = Number(price || 0)
 
@@ -343,7 +393,7 @@ export default function ServicePackages() {
                         : '/ năm'
 
                     const current = laGoiHienTai(goi)
-                    const isFree = Number(goi.priceMonthly) === 0
+const canUpgrade = isHigherPackage(goi)
 
                     return (
                         <div
@@ -414,23 +464,22 @@ export default function ServicePackages() {
                                 </div>
                             )}
 
+                            {canUpgrade ? (
                             <button
                                 className="btn-primary"
-                                style={{
-                                    ...styles.buyBtn,
-                                    ...(current ? styles.currentBtn : {}),
-                                }}
-                                disabled={buyingId === goi.id || current}
+                                style={styles.buyBtn}
+                                disabled={buyingId === goi.id}
                                 onClick={() => handleMuaGoi(goi.id)}
                             >
-                                {current
-                                    ? 'Gói hiện tại'
-                                    : buyingId === goi.id
-                                        ? 'Đang chuyển hướng...'
-                                        : isFree
-                                            ? 'Kích hoạt miễn phí'
-                                            : 'Đăng ký ngay'}
+                                {buyingId === goi.id
+                                    ? 'Đang chuyển hướng...'
+                                    : getPackageActionLabel(goi)}
                             </button>
+                        ) : (
+                            <div style={styles.unavailableBtn}>
+                                {getUnavailablePackageText(goi)}
+                            </div>
+                        )}
                         </div>
                     )
                 })}
@@ -780,4 +829,17 @@ const styles = {
         color: 'var(--text-secondary)',
         fontWeight: 500,
     },
+    unavailableBtn: {
+    width: '100%',
+    padding: '12px',
+    fontSize: '14px',
+    fontWeight: 600,
+    borderRadius: '8px',
+    marginTop: '12px',
+    textAlign: 'center',
+    background: 'var(--bg-elevated)',
+    color: 'var(--text-muted)',
+    border: '0.5px solid var(--border)',
+    boxSizing: 'border-box',
+},
 }
