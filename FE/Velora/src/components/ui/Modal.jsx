@@ -17,7 +17,7 @@ export default function Modal({ tieu_de, onDong, children, width = 480 }) {
             <IconX size={15} />
           </button>
         </div>
-        <div style={{ padding: '16px 20px' }}>{children}</div>
+        <div style={{ padding: '14px 18px' }}>{children}</div>
       </div>
     </div>
   )
@@ -25,6 +25,6 @@ export default function Modal({ tieu_de, onDong, children, width = 480 }) {
 
 const styles = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
-  box:     { background: 'var(--bg-surface)', border: '.5px solid var(--border)', borderRadius: 10, overflow: 'hidden' },
-  header:  { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderBottom: '.5px solid var(--border)' },
+  box:     { background: 'var(--bg-surface)', border: '.5px solid var(--border)', borderRadius: 8, overflow: 'hidden' },
+  header:  { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '.5px solid var(--border)' },
 }
