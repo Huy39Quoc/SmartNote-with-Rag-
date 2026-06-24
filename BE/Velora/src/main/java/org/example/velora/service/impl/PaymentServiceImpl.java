@@ -40,7 +40,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Value("${vnpay.tmn-code:DEFAULT_TMN}")         private String tmnCode;
     @Value("${vnpay.hash-secret:DEFAULT_SECRET}")   private String hashSecret;
     @Value("${vnpay.api-url:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}") private String apiUrl;
-    @Value("${vnpay.return-url:http://localhost:5173/tong-quan}")                  private String returnUrl;
+    @Value("${vnpay.return-url:http://localhost:5173/service-packages}") private String returnUrl;
     @Value("${vnpay.callback-url:http://localhost:8080/api/packages/vnpay-callback}") private String callbackUrl;
 
     // =========================================================
@@ -133,7 +133,11 @@ public class PaymentServiceImpl implements PaymentService {
             packageTransactionRepository.save(tx);
         }
 
-        return returnUrl + "?status=" + tx.getStatus().toLowerCase();
+        if ("SUCCESS".equalsIgnoreCase(tx.getStatus())) {
+    return returnUrl;
+}
+
+return returnUrl + "?status=" + tx.getStatus().toLowerCase();
     }
 
     // =========================================================

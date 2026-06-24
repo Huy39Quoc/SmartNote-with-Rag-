@@ -1,104 +1,78 @@
 import { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import packageApi from '../../lib/api/packageApi'
 import Spinner from '../../components/ui/Spinner'
 import useAuthStore from '../../service/authStore'
 
-const FEATURE_ROWS = [
-    {
-        id: 'TAG_SUBJECT',
-        label: 'Tag môn học / chủ đề / dự án',
-        free: true,
-        pro: true,
-        plus: true,
-    },
-    {
-        id: 'CHECKLIST_BASIC',
-        label: 'Checklist công việc cơ bản',
-        free: true,
-        pro: true,
-        plus: true,
-    },
-    {
-        id: 'AI_NOTE_FORMAT',
-        label: 'AI format ghi chú',
-        free: '10 lần/tháng',
-        pro: 'Vô hạn',
-        plus: 'Vô hạn',
-    },
-    {
-        id: 'AI_SUMMARY_BASIC',
-        label: 'Tóm tắt AI cơ bản',
-        free: true,
-        pro: true,
-        plus: true,
-    },
-    {
-        id: 'AI_SUMMARY_ADVANCED',
-        label: 'Tóm tắt & phân tích AI nâng cao',
-        free: false,
-        pro: true,
-        plus: true,
-    },
-    {
-        id: 'DOCUMENT_UPLOAD',
-        label: 'Upload tài liệu',
-        free: '1GB',
-        pro: '2GB',
-        plus: '10GB',
-    },
-    {
-        id: 'EXTRACT_SCHEDULE',
-        label: 'AI trích xuất deadline từ ghi chú',
-        free: false,
-        pro: true,
-        plus: true,
-    },
-    {
-        id: 'AI_FLASHCARD',
-        label: 'Flashcard AI tự động',
-        free: false,
-        pro: true,
-        plus: true,
-    },
-    {
-        id: 'EXPORT_FILE',
-        label: 'Export PDF / Word',
-        free: false,
-        pro: true,
-        plus: true,
-    },
-    {
-        id: 'TEAM_WORK',
-        label: 'Học nhóm & chia sẻ ghi chú',
-        free: false,
-        pro: false,
-        plus: true,
-    },
-    {
-        id: 'TEAM_DASHBOARD',
-        label: 'Dashboard tiến độ nhóm',
-        free: false,
-        pro: false,
-        plus: true,
-    },
-    {
-        id: 'GOOGLE_CALENDAR',
-        label: 'Tích hợp Google Calendar',
-        free: false,
-        pro: false,
-        plus: true,
-    },
+const PACKAGE_RANK = {
+    FREE: 0,
+    PRO: 1,
+    PLUS: 2,
+}
+
+const FEATURE_CODES = [
+    'NOTE_LIMIT',
+    'AI_NOTE_FORMAT',
+    'DOCUMENT_UPLOAD',
+    'DEVICE_LIMIT',
+    'TAG_SUBJECT',
+    'CHECKLIST_BASIC',
+    'AI_SUMMARY_BASIC',
+    'AI_SUMMARY_ADVANCED',
+    'AI_CHAT',
+    'AI_ANALYZE',
+    'EXTRACT_SCHEDULE',
+    'DEADLINE_MANAGEMENT',
+    'PRIORITY_SUGGESTION',
+    'AI_FLASHCARD',
+    'EXPORT_FILE',
+    'TEAM_WORK',
+    'AI_PROGRESS_ANALYTICS',
+    'TEAM_DASHBOARD',
+    'GOOGLE_CALENDAR',
+    'MANAGE_MEMBERS',
+    'CUSTOM_WORKSPACE',
+    'PRIORITY_SUPPORT',
 ]
 
 export default function ServicePackages() {
     const { nguoiDung, layThongTin } = useAuthStore()
+    const navigate = useNavigate()
+    const [searchParams] = useSearchParams()
 
     const [danhSachGoi, setDanhSachGoi] = useState([])
     const [loading, setLoading] = useState(true)
     const [buyingId, setBuyingId] = useState(null)
     const [billingCycle, setBillingCycle] = useState('monthly')
 
+    const currentPackageName = nguoiDung?.packageName || 'FREE'
+    const usedAi = nguoiDung?.aiUsedThisMonth || 0
+    const maxAi = nguoiDung?.maxAiFormatsPerMonth
+    const noteCount = nguoiDung?.noteCount || 0
+    const maxNotes = nguoiDung?.maxNotes
+    const storageUsedBytes = nguoiDung?.storageUsedBytes || 0
+    const storageGb = nguoiDung?.storageGb
+    const maxStorageBytes =
+        storageGb === null || storageGb === undefined || Number(storageGb) < 0
+            ? null
+            : Number(storageGb) * 1024 * 1024 * 1024
+
+    useEffect(() => {
+        taiGoiDichVu()
+    }, [])
+
+    useEffect(() => {
+        const status = searchParams.get('status')
+
+        if (!status) return
+
+        layThongTin?.()
+        navigate('/service-packages', { replace: true })
+    }, [searchParams, navigate, layThongTin])
+
     const taiGoiDichVu = async () => {
+        setLoading(true)
+
         try {
             const { data } = await packageApi.layDanhSachGoiHoatDong()
             setDanhSachGoi(data.data || data || [])
@@ -110,10 +84,6 @@ export default function ServicePackages() {
         }
     }
 
-    useEffect(() => {
-        taiGoiDichVu()
-    }, [])
-
     const handleMuaGoi = async (id) => {
         setBuyingId(id)
 
@@ -122,8 +92,8 @@ export default function ServicePackages() {
             const responseData = data.data || data
 
             if (responseData?.activated) {
-                alert(`Đã kích hoạt gói ${responseData.packageName}`)
-                await layThongTin()
+                await layThongTin?.()
+                await taiGoiDichVu()
                 return
             }
 
@@ -143,6 +113,8 @@ export default function ServicePackages() {
 
     const getFeatureLabel = (id) => {
         const featuresMap = {
+            NOTE_LIMIT: 'Số ghi chú',
+            DEVICE_LIMIT: 'Số thiết bị',
             TAG_SUBJECT: 'Tag môn học / chủ đề',
             CHECKLIST_BASIC: 'Checklist công việc cơ bản',
             AI_NOTE_FORMAT: 'AI format ghi chú',
@@ -176,60 +148,51 @@ export default function ServicePackages() {
         return `${value}${suffix}`
     }
 
+    const getPackageName = (goi) => {
+        return goi?.name?.toUpperCase() || 'FREE'
+    }
+
+    const getCurrentPackageName = () => {
+        return currentPackageName?.toUpperCase() || 'FREE'
+    }
+
+    const getPackageRank = (packageName) => {
+        return PACKAGE_RANK[packageName?.toUpperCase()] ?? 0
+    }
+
     const laGoiHienTai = (goi) => {
-        const currentPackage = nguoiDung?.packageName || 'FREE'
-        return currentPackage.toUpperCase() === goi.name?.toUpperCase()
+        return getCurrentPackageName() === getPackageName(goi)
     }
 
-const PACKAGE_RANK = {
-    FREE: 0,
-    PRO: 1,
-    PLUS: 2,
-}
+    const isHigherPackage = (goi) => {
+        const currentRank = getPackageRank(getCurrentPackageName())
+        const targetRank = getPackageRank(getPackageName(goi))
 
-const getPackageName = (goi) => {
-    return goi?.name?.toUpperCase() || 'FREE'
-}
-
-const getCurrentPackageName = () => {
-    return currentPackageName?.toUpperCase() || 'FREE'
-}
-
-const getPackageRank = (packageName) => {
-    return PACKAGE_RANK[packageName?.toUpperCase()] ?? 0
-}
-
-const isHigherPackage = (goi) => {
-    const currentRank = getPackageRank(getCurrentPackageName())
-    const targetRank = getPackageRank(getPackageName(goi))
-
-    return targetRank > currentRank
-}
-
-const isLowerPackage = (goi) => {
-    const currentRank = getPackageRank(getCurrentPackageName())
-    const targetRank = getPackageRank(getPackageName(goi))
-
-    return targetRank < currentRank
-}
-
-const getPackageActionLabel = (goi) => {
-    const targetName = getPackageName(goi)
-
-    return `Nâng cấp lên ${targetName}`
-}
-
-const getUnavailablePackageText = (goi) => {
-    if (laGoiHienTai(goi)) {
-        return 'Gói hiện tại'
+        return targetRank > currentRank
     }
 
-    if (isLowerPackage(goi)) {
-        return `Đã bao gồm trong gói ${getCurrentPackageName()}`
+    const isLowerPackage = (goi) => {
+        const currentRank = getPackageRank(getCurrentPackageName())
+        const targetRank = getPackageRank(getPackageName(goi))
+
+        return targetRank < currentRank
     }
 
-    return 'Không khả dụng'
-}
+    const getPackageActionLabel = (goi) => {
+        return `Nâng cấp lên ${getPackageName(goi)}`
+    }
+
+    const getUnavailablePackageText = (goi) => {
+        if (laGoiHienTai(goi)) {
+            return 'Gói hiện tại'
+        }
+
+        if (isLowerPackage(goi)) {
+            return `Đã bao gồm trong gói ${getCurrentPackageName()}`
+        }
+
+        return 'Không khả dụng'
+    }
 
     const formatGia = (price) => {
         const value = Number(price || 0)
@@ -295,16 +258,57 @@ const getUnavailablePackageText = (goi) => {
         return <span style={styles.compareText}>{value}</span>
     }
 
-    const currentPackageName = nguoiDung?.packageName || 'FREE'
-    const usedAi = nguoiDung?.aiUsedThisMonth || 0
-    const maxAi = nguoiDung?.maxAiFormatsPerMonth
-    const noteCount = nguoiDung?.noteCount || 0
-    const maxNotes = nguoiDung?.maxNotes
-    const storageUsedBytes = nguoiDung?.storageUsedBytes || 0
-    const storageGb = nguoiDung?.storageGb
-    const maxStorageBytes = storageGb === null || storageGb === undefined || storageGb < 0
-        ? null
-        : storageGb * 1024 * 1024 * 1024
+    const getPackageByName = (name) => {
+        return danhSachGoi.find(
+            goi => goi.name?.toUpperCase() === name.toUpperCase()
+        )
+    }
+
+    const packageHasFeature = (goi, featureCode) => {
+        if (!goi?.features) return false
+
+        return goi.features
+            .split(',')
+            .map(item => item.trim())
+            .filter(Boolean)
+            .includes(featureCode)
+    }
+
+    const renderPackageFeatureValue = (goi, featureCode) => {
+        if (!goi) return false
+
+        if (featureCode === 'AI_NOTE_FORMAT') {
+            return hienThiGioiHan(goi.maxAiFormatsPerMonth, ' lần/tháng')
+        }
+
+        if (featureCode === 'DOCUMENT_UPLOAD') {
+            return hienThiGioiHan(goi.storageGb, ' GB')
+        }
+
+        if (featureCode === 'NOTE_LIMIT') {
+            return hienThiGioiHan(goi.maxNotes, ' ghi chú')
+        }
+
+        if (featureCode === 'DEVICE_LIMIT') {
+            return hienThiGioiHan(goi.maxDevices, ' thiết bị')
+        }
+
+        return packageHasFeature(goi, featureCode)
+    }
+
+    const buildDynamicCompareRows = () => {
+        const free = getPackageByName('FREE')
+        const pro = getPackageByName('PRO')
+        const plus = getPackageByName('PLUS')
+
+        return FEATURE_CODES.map(code => ({
+            id: code,
+            label: getFeatureLabel(code),
+            free: renderPackageFeatureValue(free, code),
+            pro: renderPackageFeatureValue(pro, code),
+            plus: renderPackageFeatureValue(plus, code),
+        }))
+    }
 
     if (loading) {
         return (
@@ -393,7 +397,7 @@ const getUnavailablePackageText = (goi) => {
                         : '/ năm'
 
                     const current = laGoiHienTai(goi)
-const canUpgrade = isHigherPackage(goi)
+                    const canUpgrade = isHigherPackage(goi)
 
                     return (
                         <div
@@ -465,21 +469,21 @@ const canUpgrade = isHigherPackage(goi)
                             )}
 
                             {canUpgrade ? (
-                            <button
-                                className="btn-primary"
-                                style={styles.buyBtn}
-                                disabled={buyingId === goi.id}
-                                onClick={() => handleMuaGoi(goi.id)}
-                            >
-                                {buyingId === goi.id
-                                    ? 'Đang chuyển hướng...'
-                                    : getPackageActionLabel(goi)}
-                            </button>
-                        ) : (
-                            <div style={styles.unavailableBtn}>
-                                {getUnavailablePackageText(goi)}
-                            </div>
-                        )}
+                                <button
+                                    className="btn-primary"
+                                    style={styles.buyBtn}
+                                    disabled={buyingId === goi.id}
+                                    onClick={() => handleMuaGoi(goi.id)}
+                                >
+                                    {buyingId === goi.id
+                                        ? 'Đang chuyển hướng...'
+                                        : getPackageActionLabel(goi)}
+                                </button>
+                            ) : (
+                                <div style={styles.unavailableBtn}>
+                                    {getUnavailablePackageText(goi)}
+                                </div>
+                            )}
                         </div>
                     )
                 })}
@@ -491,23 +495,23 @@ const canUpgrade = isHigherPackage(goi)
                 <div style={styles.compareTableWrap}>
                     <table style={styles.compareTable}>
                         <thead>
-                        <tr>
-                            <th style={styles.compareTh}>Tính năng</th>
-                            <th style={styles.compareTh}>Free</th>
-                            <th style={styles.compareTh}>Pro</th>
-                            <th style={styles.compareTh}>Plus</th>
-                        </tr>
+                            <tr>
+                                <th style={styles.compareTh}>Tính năng</th>
+                                <th style={styles.compareTh}>Free</th>
+                                <th style={styles.compareTh}>Pro</th>
+                                <th style={styles.compareTh}>Plus</th>
+                            </tr>
                         </thead>
 
                         <tbody>
-                        {FEATURE_ROWS.map(row => (
-                            <tr key={row.id}>
-                                <td style={styles.compareTdFeature}>{row.label}</td>
-                                <td style={styles.compareTd}>{renderCompareValue(row.free)}</td>
-                                <td style={styles.compareTd}>{renderCompareValue(row.pro)}</td>
-                                <td style={styles.compareTd}>{renderCompareValue(row.plus)}</td>
-                            </tr>
-                        ))}
+                            {buildDynamicCompareRows().map(row => (
+                                <tr key={row.id}>
+                                    <td style={styles.compareTdFeature}>{row.label}</td>
+                                    <td style={styles.compareTd}>{renderCompareValue(row.free)}</td>
+                                    <td style={styles.compareTd}>{renderCompareValue(row.pro)}</td>
+                                    <td style={styles.compareTd}>{renderCompareValue(row.plus)}</td>
+                                </tr>
+                            ))}
                         </tbody>
                     </table>
                 </div>
@@ -545,12 +549,6 @@ const styles = {
         overflowX: 'hidden',
         padding: '24px',
         boxSizing: 'border-box',
-    },
-
-    inner: {
-        maxWidth: '1200px',
-        margin: '0 auto',
-        paddingBottom: '48px',
     },
     title: {
         fontSize: '22px',
@@ -766,12 +764,6 @@ const styles = {
         marginTop: '12px',
         cursor: 'pointer',
     },
-    currentBtn: {
-        background: 'var(--bg-elevated)',
-        color: 'var(--text-muted)',
-        border: '0.5px solid var(--border)',
-        cursor: 'not-allowed',
-    },
     compareSection: {
         marginTop: 34,
         marginBottom: 40,
@@ -830,16 +822,16 @@ const styles = {
         fontWeight: 500,
     },
     unavailableBtn: {
-    width: '100%',
-    padding: '12px',
-    fontSize: '14px',
-    fontWeight: 600,
-    borderRadius: '8px',
-    marginTop: '12px',
-    textAlign: 'center',
-    background: 'var(--bg-elevated)',
-    color: 'var(--text-muted)',
-    border: '0.5px solid var(--border)',
-    boxSizing: 'border-box',
-},
+        width: '100%',
+        padding: '12px',
+        fontSize: '14px',
+        fontWeight: 600,
+        borderRadius: '8px',
+        marginTop: '12px',
+        textAlign: 'center',
+        background: 'var(--bg-elevated)',
+        color: 'var(--text-muted)',
+        border: '0.5px solid var(--border)',
+        boxSizing: 'border-box',
+    },
 }

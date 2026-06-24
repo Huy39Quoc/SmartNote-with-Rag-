@@ -168,6 +168,13 @@ public class AdminServiceImpl implements AdminService {
     }
 
     private void mapRequestToEntity(PackageServiceRequest request, PackageService pkg) {
+        if (request.getPriceMonthly() == null || request.getPriceMonthly() < 0) {
+            throw new BadRequestException("Giá tháng không được để trống hoặc nhỏ hơn 0");
+        }
+
+        if (request.getPriceYearly() == null || request.getPriceYearly() < 0) {
+            throw new BadRequestException("Giá năm không được để trống hoặc nhỏ hơn 0");
+        }
         pkg.setName(request.getName());
         pkg.setPriceMonthly(request.getPriceMonthly());
         pkg.setPriceYearly(request.getPriceYearly());

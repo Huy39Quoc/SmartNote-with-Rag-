@@ -1,0 +1,4 @@
+Java là ngôn ngữ lập trình hướng đối tượng. 
+OOP có bốn tính chất chính: Encapsulation, Inheritance, Polymorphism và Abstraction.
+Spring Boot giúp xây dựng ứng dụng Java nhanh hơn nhờ auto configuration.
+JPA là chuẩn ORM giúp ánh xạ object Java với bảng trong database.

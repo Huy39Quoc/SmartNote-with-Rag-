@@ -24,6 +24,7 @@ const menu = [
     { to: '/shared-notes', label: 'Được chia sẻ', icon: IconShare },
     { to: '/chat', label: 'Hỏi đáp AI', icon: IconMessages },
     { to: '/documents', label: 'Tài liệu', icon: IconFileText },
+    { to: '/shared-documents', label: 'Tài liệu được chia sẻ', icon: IconShare },
     { to: '/schedule', label: 'Lịch & Deadline', icon: IconCalendar },
     { to: '/knowledge', label: 'Kiến thức', icon: IconShare },
     { to: '/account', label: 'Tài khoản', icon: IconUser },
@@ -80,7 +81,7 @@ export default function Sidebar() {
     return (
         <aside style={styles.sidebar}>
             <div style={styles.logo}>
-                <img src={logo} alt="Velora" style={{ height: 22 }} />
+                <img src={logo} alt="Velora" style={{ height: 20 }} />
             </div>
 
             <nav style={styles.nav}>
@@ -94,7 +95,7 @@ export default function Sidebar() {
                             style={navStyle}
                             className={({ isActive }) => isActive ? 'active' : ''}
                         >
-                            <Icon size={15} />
+                            <Icon size={16} />
                             <span>{label}</span>
 
                             {laThongBao && soThongBaoChuaDoc > 0 && (
@@ -109,11 +110,11 @@ export default function Sidebar() {
                 {laAdmin() && (
                     <>
                         <NavLink to="/admin" style={navStyle} className={({ isActive }) => isActive ? 'active' : ''}>
-                            <IconShield size={15} />
+                            <IconShield size={16} />
                             <span>Quản trị</span>
                         </NavLink>
                         <NavLink to="/admin/service-packages" style={navStyle} className={({ isActive }) => isActive ? 'active' : ''}>
-                            <IconShield size={15} />
+                            <IconShield size={16} />
                             <span>Quản lý Gói</span>
                         </NavLink>
                     </>
@@ -163,8 +164,8 @@ export default function Sidebar() {
                         marginTop: 2,
                     }}
                 >
-                    <IconLogout size={13} />
-                    <span style={{ fontSize: 12 }}>Đăng xuất</span>
+                    <IconLogout size={14} />
+                    <span style={{ fontSize: 13 }}>Đăng xuất</span>
                 </button>
             </div>
         </aside>
@@ -175,9 +176,9 @@ const navStyle = ({ isActive }) => ({
     display: 'flex',
     alignItems: 'center',
     gap: 8,
-    padding: '6px 10px',
+    padding: '6px 8px',
     borderRadius: 6,
-    fontSize: 12,
+    fontSize: 13,
     color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
     background: isActive ? 'var(--bg-elevated)' : 'transparent',
     textDecoration: 'none',
@@ -196,12 +197,12 @@ const styles = {
         overflow: 'hidden',
     },
     logo: {
-        padding: '14px 12px 10px',
+        padding: '10px 10px',
         borderBottom: '.5px solid var(--border)',
     },
     nav: {
         flex: 1,
-        padding: '8px 8px',
+        padding: '6px 6px',
         display: 'flex',
         flexDirection: 'column',
         gap: 1,
@@ -218,15 +219,15 @@ const styles = {
         padding: '6px 8px',
     },
     avatar: {
-        width: 26,
-        height: 26,
+        width: 28,
+        height: 28,
         borderRadius: '50%',
         background: 'var(--bg-ai)',
         color: 'var(--accent-blue-dim)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: 600,
         flexShrink: 0,
     },
