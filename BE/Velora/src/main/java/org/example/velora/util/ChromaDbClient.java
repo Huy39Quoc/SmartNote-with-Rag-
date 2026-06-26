@@ -86,28 +86,44 @@ public class ChromaDbClient {
      * Gửi file audio dưới dạng multipart/form-data
      */
     public String transcribeAudio(String filePath, String language) {
-        try {
-            MultipartBodyBuilder builder = new MultipartBodyBuilder();
-            builder.part("file", new FileSystemResource(filePath));
-            builder.part("language", language != null ? language : "vi");
+    try {
+        java.io.File audioFile = new java.io.File(filePath);
 
-            String raw = chromaWebClient.post()
-                    .uri("/audio/transcribe")
-                    .contentType(MediaType.MULTIPART_FORM_DATA)
-                    .body(BodyInserters.fromMultipartData(builder.build()))
-                    .retrieve().bodyToMono(String.class)
-                    .timeout(Duration.ofMinutes(30))  // Audio dài có thể mất vài phút
-                    .block();
-
-            if (raw == null) return "";
-            Map<?, ?> resp = objectMapper.readValue(raw, Map.class);
-            Object value = resp.get("transcript");
-            return value != null ? (String) value : "";
-        } catch (Exception e) {
-            log.error("Whisper transcribe error: {}", e.getMessage());
-            throw new RuntimeException("Không thể nhận dạng âm thanh: " + e.getMessage());
+        if (!audioFile.exists()) {
+            throw new RuntimeException("File audio không tồn tại trong backend container: " + filePath);
         }
+
+        MultipartBodyBuilder builder = new MultipartBodyBuilder();
+        builder.part("file", new FileSystemResource(audioFile));
+        builder.part("language", language != null ? language : "vi");
+
+        String raw = chromaWebClient.post()
+                .uri("/audio/transcribe")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(BodyInserters.fromMultipartData(builder.build()))
+                .retrieve()
+                .bodyToMono(String.class)
+                .timeout(Duration.ofMinutes(30))
+                .block();
+
+        if (raw == null || raw.isBlank()) {
+            throw new RuntimeException("AI service trả về response rỗng");
+        }
+
+        Map<?, ?> resp = objectMapper.readValue(raw, Map.class);
+        Object value = resp.get("transcript");
+
+        if (value == null || value.toString().isBlank()) {
+            throw new RuntimeException("AI service không trả transcript. Response: " + raw);
+        }
+
+        return value.toString();
+
+    } catch (Exception e) {
+        log.error("Whisper transcribe error filePath={}: {}", filePath, e.getMessage(), e);
+        throw new RuntimeException("Không thể nhận dạng âm thanh: " + e.getMessage());
     }
+}
 
     public boolean isHealthy() {
         try {

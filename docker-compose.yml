@@ -30,4 +30,5 @@ services:
       - .env
     volumes:
       - ./AI/chroma_data:/app/chroma_data
+      - ./data/uploads:/app/uploads
     restart: unless-stopped

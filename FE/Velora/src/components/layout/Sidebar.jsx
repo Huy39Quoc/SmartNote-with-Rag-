@@ -24,7 +24,6 @@ const menu = [
     { to: '/shared-notes', label: 'Được chia sẻ', icon: IconShare },
     { to: '/chat', label: 'Hỏi đáp AI', icon: IconMessages },
     { to: '/documents', label: 'Tài liệu', icon: IconFileText },
-    { to: '/shared-documents', label: 'Tài liệu được chia sẻ', icon: IconShare },
     { to: '/schedule', label: 'Lịch & Deadline', icon: IconCalendar },
     { to: '/knowledge', label: 'Kiến thức', icon: IconShare },
     { to: '/account', label: 'Tài khoản', icon: IconUser },

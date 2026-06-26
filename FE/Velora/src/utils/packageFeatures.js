@@ -31,14 +31,42 @@ export const parsePackageFeatures = (nguoiDung) => {
 }
 
 export const hasFeature = (nguoiDung, featureCode) => {
-    if (!featureCode) return false
+    if (!nguoiDung || !featureCode) {
+        return false
+    }
 
-    // Admin được dùng toàn bộ tính năng để test / quản trị
-    if (nguoiDung?.role === 'ADMIN') return true
+    const packageName =
+        nguoiDung.packageName ||
+        nguoiDung.currentPackageName ||
+        nguoiDung.package?.name ||
+        nguoiDung.currentPackage?.name ||
+        'FREE'
 
-    const features = parsePackageFeatures(nguoiDung)
+    if (packageName.toUpperCase() === 'PLUS') {
+        return true
+    }
 
-    return features.some(f => f.toUpperCase() === featureCode.toUpperCase())
+    const rawFeatures =
+        nguoiDung.features ||
+        nguoiDung.packageFeatures ||
+        nguoiDung.currentPackage?.features ||
+        nguoiDung.package?.features ||
+        ''
+
+    if (Array.isArray(rawFeatures)) {
+        return rawFeatures
+            .map(item => String(item).trim().toUpperCase())
+            .includes(featureCode.toUpperCase())
+    }
+
+    if (typeof rawFeatures === 'string') {
+        return rawFeatures
+            .split(',')
+            .map(item => item.trim().toUpperCase())
+            .includes(featureCode.toUpperCase())
+    }
+
+    return false
 }
 
 export const hasAllFeatures = (nguoiDung, featureCodes = []) => {

@@ -2,6 +2,7 @@ package org.example.velora.service.impl;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.example.velora.exception.BadRequestException;
 import org.example.velora.util.LmStudioClient;
 import org.example.velora.util.ChromaDbClient;
 import org.example.velora.dto.request.NoteRequest;
@@ -625,12 +626,21 @@ public class AiServiceImpl implements AiService {
     @Override
     public String transcribeAudioFile(String filePath) {
         try {
-            // Thử gọi /v1/audio/transcriptions nếu LM Studio hỗ trợ (version mới)
-            return chromaDbClient.transcribeAudio(filePath, "vi");
+            String transcript = chromaDbClient.transcribeAudio(filePath, "vi");
+
+            if (transcript == null || transcript.isBlank()) {
+                throw new BadRequestException("AI không trả về transcript từ file âm thanh.");
+            }
+
+            if (transcript.contains("Cần cài Whisper")) {
+                throw new BadRequestException("Whisper chưa hoạt động đúng trong AI service.");
+            }
+
+            return transcript;
+
         } catch (Exception e) {
-            log.warn("LM Studio audio transcription not supported, using fallback: {}", e.getMessage());
-            // Fallback: trả về thông báo để xử lý thủ công
-            return "[Cần cài Whisper để phân tích âm thanh. File: " + new File(filePath).getName() + "]";
+            log.error("Audio transcription failed. filePath={}", filePath, e);
+            throw new BadRequestException("Không thể nhận dạng âm thanh: " + e.getMessage());
         }
     }
 
