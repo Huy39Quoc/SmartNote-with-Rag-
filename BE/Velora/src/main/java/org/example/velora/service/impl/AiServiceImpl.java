@@ -23,7 +23,9 @@ import java.io.File;
 import java.time.LocalDate;
 import java.util.*;
 
-@Service @RequiredArgsConstructor @Slf4j
+@Service
+@RequiredArgsConstructor
+@Slf4j
 public class AiServiceImpl implements AiService {
 
     private final LmStudioClient lmStudioClient;
@@ -37,20 +39,24 @@ public class AiServiceImpl implements AiService {
         NoteResponse.AiResult.AiResultBuilder b = NoteResponse.AiResult.builder().action(action.name());
         try {
             switch (action) {
-                case SUMMARIZE -> b.summary(lmStudioClient.complete(
-                        getPrompt("note.summarize") + "\n\n" + content));
-                case STRUCTURE -> b.improvedContent(lmStudioClient.complete(
-                        getPrompt("note.structure") + "\n\n" + content));
+                case SUMMARIZE ->
+                        b.summary(lmStudioClient.complete(
+                                getPrompt("note.summarize") + "\n\n" + content));
+                case STRUCTURE ->
+                        b.improvedContent(lmStudioClient.complete(
+                                getPrompt("note.structure") + "\n\n" + content));
                 case SUGGEST_TITLE -> {
                     String raw = lmStudioClient.complete(getPrompt("note.suggest_title") + "\n\n" + content);
                     List<String> titles = parseJsonArray(raw);
                     b.suggestedTitle(titles.isEmpty() ? "Ghi chú mới" : titles.get(0)).keyPoints(titles);
                 }
-                case CREATE_CHECKLIST -> b.checklist(parseJsonArray(
-                        lmStudioClient.complete(getPrompt("note.checklist") + "\n\n" + content)));
-                case IMPROVE_ALL -> b
-                        .summary(lmStudioClient.complete(getPrompt("note.summarize") + "\n\n" + content))
-                        .improvedContent(lmStudioClient.complete(getPrompt("note.structure") + "\n\n" + content));
+                case CREATE_CHECKLIST ->
+                        b.checklist(parseJsonArray(
+                                lmStudioClient.complete(getPrompt("note.checklist") + "\n\n" + content)));
+                case IMPROVE_ALL ->
+                        b
+                                .summary(lmStudioClient.complete(getPrompt("note.summarize") + "\n\n" + content))
+                                .improvedContent(lmStudioClient.complete(getPrompt("note.structure") + "\n\n" + content));
             }
         } catch (Exception e) {
             log.error("improveNote error: {}", e.getMessage());
@@ -63,14 +69,17 @@ public class AiServiceImpl implements AiService {
     public DocumentResponse.AnalysisResult analyzeDocument(String text, String instruction) {
         String truncated = text.length() > 8000 ? text.substring(0, 8000) + "..." : text;
         String prompt = getPrompt("document.analyze");
-        if (StringUtils.hasText(instruction)) prompt = instruction + "\n\n" + prompt;
+        if (StringUtils.hasText(instruction)) {
+            prompt = instruction + "\n\n" + prompt;
+        }
         try {
             String raw = lmStudioClient.complete(prompt + "\n\n" + truncated);
 
             // Sửa đổi: Sử dụng TypeReference để định nghĩa chính xác kiểu dữ liệu Map<String, Object>
             Map<String, Object> parsed = objectMapper.readValue(
                     cleanJson(raw, '{'),
-                    new TypeReference<Map<String, Object>>() {}
+                    new TypeReference<Map<String, Object>>() {
+                    }
             );
 
             @SuppressWarnings("unchecked")
@@ -143,8 +152,8 @@ public class AiServiceImpl implements AiService {
         if (answer == null || answer.isBlank()
                 || answer.contains("Không thể kết nối AI")
                 || answer.contains("AI chưa trả về nội dung")) {
-            return "Mình đã tìm thấy nội dung liên quan trong tài liệu, nhưng model AI trả lời chưa ổn. " +
-                    "Bạn có thể xem các đoạn liên quan dưới đây:\n\n" + context;
+            return "Mình đã tìm thấy nội dung liên quan trong tài liệu, nhưng model AI trả lời chưa ổn. "
+                    + "Bạn có thể xem các đoạn liên quan dưới đây:\n\n" + context;
         }
 
         return answer;
@@ -213,13 +222,16 @@ public class AiServiceImpl implements AiService {
 
             List<Map<String, Object>> items = objectMapper.readValue(
                     json,
-                    new TypeReference<List<Map<String, Object>>>() {}
+                    new TypeReference<List<Map<String, Object>>>() {
+                    }
             );
 
             List<ScheduleResponse.Item> extracted = new ArrayList<>();
 
             for (Map<String, Object> m : items) {
-                if (m == null) continue;
+                if (m == null) {
+                    continue;
+                }
 
                 String taskName = asText(m.get("task"));
                 if (!StringUtils.hasText(taskName)) {
@@ -233,7 +245,9 @@ public class AiServiceImpl implements AiService {
                     taskName = buildTaskNameAroundDate(originalContent, deadlineStr);
                 }
 
-                if (!StringUtils.hasText(taskName)) continue;
+                if (!StringUtils.hasText(taskName)) {
+                    continue;
+                }
 
                 Schedule.Priority priority = parsePriority(asText(m.get("priority")), taskName);
 
@@ -300,7 +314,9 @@ public class AiServiceImpl implements AiService {
             int year;
             if (matcher.group(3) != null) {
                 year = Integer.parseInt(matcher.group(3));
-                if (year < 100) year += 2000;
+                if (year < 100) {
+                    year += 2000;
+                }
             } else {
                 year = LocalDate.now().getYear();
             }
@@ -362,7 +378,9 @@ public class AiServiceImpl implements AiService {
     }
 
     private String cleanupTaskName(String text) {
-        if (text == null) return "Công việc";
+        if (text == null) {
+            return "Công việc";
+        }
 
         String cleaned = text.trim();
 
@@ -402,7 +420,9 @@ public class AiServiceImpl implements AiService {
         int year;
         if (m.group(3) != null) {
             year = Integer.parseInt(m.group(3));
-            if (year < 100) year += 2000;
+            if (year < 100) {
+                year += 2000;
+            }
         } else {
             year = LocalDate.now().getYear();
         }
@@ -445,7 +465,6 @@ public class AiServiceImpl implements AiService {
     private String asText(Object value) {
         return value == null ? null : String.valueOf(value);
     }
-
 
     @Override
     public KnowledgeGroupResponse.ClassifyResult classifyContent(String content) {
@@ -492,7 +511,8 @@ public class AiServiceImpl implements AiService {
 
             Map<String, Object> parsed = objectMapper.readValue(
                     extractJsonObject(raw),
-                    new TypeReference<Map<String, Object>>() {}
+                    new TypeReference<Map<String, Object>>() {
+                    }
             );
 
             String groupName = asText(parsed.get("groupName"));
@@ -618,10 +638,10 @@ public class AiServiceImpl implements AiService {
     }
 
     /**
-     * Transcribe audio file → text tiếng Việt.
-     * LM Studio hiện chưa hỗ trợ audio trực tiếp qua /v1/audio/transcriptions
-     * nên dùng phương án: đọc file binary → base64 → gửi kèm prompt mô tả.
-     * Trong production nên thay bằng Whisper API hoặc faster-whisper local.
+     * Transcribe audio file → text tiếng Việt. LM Studio hiện chưa hỗ trợ audio
+     * trực tiếp qua /v1/audio/transcriptions nên dùng phương án: đọc file
+     * binary → base64 → gửi kèm prompt mô tả. Trong production nên thay bằng
+     * Whisper API hoặc faster-whisper local.
      */
     @Override
     public String transcribeAudioFile(String filePath) {
@@ -673,6 +693,7 @@ public class AiServiceImpl implements AiService {
 
     @lombok.Data
     public static class AiFlashcardItem {
+
         private String question;
         private String answer;
     }
@@ -709,11 +730,11 @@ public class AiServiceImpl implements AiService {
 
             String cleanJson = extractJsonArray(aiRawJson);
 
-            AiFlashcardItem[] items =
-                    objectMapper.readValue(
-                            cleanJson,
-                            AiFlashcardItem[].class
-                    );
+            AiFlashcardItem[] items
+                    = objectMapper.readValue(
+                    cleanJson,
+                    AiFlashcardItem[].class
+            );
 
             for (AiFlashcardItem item : items) {
 
@@ -750,19 +771,185 @@ public class AiServiceImpl implements AiService {
         return savedCards;
     }
 
+    @Override
+    public String generateDiagramFromNote(
+            String title,
+            String content,
+            NoteRequest.GenerateDiagram.DiagramType diagramType
+    ) {
+        String safeTitle = title == null ? "Ghi chú" : title;
+        String safeContent = content == null ? "" : content;
+
+        if (!StringUtils.hasText(safeContent)) {
+            throw new BadRequestException("Ghi chú không có nội dung để tạo sơ đồ.");
+        }
+
+        String prompt = buildDiagramPrompt(safeTitle, safeContent, diagramType);
+
+        try {
+            String raw = lmStudioClient.complete(prompt);
+            return cleanDiagramOutput(raw, diagramType);
+        } catch (Exception e) {
+            log.error("generateDiagramFromNote error: {}", e.getMessage(), e);
+            throw new BadRequestException("Không thể tạo sơ đồ từ ghi chú: " + e.getMessage());
+        }
+    }
+
     private List<String> parseJsonArray(String raw) {
         try {
             // Sửa đổi: Định hình rõ cấu trúc kiểu dữ liệu List<String> khi nhận mảng từ JSON
-            return objectMapper.readValue(cleanJson(raw, '['), new TypeReference<List<String>>() {});
+            return objectMapper.readValue(cleanJson(raw, '['), new TypeReference<List<String>>() {
+            });
         } catch (Exception e) {
             return List.of(raw.trim());
         }
     }
 
     private String cleanJson(String raw, char startChar) {
-        if (raw == null) return startChar == '[' ? "[]" : "{}";
+        if (raw == null) {
+            return startChar == '[' ? "[]" : "{}";
+        }
         raw = raw.trim();
         int idx = raw.indexOf(startChar);
         return idx >= 0 ? raw.substring(idx) : raw;
+    }
+
+    private String buildDiagramPrompt(
+            String title,
+            String content,
+            NoteRequest.GenerateDiagram.DiagramType diagramType
+    ) {
+        String commonRule = """
+            Quy tắc bắt buộc:
+            - Chỉ dựa trên nội dung ghi chú được cung cấp.
+            - Không bịa thêm kiến thức ngoài ghi chú.
+            - Không giải thích thêm.
+            - Không dùng markdown fence ``` .
+            - Nội dung node ngắn gọn, dễ hiểu.
+            
+            Tiêu đề ghi chú:
+            %s
+            
+            Nội dung ghi chú:
+            %s
+            """.formatted(title, content);
+
+        return switch (diagramType) {
+            case MINDMAP -> """
+                Bạn là AI tạo sơ đồ tư duy học tập.
+                Hãy tạo Mermaid mindmap từ ghi chú sau.
+                
+                Format bắt buộc:
+                mindmap
+                  root((Chủ đề chính))
+                    Ý chính 1
+                      Ý phụ 1
+                      Ý phụ 2
+                    Ý chính 2
+                
+                Yêu cầu:
+                - Root là chủ đề chính của ghi chú.
+                - Tối đa 4 cấp.
+                - Không dùng ký tự đặc biệt khó render.
+                
+                %s
+                """.formatted(commonRule);
+
+            case FLOWCHART -> """
+                Bạn là AI tạo flowchart học tập.
+                Hãy tạo Mermaid flowchart TD từ ghi chú sau.
+                
+                Format bắt buộc:
+                flowchart TD
+                    A[Nội dung] --> B[Nội dung]
+                    B --> C[Nội dung]
+                
+                Yêu cầu:
+                - Nếu ghi chú có quy trình, biểu diễn theo từng bước.
+                - Nếu ghi chú không có quy trình, tạo flow học tập từ khái niệm chính đến chi tiết.
+                - ID node dùng chữ cái A, B, C, D...
+                
+                %s
+                """.formatted(commonRule);
+
+            case ARCHITECTURE -> """
+                Bạn là AI tạo sơ đồ kiến trúc hệ thống.
+                Hãy tạo Mermaid flowchart LR từ ghi chú sau.
+                
+                Format bắt buộc:
+                flowchart LR
+                    FE[Frontend] --> BE[Backend]
+                    BE --> DB[(Database)]
+                
+                Yêu cầu:
+                - Chỉ tạo sơ đồ kiến trúc nếu ghi chú có nội dung về hệ thống, phần mềm, module, database, API.
+                - Nếu không phải nội dung kỹ thuật, hãy chuyển thành sơ đồ các thành phần chính của chủ đề.
+                - Dùng mũi tên thể hiện quan hệ hoặc luồng giao tiếp.
+                
+                %s
+                """.formatted(commonRule);
+
+            case SKETCHNOTE -> """
+                Bạn là AI tạo sketchnote học tập.
+                Hãy trả về JSON hợp lệ từ ghi chú sau.
+                
+                Format bắt buộc:
+                {
+                  "title": "Tiêu đề ngắn",
+                  "blocks": [
+                    {
+                      "icon": "🎯",
+                      "heading": "Ý chính",
+                      "content": "Nội dung ngắn gọn"
+                    }
+                  ]
+                }
+                
+                Yêu cầu:
+                - Có từ 4 đến 8 blocks.
+                - Mỗi block có icon emoji phù hợp.
+                - Content ngắn, dễ học.
+                - Chỉ trả JSON, không giải thích.
+                
+                %s
+                """.formatted(commonRule);
+        };
+    }
+
+    private String cleanDiagramOutput(
+            String raw,
+            NoteRequest.GenerateDiagram.DiagramType diagramType
+    ) {
+        if (raw == null || raw.isBlank()) {
+            throw new BadRequestException("AI không trả về nội dung sơ đồ.");
+        }
+
+        String cleaned = raw.trim()
+                .replace("```mermaid", "")
+                .replace("```json", "")
+                .replace("```", "")
+                .trim();
+
+        if (diagramType == NoteRequest.GenerateDiagram.DiagramType.SKETCHNOTE) {
+            int start = cleaned.indexOf('{');
+            int end = cleaned.lastIndexOf('}');
+            if (start >= 0 && end > start) {
+                return cleaned.substring(start, end + 1);
+            }
+            throw new BadRequestException("AI trả về Sketchnote không đúng JSON.");
+        }
+
+        if (diagramType == NoteRequest.GenerateDiagram.DiagramType.MINDMAP
+                && !cleaned.startsWith("mindmap")) {
+            throw new BadRequestException("AI trả về Mindmap không đúng định dạng Mermaid.");
+        }
+
+        if ((diagramType == NoteRequest.GenerateDiagram.DiagramType.FLOWCHART
+                || diagramType == NoteRequest.GenerateDiagram.DiagramType.ARCHITECTURE)
+                && !cleaned.startsWith("flowchart")) {
+            throw new BadRequestException("AI trả về diagram không đúng định dạng Mermaid.");
+        }
+
+        return cleaned;
     }
 }

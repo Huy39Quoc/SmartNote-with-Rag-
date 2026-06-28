@@ -28,6 +28,8 @@ const noteApi = {
 
     layGhiChuDuocChiaSe: () =>
         client.get('/note-shares/shared-with-me'),
+    
+    taoSoDo: (id, payload) => client.post(`/notes/${id}/diagram`, payload),
 }
 
 export default noteApi

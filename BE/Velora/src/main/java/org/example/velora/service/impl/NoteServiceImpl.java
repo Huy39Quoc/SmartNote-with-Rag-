@@ -63,9 +63,16 @@ public class NoteServiceImpl implements NoteService {
     public NoteResponse.Detail update(UUID userId, UUID noteId, NoteRequest.Update req) {
         Note note = getEditableNote(userId, noteId);
 
-        if (StringUtils.hasText(req.getTitle()))  note.setTitle(req.getTitle());
-        if (req.getContent() != null) { note.setContent(req.getContent()); note.setIsEmbedded(false); }
-        if (req.getTagIds() != null)  note.setTags(tagRepository.findAllById(req.getTagIds()));
+        if (StringUtils.hasText(req.getTitle())) {
+            note.setTitle(req.getTitle());
+        }
+        if (req.getContent() != null) {
+            note.setContent(req.getContent());
+            note.setIsEmbedded(false);
+        }
+        if (req.getTagIds() != null) {
+            note.setTags(tagRepository.findAllById(req.getTagIds()));
+        }
 
         note = noteRepository.save(note);
         embedNoteSafely(note);
@@ -132,13 +139,56 @@ public class NoteServiceImpl implements NoteService {
         return result;
     }
 
+    @Override
+    public NoteResponse.DiagramResult generateDiagram(
+            UUID userId,
+            UUID noteId,
+            NoteRequest.GenerateDiagram req
+    ) {
+        User user = getUser(userId);
+
+        PackageValidationDto.validateAiUsage(user, "AI_NOTE_FORMAT", userRepository);
+
+        Note note = getAccessibleNote(userId, noteId);
+
+        if (req.getDiagramType() == null) {
+            throw new BadRequestException("Vui lòng chọn loại sơ đồ.");
+        }
+
+        if (!StringUtils.hasText(note.getContent())) {
+            throw new BadRequestException("Ghi chú không có nội dung để tạo sơ đồ.");
+        }
+
+        String diagramCode = aiService.generateDiagramFromNote(
+                note.getTitle(),
+                note.getContent(),
+                req.getDiagramType()
+        );
+
+        PackageValidationDto.incrementAiUsage(user, userRepository);
+
+        String format = req.getDiagramType() == NoteRequest.GenerateDiagram.DiagramType.SKETCHNOTE
+                ? "JSON"
+                : "MERMAID";
+
+        return NoteResponse.DiagramResult.builder()
+                .noteId(note.getId())
+                .noteTitle(note.getTitle())
+                .diagramType(req.getDiagramType().name())
+                .format(format)
+                .diagramCode(diagramCode)
+                .build();
+    }
     // ── Private helpers ───────────────────────────────────────────────────
 
     private void embedNoteSafely(Note note) {
         try {
             String content = "# " + (note.getTitle() != null ? note.getTitle() : "")
                     + "\n\n" + (note.getContent() != null ? note.getContent() : "");
-            if (!StringUtils.hasText(content)) { note.setIsEmbedded(false); return; }
+            if (!StringUtils.hasText(content)) {
+                note.setIsEmbedded(false);
+                return;
+            }
             note.setIsEmbedded(chromaDbClient.embed(
                     note.getId().toString(), content,
                     note.getUser().getId().toString(), "note"));
@@ -150,27 +200,35 @@ public class NoteServiceImpl implements NoteService {
     private Note getOwnedNote(UUID userId, UUID noteId) {
         Note note = noteRepository.findById(noteId)
                 .orElseThrow(() -> new ResourceNotFoundException("Ghi chú không tồn tại"));
-        if (note.getUser() == null || !note.getUser().getId().equals(userId))
+        if (note.getUser() == null || !note.getUser().getId().equals(userId)) {
             throw new ResourceNotFoundException("Ghi chú không tồn tại");
+        }
         return note;
     }
 
     private Note getAccessibleNote(UUID userId, UUID noteId) {
         Note note = noteRepository.findById(noteId)
                 .orElseThrow(() -> new ResourceNotFoundException("Ghi chú không tồn tại"));
-        if (note.getUser() != null && note.getUser().getId().equals(userId)) return note;
-        if (noteShareRepository.existsByNoteIdAndSharedWithId(noteId, userId)) return note;
+        if (note.getUser() != null && note.getUser().getId().equals(userId)) {
+            return note;
+        }
+        if (noteShareRepository.existsByNoteIdAndSharedWithId(noteId, userId)) {
+            return note;
+        }
         throw new ResourceNotFoundException("Ghi chú không tồn tại");
     }
 
     private Note getEditableNote(UUID userId, UUID noteId) {
         Note note = noteRepository.findById(noteId)
                 .orElseThrow(() -> new ResourceNotFoundException("Ghi chú không tồn tại"));
-        if (note.getUser() != null && note.getUser().getId().equals(userId)) return note;
+        if (note.getUser() != null && note.getUser().getId().equals(userId)) {
+            return note;
+        }
         NoteShare share = noteShareRepository.findByNoteIdAndSharedWithId(noteId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Ghi chú không tồn tại"));
-        if (share.getPermission() != NoteShare.Permission.EDIT)
+        if (share.getPermission() != NoteShare.Permission.EDIT) {
             throw new BadRequestException("Bạn không có quyền chỉnh sửa ghi chú này");
+        }
         return note;
     }
 
@@ -186,7 +244,9 @@ public class NoteServiceImpl implements NoteService {
     }
 
     private String resolveAccessMode(Note note, UUID userId) {
-        if (note.getUser() != null && note.getUser().getId().equals(userId)) return "OWNER";
+        if (note.getUser() != null && note.getUser().getId().equals(userId)) {
+            return "OWNER";
+        }
         return noteShareRepository.findByNoteIdAndSharedWithId(note.getId(), userId)
                 .map(s -> s.getPermission() == NoteShare.Permission.EDIT ? "EDIT" : "VIEW")
                 .orElse("VIEW");

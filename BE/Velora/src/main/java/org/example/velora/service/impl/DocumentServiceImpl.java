@@ -124,9 +124,22 @@ public class DocumentServiceImpl implements DocumentService {
 
             if (doc.getFileType() == Document.FileType.AUDIO) {
                 String transcript = aiService.transcribeAudioFile(doc.getStoragePath());
+
+                if (transcript == null
+                        || transcript.isBlank()
+                        || transcript.contains("Whisper")
+                        || transcript.contains("cài đặt Whisper")
+                        || transcript.contains("Cần cài Whisper")) {
+                    throw new BadRequestException("Transcribe audio thất bại, không lưu transcript fallback.");
+                }
+
                 doc.setAudioTranscript(transcript);
-                embedded = chromaDbClient.embed(docId.toString(), transcript,
-                        doc.getUser().getId().toString(), "audio");
+                embedded = chromaDbClient.embed(
+                        docId.toString(),
+                        transcript,
+                        doc.getUser().getId().toString(),
+                        "audio"
+                );
             } else {
                 String text = fileExtractor.extract(doc.getStoragePath(), doc.getFileType());
                 doc.setExtractedText(text);
@@ -162,17 +175,35 @@ public class DocumentServiceImpl implements DocumentService {
         if (doc.getStatus() != Document.Status.DONE)
             throw new BadRequestException("Audio chưa xử lý xong (trạng thái: " + doc.getStatus() + ")");
 
-        String raw = doc.getAudioTranscript() != null
-                ? doc.getAudioTranscript()
-                : aiService.transcribeAudioFile(doc.getStoragePath());
+        String raw = doc.getAudioTranscript();
+
+        if (raw == null
+                || raw.isBlank()
+                || raw.contains("Whisper")
+                || raw.contains("cài đặt Whisper")
+                || raw.contains("Cần cài Whisper")) {
+            raw = aiService.transcribeAudioFile(doc.getStoragePath());
+            doc.setAudioTranscript(raw);
+            documentRepository.save(doc);
+        }
 
         String structured = aiService.structureTranscript(raw, req.getTopic());
-        String title = req.getNoteTitle() != null ? req.getNoteTitle() : aiService.suggestTitle(structured);
+
+        String title = doc.getOriginalName();
+        if (title == null || title.isBlank()) {
+            title = doc.getFileName();
+        }
 
         UUID createdNoteId = null;
         if (Boolean.TRUE.equals(req.getCreateNote())) {
             Note note = noteRepository.save(
-                    Note.builder().user(user).title(title).content(structured).build());
+                    Note.builder()
+                            .user(user)
+                            .title(title)
+                            .content(structured)
+                            .build()
+            );
+
             chromaDbClient.embed(note.getId().toString(), structured, userId.toString(), "note");
             createdNoteId = note.getId();
         }

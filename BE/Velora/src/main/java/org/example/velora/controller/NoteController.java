@@ -31,8 +31,8 @@ public class NoteController {
             @Valid @RequestBody NoteRequest.Create req
     ) {
 
-        System.out.println("noi dung " +req.getContent());
-        System.out.println("tieu de " +req.getTitle());
+        System.out.println("noi dung " + req.getContent());
+        System.out.println("tieu de " + req.getTitle());
         return ResponseEntity.ok(ApiResponse.ok(noteService.create(u.getUserId(), req)));
     }
 
@@ -93,8 +93,8 @@ public class NoteController {
             @PathVariable UUID id,
             @PathVariable String format
     ) {
-        NoteExportService.ExportedFile file =
-                noteExportService.export(u.getUserId(), id, format);
+        NoteExportService.ExportedFile file
+                = noteExportService.export(u.getUserId(), id, format);
 
         String encodedFileName = URLEncoder
                 .encode(file.getFileName(), StandardCharsets.UTF_8)
@@ -107,5 +107,14 @@ public class NoteController {
                 )
                 .header(HttpHeaders.CONTENT_TYPE, file.getContentType())
                 .body(file.getBytes());
+    }
+
+    @PostMapping("/{id}/diagram")
+    public ResponseEntity<ApiResponse<NoteResponse.DiagramResult>> generateDiagram(
+            @AuthenticationPrincipal UserDetailsImpl.UserDetailsWithId u,
+            @PathVariable UUID id,
+            @Valid @RequestBody NoteRequest.GenerateDiagram req
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(noteService.generateDiagram(u.getUserId(), id, req)));
     }
 }

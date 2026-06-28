@@ -12,6 +12,7 @@ public class NoteResponse {
     @Data
     @Builder
     public static class Summary {
+
         private UUID id;
         private String title;
         private String contentPreview;
@@ -24,6 +25,7 @@ public class NoteResponse {
     @Data
     @Builder
     public static class Detail {
+
         private UUID id;
         private String title;
         private String content;
@@ -38,6 +40,7 @@ public class NoteResponse {
     @Data
     @Builder
     public static class AiResult {
+
         private String summary;
         private List<String> keyPoints;
         private String suggestedTitle;
@@ -49,11 +52,23 @@ public class NoteResponse {
     @Data
     @Builder
     public static class Page {
+
         private List<Summary> content;
         private int pageNumber;
         private int pageSize;
         private long totalElements;
         private int totalPages;
         private boolean last;
+    }
+
+    @Data
+    @Builder
+    public static class DiagramResult {
+
+        private UUID noteId;
+        private String noteTitle;
+        private String diagramType;
+        private String format;       // MERMAID hoặc JSON
+        private String diagramCode;  // Mermaid code hoặc JSON text
     }
 }
