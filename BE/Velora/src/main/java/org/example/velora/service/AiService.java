@@ -7,7 +7,6 @@ import org.example.velora.dto.response.NoteResponse;
 import org.example.velora.dto.response.ScheduleResponse;
 import org.example.velora.entity.Flashcard;
 import org.example.velora.entity.Note;
-import org.example.velora.dto.request.NoteRequest;
 import java.util.List;
 
 public interface AiService {

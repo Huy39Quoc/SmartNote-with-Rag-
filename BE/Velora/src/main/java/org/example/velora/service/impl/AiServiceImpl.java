@@ -777,21 +777,31 @@ public class AiServiceImpl implements AiService {
             String content,
             NoteRequest.GenerateDiagram.DiagramType diagramType
     ) {
-        String safeTitle = title == null ? "Ghi chú" : title;
-        String safeContent = content == null ? "" : content;
-
-        if (!StringUtils.hasText(safeContent)) {
+        if (!StringUtils.hasText(content)) {
             throw new BadRequestException("Ghi chú không có nội dung để tạo sơ đồ.");
         }
 
-        String prompt = buildDiagramPrompt(safeTitle, safeContent, diagramType);
+        if (diagramType == null) {
+            throw new BadRequestException("Vui lòng chọn loại sơ đồ.");
+        }
+
+        String safeTitle = StringUtils.hasText(title) ? title.trim() : "Ghi chú";
+        String truncated = content.length() > 5000 ? content.substring(0, 5000) : content;
+
+        String prompt = buildDiagramPrompt(safeTitle, truncated, diagramType);
 
         try {
             String raw = lmStudioClient.complete(prompt);
-            return cleanDiagramOutput(raw, diagramType);
+
+            if (!StringUtils.hasText(raw)) {
+                return buildFallbackDiagram(safeTitle, truncated, diagramType);
+            }
+
+            return normalizeDiagramOutput(raw, safeTitle, truncated, diagramType);
+
         } catch (Exception e) {
             log.error("generateDiagramFromNote error: {}", e.getMessage(), e);
-            throw new BadRequestException("Không thể tạo sơ đồ từ ghi chú: " + e.getMessage());
+            return buildFallbackDiagram(safeTitle, truncated, diagramType);
         }
     }
 
@@ -819,100 +829,123 @@ public class AiServiceImpl implements AiService {
             String content,
             NoteRequest.GenerateDiagram.DiagramType diagramType
     ) {
-        String commonRule = """
-            Quy tắc bắt buộc:
-            - Chỉ dựa trên nội dung ghi chú được cung cấp.
-            - Không bịa thêm kiến thức ngoài ghi chú.
-            - Không giải thích thêm.
-            - Không dùng markdown fence ``` .
-            - Nội dung node ngắn gọn, dễ hiểu.
-            
-            Tiêu đề ghi chú:
-            %s
-            
-            Nội dung ghi chú:
-            %s
-            """.formatted(title, content);
+        String common = """
+            Bạn là công cụ tạo sơ đồ học tập.
+            QUY TẮC BẮT BUỘC:
+            - Chỉ trả về đúng nội dung sơ đồ.
+            - Không giải thích.
+            - Không viết thêm mở đầu/kết luận.
+            - Không markdown thừa ngoài nội dung cần thiết.
+            - Nội dung phải ngắn gọn, dễ học, dễ nhìn.
+            """;
 
         return switch (diagramType) {
             case MINDMAP -> """
-                Bạn là AI tạo sơ đồ tư duy học tập.
-                Hãy tạo Mermaid mindmap từ ghi chú sau.
-                
-                Format bắt buộc:
-                mindmap
-                  root((Chủ đề chính))
-                    Ý chính 1
-                      Ý phụ 1
-                      Ý phụ 2
-                    Ý chính 2
-                
-                Yêu cầu:
-                - Root là chủ đề chính của ghi chú.
-                - Tối đa 4 cấp.
-                - Không dùng ký tự đặc biệt khó render.
-                
                 %s
-                """.formatted(commonRule);
+
+                Hãy tạo sơ đồ Mermaid mindmap từ ghi chú sau.
+
+                BẮT BUỘC:
+                - Chỉ trả về code Mermaid.
+                - Dòng đầu tiên phải là: mindmap
+                - Dùng cấu trúc mindmap chuẩn Mermaid.
+                - Node gốc là tiêu đề note.
+
+                Ví dụ format:
+                mindmap
+                  root((Java OOP))
+                    Class
+                    Object
+                    Interface
+
+                Tiêu đề:
+                %s
+
+                Nội dung:
+                %s
+                """.formatted(common, title, content);
 
             case FLOWCHART -> """
-                Bạn là AI tạo flowchart học tập.
-                Hãy tạo Mermaid flowchart TD từ ghi chú sau.
-                
-                Format bắt buộc:
-                flowchart TD
-                    A[Nội dung] --> B[Nội dung]
-                    B --> C[Nội dung]
-                
-                Yêu cầu:
-                - Nếu ghi chú có quy trình, biểu diễn theo từng bước.
-                - Nếu ghi chú không có quy trình, tạo flow học tập từ khái niệm chính đến chi tiết.
-                - ID node dùng chữ cái A, B, C, D...
-                
                 %s
-                """.formatted(commonRule);
+
+                Hãy tạo sơ đồ Mermaid flowchart từ ghi chú sau.
+
+                BẮT BUỘC:
+                - Chỉ trả về code Mermaid.
+                - Dòng đầu tiên phải là: flowchart TD
+                - Mỗi bước phải ngắn gọn.
+                - Nếu nội dung không phải quy trình, hãy tự chuyển thành luồng học/ý chính.
+
+                Ví dụ format:
+                flowchart TD
+                  A[Đọc đề] --> B[Phân tích]
+                  B --> C[Thực hiện]
+                  C --> D[Kiểm tra]
+
+                Tiêu đề:
+                %s
+
+                Nội dung:
+                %s
+                """.formatted(common, title, content);
 
             case ARCHITECTURE -> """
-                Bạn là AI tạo sơ đồ kiến trúc hệ thống.
-                Hãy tạo Mermaid flowchart LR từ ghi chú sau.
-                
-                Format bắt buộc:
-                flowchart LR
-                    FE[Frontend] --> BE[Backend]
-                    BE --> DB[(Database)]
-                
-                Yêu cầu:
-                - Chỉ tạo sơ đồ kiến trúc nếu ghi chú có nội dung về hệ thống, phần mềm, module, database, API.
-                - Nếu không phải nội dung kỹ thuật, hãy chuyển thành sơ đồ các thành phần chính của chủ đề.
-                - Dùng mũi tên thể hiện quan hệ hoặc luồng giao tiếp.
-                
                 %s
-                """.formatted(commonRule);
+
+                Hãy tạo sơ đồ Mermaid flowchart mô tả cấu trúc/kiến trúc từ ghi chú sau.
+
+                BẮT BUỘC:
+                - Chỉ trả về code Mermaid.
+                - Dòng đầu tiên phải là: flowchart LR
+                - Biểu diễn dạng các khối thành phần và mối liên hệ.
+                - Nếu nội dung không phải hệ thống, hãy nhóm thành các khối kiến thức.
+
+                Ví dụ format:
+                flowchart LR
+                  A[Frontend] --> B[Backend]
+                  B --> C[Database]
+
+                Tiêu đề:
+                %s
+
+                Nội dung:
+                %s
+                """.formatted(common, title, content);
 
             case SKETCHNOTE -> """
-                Bạn là AI tạo sketchnote học tập.
-                Hãy trả về JSON hợp lệ từ ghi chú sau.
-                
-                Format bắt buộc:
+                %s
+
+                Hãy tạo Sketchnote JSON từ ghi chú sau.
+
+                BẮT BUỘC:
+                - Chỉ trả về JSON object hợp lệ.
+                - Không giải thích.
+                - Không thêm chữ ngoài JSON.
+                - Không dùng ```json.
+
+                Format:
                 {
-                  "title": "Tiêu đề ngắn",
+                  "title": "Tên sketchnote",
                   "blocks": [
                     {
-                      "icon": "🎯",
+                      "icon": "📘",
                       "heading": "Ý chính",
                       "content": "Nội dung ngắn gọn"
                     }
                   ]
                 }
-                
+
                 Yêu cầu:
-                - Có từ 4 đến 8 blocks.
-                - Mỗi block có icon emoji phù hợp.
-                - Content ngắn, dễ học.
-                - Chỉ trả JSON, không giải thích.
-                
+                - 4 đến 8 blocks
+                - content ngắn gọn
+                - icon là emoji
+
+                Tiêu đề:
                 %s
-                """.formatted(commonRule);
+
+                Nội dung:
+                %s
+                """.formatted(common, title, content);
         };
     }
 
@@ -933,23 +966,271 @@ public class AiServiceImpl implements AiService {
         if (diagramType == NoteRequest.GenerateDiagram.DiagramType.SKETCHNOTE) {
             int start = cleaned.indexOf('{');
             int end = cleaned.lastIndexOf('}');
+
             if (start >= 0 && end > start) {
-                return cleaned.substring(start, end + 1);
+                return cleaned.substring(start, end + 1).trim();
             }
-            throw new BadRequestException("AI trả về Sketchnote không đúng JSON.");
+
+            String safeText = cleaned
+                    .replace("\\", "\\\\")
+                    .replace("\"", "\\\"")
+                    .replace("\r", "")
+                    .replace("\n", "\\n");
+
+            return """
+                {
+                  "title": "Sketchnote",
+                  "blocks": [
+                    {
+                      "icon": "📝",
+                      "heading": "Nội dung chính",
+                      "content": "%s"
+                    }
+                  ]
+                }
+                """.formatted(safeText);
         }
 
-        if (diagramType == NoteRequest.GenerateDiagram.DiagramType.MINDMAP
-                && !cleaned.startsWith("mindmap")) {
+        if (diagramType == NoteRequest.GenerateDiagram.DiagramType.MINDMAP) {
+            int index = cleaned.indexOf("mindmap");
+
+            if (index >= 0) {
+                return cleaned.substring(index).trim();
+            }
+
             throw new BadRequestException("AI trả về Mindmap không đúng định dạng Mermaid.");
         }
 
-        if ((diagramType == NoteRequest.GenerateDiagram.DiagramType.FLOWCHART
-                || diagramType == NoteRequest.GenerateDiagram.DiagramType.ARCHITECTURE)
-                && !cleaned.startsWith("flowchart")) {
+        if (diagramType == NoteRequest.GenerateDiagram.DiagramType.FLOWCHART
+                || diagramType == NoteRequest.GenerateDiagram.DiagramType.ARCHITECTURE) {
+            int index = cleaned.indexOf("flowchart");
+
+            if (index >= 0) {
+                return cleaned.substring(index).trim();
+            }
+
             throw new BadRequestException("AI trả về diagram không đúng định dạng Mermaid.");
         }
 
         return cleaned;
+    }
+
+    private String normalizeDiagramOutput(
+            String raw,
+            String title,
+            String content,
+            NoteRequest.GenerateDiagram.DiagramType diagramType
+    ) {
+        String cleaned = raw.trim()
+                .replace("```mermaid", "")
+                .replace("```json", "")
+                .replace("```", "")
+                .trim();
+
+        return switch (diagramType) {
+            case SKETCHNOTE -> normalizeSketchnote(cleaned, title, content);
+            case MINDMAP -> normalizeMindmap(cleaned, title, content);
+            case FLOWCHART -> normalizeFlowchart(cleaned, title, content, false);
+            case ARCHITECTURE -> normalizeFlowchart(cleaned, title, content, true);
+        };
+    }
+
+    private String normalizeSketchnote(String cleaned, String title, String content) {
+        int start = cleaned.indexOf('{');
+        int end = cleaned.lastIndexOf('}');
+
+        if (start >= 0 && end > start) {
+            String json = cleaned.substring(start, end + 1).trim();
+            try {
+                objectMapper.readTree(json);
+                return json;
+            } catch (Exception ignored) {
+            }
+        }
+
+        return buildFallbackSketchnote(title, content);
+    }
+
+    private String normalizeMindmap(String cleaned, String title, String content) {
+        int index = cleaned.indexOf("mindmap");
+        if (index >= 0) {
+            return cleaned.substring(index).trim();
+        }
+
+        return buildFallbackMindmap(title, content);
+    }
+
+    private String normalizeFlowchart(
+            String cleaned,
+            String title,
+            String content,
+            boolean architecture
+    ) {
+        int indexTd = cleaned.indexOf("flowchart TD");
+        int indexLr = cleaned.indexOf("flowchart LR");
+        int index = -1;
+
+        if (indexTd >= 0 && indexLr >= 0) {
+            index = Math.min(indexTd, indexLr);
+        } else if (indexTd >= 0) {
+            index = indexTd;
+        } else if (indexLr >= 0) {
+            index = indexLr;
+        } else {
+            int generic = cleaned.indexOf("flowchart");
+            if (generic >= 0) index = generic;
+        }
+
+        if (index >= 0) {
+            return cleaned.substring(index).trim();
+        }
+
+        return architecture
+                ? buildFallbackArchitecture(title, content)
+                : buildFallbackFlowchart(title, content);
+    }
+
+    private String buildFallbackDiagram(
+            String title,
+            String content,
+            NoteRequest.GenerateDiagram.DiagramType diagramType
+    ) {
+        return switch (diagramType) {
+            case MINDMAP -> buildFallbackMindmap(title, content);
+            case FLOWCHART -> buildFallbackFlowchart(title, content);
+            case ARCHITECTURE -> buildFallbackArchitecture(title, content);
+            case SKETCHNOTE -> buildFallbackSketchnote(title, content);
+        };
+    }
+
+    private List<String> extractKeyLines(String content) {
+        if (!StringUtils.hasText(content)) {
+            return List.of("Nội dung chính");
+        }
+
+        List<String> lines = new ArrayList<>();
+
+        String[] rawLines = content.split("[\\n.!?]+");
+        for (String line : rawLines) {
+            String cleaned = line.trim().replaceAll("\\s+", " ");
+            if (cleaned.length() >= 3) {
+                lines.add(cleaned);
+            }
+            if (lines.size() >= 6) break;
+        }
+
+        if (lines.isEmpty()) {
+            String shortened = content.trim();
+            if (shortened.length() > 120) {
+                shortened = shortened.substring(0, 120);
+            }
+            lines.add(shortened);
+        }
+
+        return lines;
+    }
+
+    private String escapeMermaid(String text) {
+        if (text == null) return "";
+        return text
+                .replace("\"", "'")
+                .replace("[", "(")
+                .replace("]", ")")
+                .replace("{", "(")
+                .replace("}", ")")
+                .replace("<", "")
+                .replace(">", "")
+                .replace("\n", " ")
+                .replace("\r", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
+
+    private String buildFallbackMindmap(String title, String content) {
+        List<String> lines = extractKeyLines(content);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("mindmap\n");
+        sb.append("  root((").append(escapeMermaid(title)).append("))\n");
+
+        for (String line : lines) {
+            sb.append("    ").append(escapeMermaid(line)).append("\n");
+        }
+
+        return sb.toString();
+    }
+
+    private String buildFallbackFlowchart(String title, String content) {
+        List<String> lines = extractKeyLines(content);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("flowchart TD\n");
+        sb.append("  A[").append(escapeMermaid(title)).append("]\n");
+
+        char current = 'A';
+        for (int i = 0; i < lines.size(); i++) {
+            char next = (char) ('B' + i);
+            sb.append("  ").append(next).append("[")
+                    .append(escapeMermaid(lines.get(i)))
+                    .append("]\n");
+            sb.append("  ").append(current).append(" --> ").append(next).append("\n");
+            current = next;
+        }
+
+        return sb.toString();
+    }
+
+    private String buildFallbackArchitecture(String title, String content) {
+        List<String> lines = extractKeyLines(content);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("flowchart LR\n");
+        sb.append("  A[").append(escapeMermaid(title)).append("]\n");
+
+        for (int i = 0; i < lines.size(); i++) {
+            char node = (char) ('B' + i);
+            sb.append("  ").append(node).append("[")
+                    .append(escapeMermaid(lines.get(i)))
+                    .append("]\n");
+            sb.append("  A --> ").append(node).append("\n");
+        }
+
+        return sb.toString();
+    }
+
+    private String buildFallbackSketchnote(String title, String content) {
+        List<String> lines = extractKeyLines(content);
+
+        List<Map<String, String>> blocks = new ArrayList<>();
+        String[] icons = {"📘", "🧠", "📌", "✅", "💡", "📝"};
+
+        for (int i = 0; i < lines.size(); i++) {
+            Map<String, String> block = new LinkedHashMap<>();
+            block.put("icon", icons[i % icons.length]);
+            block.put("heading", "Ý " + (i + 1));
+            block.put("content", lines.get(i));
+            blocks.add(block);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("title", title);
+        result.put("blocks", blocks);
+
+        try {
+            return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(result);
+        } catch (Exception e) {
+            return """
+                {
+                  "title": "Sketchnote",
+                  "blocks": [
+                    {
+                      "icon": "📝",
+                      "heading": "Nội dung chính",
+                      "content": "Không thể chuẩn hóa dữ liệu."
+                    }
+                  ]
+                }
+                """;
+        }
     }
 }
