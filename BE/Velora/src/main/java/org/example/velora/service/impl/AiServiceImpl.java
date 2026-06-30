@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.velora.exception.BadRequestException;
 import org.example.velora.util.LmStudioClient;
 import org.example.velora.util.ChromaDbClient;
+import org.example.velora.util.RichTextContent;
 import org.example.velora.dto.request.NoteRequest;
 import org.example.velora.dto.response.*;
 import org.example.velora.entity.Flashcard;
@@ -720,7 +721,7 @@ public class AiServiceImpl implements AiService {
         ]
 
         Nội dung ghi chú:
-        """ + "\n" + note.getContent();
+        """ + "\n" + RichTextContent.toPlainText(note.getContent());
 
         String aiRawJson = lmStudioClient.complete(prompt);
 

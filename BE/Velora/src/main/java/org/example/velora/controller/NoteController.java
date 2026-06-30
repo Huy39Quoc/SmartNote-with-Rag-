@@ -31,8 +31,6 @@ public class NoteController {
             @Valid @RequestBody NoteRequest.Create req
     ) {
 
-        System.out.println("noi dung " + req.getContent());
-        System.out.println("tieu de " + req.getTitle());
         return ResponseEntity.ok(ApiResponse.ok(noteService.create(u.getUserId(), req)));
     }
 

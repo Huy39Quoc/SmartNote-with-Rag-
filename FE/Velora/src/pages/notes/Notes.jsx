@@ -1,5 +1,5 @@
-
-import { useCallback, useEffect, useState } from 'react'
+﻿
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
     IconBookmark,
@@ -23,11 +23,13 @@ import tagApi from '../../lib/api/tagApi'
 import flashcardApi from '../../lib/api/flashcardApi'
 import NoteCard from '../../components/notes/NoteCard'
 import AiPanel from '../../components/notes/AiPanel'
+import RichTextEditor from '../../components/notes/RichTextEditor'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
 import toast from 'react-hot-toast'
 import useAuthStore from '../../service/authStore'
 import { hasFeature, getUpgradeMessage } from '../../utils/packageFeatures'
+import { hasRichTextContent, richTextToPlainText } from '../../utils/richText'
 
 export default function Notes() {
     const { id: idParam } = useParams()
@@ -74,6 +76,23 @@ export default function Notes() {
     const [sharePermission, setSharePermission] = useState('VIEW')
     const [shareList, setShareList] = useState([])
     const [dangShare, setDangShare] = useState(false)
+    const banDaLuuRef = useRef('')
+
+    const taoDauMocGhiChu = useCallback((note) => {
+        if (!note) return ''
+
+        const tagIds = (note.tags || [])
+            .map(t => t.id)
+            .filter(Boolean)
+            .sort()
+
+        return JSON.stringify({
+            id: note.id || '',
+            title: note.title || '',
+            content: note.content || '',
+            tagIds,
+        })
+    }, [])
 
     const taiDanhSach = useCallback(async () => {
         setDangTai(true)
@@ -114,11 +133,12 @@ export default function Notes() {
         try {
             const { data } = await noteApi.layTheoId(id)
 
+            banDaLuuRef.current = taoDauMocGhiChu(data.data)
             setGhiChuHienTai(data.data)
             setKetQuaDongPanel()
             navigate(`/notes/${id}`, { replace: true })
         } catch {
-            toast.error('Không thể mở ghi chú')
+            toast.error('Kh?ng th? m? ghi ch?')
         }
     }
 
@@ -182,7 +202,7 @@ export default function Notes() {
 
             toast.success(`Đã export ${format.toUpperCase()}`)
         } catch (error) {
-            toast.error(error.response?.data?.message || 'Không thể export ghi chú')
+            toast.error(error.response?.data?.message || 'Kh?ng th? export ghi ch?')
         }
     }
 
@@ -198,7 +218,7 @@ export default function Notes() {
             return
         }
 
-        if (!ghiChuHienTai.content?.trim()) {
+        if (!hasRichTextContent(ghiChuHienTai.content)) {
             toast.error('Vui lòng viết thêm nội dung kiến thức vào ghi chú để AI bóc tách!')
             return
         }
@@ -224,7 +244,7 @@ export default function Notes() {
             }
         } catch (error) {
             console.error(error)
-            toast.error(error.response?.data?.message || 'Không thể kết nối với mô hình AI lúc này.', {
+            toast.error(error.response?.data?.message || 'Kh?ng th? k?t n?i v?i m? h?nh AI l?c n?y.', {
                 id: loadToast,
             })
         } finally {
@@ -241,17 +261,21 @@ export default function Notes() {
 
             const ghiChu = data.data
 
+            banDaLuuRef.current = taoDauMocGhiChu(ghiChu)
             setDanhSach(p => [ghiChu, ...p])
             setGhiChuHienTai(ghiChu)
             navigate(`/notes/${ghiChu.id}`, { replace: true })
         } catch {
-            toast.error('Không thể tạo ghi chú')
+            toast.error('Kh?ng th? t?o ghi ch?')
         }
     }
 
     const luu = async () => {
         if (!ghiChuHienTai) return
         if (!coTheChinhSua) return
+
+        const dauMocHienTai = taoDauMocGhiChu(ghiChuHienTai)
+        if (dauMocHienTai === banDaLuuRef.current) return
 
         setDangLuu(true)
 
@@ -266,6 +290,7 @@ export default function Notes() {
                 p.map(n => n.id === data.data.id ? { ...n, ...data.data } : n)
             )
 
+            banDaLuuRef.current = dauMocHienTai
             toast.success('Đã lưu')
         } catch {
             toast.error('Lưu thất bại')
@@ -281,6 +306,7 @@ export default function Notes() {
             await noteApi.xoa(ghiChuHienTai.id)
 
             setDanhSach(p => p.filter(n => n.id !== ghiChuHienTai.id))
+            banDaLuuRef.current = ''
             setGhiChuHienTai(null)
             navigate('/notes', { replace: true })
 
@@ -328,7 +354,7 @@ export default function Notes() {
                 .filter(Boolean)
 
             if (danhSachTask.length === 0) {
-                toast.error('Checklist không có nội dung hợp lệ')
+                toast.error('Checklist kh?ng c? n?i dung h?p l?')
                 return
             }
 
@@ -371,7 +397,7 @@ export default function Notes() {
         }
 
         if (checklistItems.length === 0) {
-            toast.error('Checklist không có nội dung hợp lệ')
+            toast.error('Checklist kh?ng c? n?i dung h?p l?')
             return
         }
 
@@ -448,7 +474,7 @@ export default function Notes() {
 
             toast.success('Đã tạo tag mới')
         } catch {
-            toast.error('Không thể tạo tag')
+            toast.error('Kh?ng th? t?o tag')
         }
     }
 
@@ -518,7 +544,7 @@ export default function Notes() {
 
             await taiDanhSachShare()
         } catch (error) {
-            toast.error(error.response?.data?.message || 'Không thể chia sẻ ghi chú')
+            toast.error(error.response?.data?.message || 'Kh?ng th? chia s? ghi ch?')
         } finally {
             setDangShare(false)
         }
@@ -533,14 +559,14 @@ export default function Notes() {
             toast.success('Đã hủy chia sẻ')
             await taiDanhSachShare()
         } catch (error) {
-            toast.error(error.response?.data?.message || 'Không thể hủy chia sẻ')
+            toast.error(error.response?.data?.message || 'Kh?ng th? h?y chia s?')
         }
     }
 
     const coTheTrichLich = (text) => {
         if (!text) return false
 
-        return /\b(?:\d{1,2}[:.][0-5]\d|[0-2]?\d\s*giờ|ngày\s*\d{1,2}|thứ\s*(?:hai|ba|tư|năm|sáu|bảy)|deadline|hẹn)\b/i.test(text)
+        return /\b(?:\d{1,2}[:.][0-5]\d|[0-2]?\d\s*gi?|ng?y\s*\d{1,2}|th?\s*(?:hai|ba|t?|n?m|s?u|b?y)|deadline|h?n)\b/i.test(text)
     }
 
     useEffect(() => {
@@ -552,7 +578,7 @@ export default function Notes() {
         setHienLichGoiY(
             duocTrichLich &&
             !daTaoLich &&
-            coTheTrichLich(ghiChuHienTai.content)
+            coTheTrichLich(richTextToPlainText(ghiChuHienTai.content))
         )
     }, [
         ghiChuHienTai?.id,
@@ -583,13 +609,15 @@ export default function Notes() {
             return
         }
 
-        if (!ghiChuHienTai?.content?.trim()) return
+        const plainContent = richTextToPlainText(ghiChuHienTai.content)
+
+        if (!plainContent) return
 
         setDangTrichLich(true)
 
         try {
             const { data } = await scheduleApi.trichXuatTuGhiChu({
-                content: ghiChuHienTai.content,
+                content: plainContent,
                 noteId: ghiChuHienTai.id,
             })
 
@@ -617,11 +645,18 @@ export default function Notes() {
     useEffect(() => {
         if (!ghiChuHienTai) return
         if (!coTheChinhSua) return
+        if (taoDauMocGhiChu(ghiChuHienTai) === banDaLuuRef.current) return
 
         const t = setTimeout(luu, 3000)
 
         return () => clearTimeout(t)
-    }, [ghiChuHienTai?.content, ghiChuHienTai?.title, coTheChinhSua])
+    }, [
+        ghiChuHienTai?.content,
+        ghiChuHienTai?.title,
+        ghiChuHienTai?.tags,
+        coTheChinhSua,
+        taoDauMocGhiChu,
+    ])
 
     return (
         <div style={styles.wrap}>
@@ -895,25 +930,19 @@ export default function Notes() {
                                 )}
                             </div>
                         </div>
-
                         <div style={styles.editorBody}>
-                            <textarea
+                            <RichTextEditor
                                 value={ghiChuHienTai.content || ''}
-                                onChange={e => {
+                                onChange={content => {
                                     if (!coTheChinhSua) return
 
                                     setGhiChuHienTai(p => ({
                                         ...p,
-                                        content: e.target.value,
+                                        content,
                                     }))
                                 }}
                                 readOnly={!coTheChinhSua}
-                                placeholder={coTheChinhSua ? 'Bắt đầu ghi chú... (hỗ trợ Markdown)' : 'Bạn chỉ có quyền xem ghi chú này'}
-                                style={{
-                                    ...styles.textarea,
-                                    cursor: coTheChinhSua ? 'text' : 'default',
-                                    color: coTheChinhSua ? 'var(--text-primary)' : 'var(--text-secondary)',
-                                }}
+                                placeholder={coTheChinhSua ? 'Bắt đầu ghi chú...' : 'Bạn chỉ có quyền xem ghi chú này'}
                             />
 
                             {hienLichGoiY && (
@@ -1171,7 +1200,7 @@ export default function Notes() {
                             {hienAi && (
                                 <AiPanel
                                     noteId={ghiChuHienTai.id}
-                                    content={ghiChuHienTai.content}
+                                    content={richTextToPlainText(ghiChuHienTai.content)}
                                     title={ghiChuHienTai.title}
                                     onApply={apDungAi}
                                     onDong={() => setHienAi(false)}

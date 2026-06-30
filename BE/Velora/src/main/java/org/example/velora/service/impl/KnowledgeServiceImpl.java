@@ -14,6 +14,7 @@ import org.example.velora.repository.NoteRepository;
 import org.example.velora.repository.UserRepository;
 import org.example.velora.service.AiService;
 import org.example.velora.service.KnowledgeService;
+import org.example.velora.util.RichTextContent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -75,7 +76,7 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
     @Override
     public KnowledgeGroupResponse.ClassifyResult classifyNote(UUID userId, KnowledgeGroupRequest.Classify req) {
-        return aiService.classifyContent(req.getContent());
+        return aiService.classifyContent(RichTextContent.toPlainText(req.getContent()));
     }
 
     @Override
@@ -84,10 +85,11 @@ public class KnowledgeServiceImpl implements KnowledgeService {
         List<KnowledgeGroup> existingGroups = groupRepository.findByUserIdOrderByCreatedAtDesc(userId);
 
         for (Note note : notes) {
-            if (note.getContent() == null || note.getContent().isBlank()) continue;
+            String plainContent = RichTextContent.toPlainText(note.getContent());
+            if (plainContent.isBlank()) continue;
 
             KnowledgeGroupResponse.ClassifyResult result = aiService.classifyContent(
-                    "# " + note.getTitle() + "\n\n" + note.getContent());
+                    "# " + note.getTitle() + "\n\n" + plainContent);
 
             String groupName = (result.getSuggestedGroupName() == null
                     || result.getSuggestedGroupName().isBlank())

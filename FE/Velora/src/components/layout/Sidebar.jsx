@@ -11,11 +11,13 @@ import {
     IconNotes,
     IconShare,
     IconBell,
+    IconSun,
+    IconMoon,
 } from '@tabler/icons-react'
 import useAuthStore from '../../service/authStore'
 import logo from '../../assets/logo.svg'
 import notificationApi from '../../lib/api/notificationApi'
-
+import useThemeStore from '../../service/themeStore'
 
 const menu = [
     { to: '/overview', label: 'Tổng quan', icon: IconLayoutDashboard },
@@ -35,6 +37,8 @@ export default function Sidebar() {
     const navigate = useNavigate()
     const location = useLocation()
     const [soThongBaoChuaDoc, setSoThongBaoChuaDoc] = useState(0)
+    const { isDark, toggleTheme } = useThemeStore()
+    const ThemeIcon = isDark ? IconSun : IconMoon
     const handleDangXuat = async () => {
         await dangXuat()
         setSoThongBaoChuaDoc(0)
@@ -152,6 +156,21 @@ export default function Sidebar() {
                         </div>
                     </div>
                 </div>
+                <button
+                    className="btn-ghost"
+                    onClick={toggleTheme}
+                    style={{
+                        width: '100%',
+                        justifyContent: 'flex-start',
+                        padding: '6px 8px',
+                        marginTop: 2,
+                    }}
+                >
+                    <ThemeIcon size={14} />
+                    <span style={{ fontSize: 13 }}>
+    {isDark ? 'Giao diện sáng' : 'Giao diện tối'}
+  </span>
+                </button>
 
                 <button
                     className="btn-ghost"

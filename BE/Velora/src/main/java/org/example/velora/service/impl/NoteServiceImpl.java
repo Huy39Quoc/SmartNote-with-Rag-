@@ -17,12 +17,19 @@ import org.example.velora.repository.UserRepository;
 import org.example.velora.service.AiService;
 import org.example.velora.service.NoteService;
 import org.example.velora.util.ChromaDbClient;
+import org.example.velora.util.RichTextContent;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
@@ -41,6 +48,9 @@ public class NoteServiceImpl implements NoteService {
     private final ChromaDbClient chromaDbClient;
     private final NoteShareRepository noteShareRepository;
 
+    @Autowired
+    private ApplicationContext applicationContext;
+
     @Override
     public NoteResponse.Detail create(UUID userId, NoteRequest.Create req) {
         User user = getUser(userId);
@@ -48,15 +58,15 @@ public class NoteServiceImpl implements NoteService {
         PackageValidationDto.validateMaxNotes(user);
 
         Note note = Note.builder()
-                .user(user).title(req.getTitle()).content(req.getContent()).build();
+                .user(user).title(req.getTitle()).content(RichTextContent.sanitize(req.getContent())).build();
 
         if (req.getTagIds() != null && !req.getTagIds().isEmpty()) {
             note.setTags(tagRepository.findAllById(req.getTagIds()));
         }
 
         note = noteRepository.save(note);
-        embedNoteSafely(note);
-        return toDetailWithAccess(noteRepository.save(note), userId);
+        scheduleNoteEmbedding(note.getId());
+        return toDetailWithAccess(note, userId);
     }
 
     @Override
@@ -67,7 +77,7 @@ public class NoteServiceImpl implements NoteService {
             note.setTitle(req.getTitle());
         }
         if (req.getContent() != null) {
-            note.setContent(req.getContent());
+            note.setContent(RichTextContent.sanitize(req.getContent()));
             note.setIsEmbedded(false);
         }
         if (req.getTagIds() != null) {
@@ -75,8 +85,8 @@ public class NoteServiceImpl implements NoteService {
         }
 
         note = noteRepository.save(note);
-        embedNoteSafely(note);
-        return toDetailWithAccess(noteRepository.save(note), userId);
+        scheduleNoteEmbedding(note.getId());
+        return toDetailWithAccess(note, userId);
     }
 
     @Override
@@ -133,7 +143,11 @@ public class NoteServiceImpl implements NoteService {
         PackageValidationDto.validateAiUsage(user, "AI_NOTE_FORMAT", userRepository);
         getEditableNote(userId, noteId);
 
-        NoteResponse.AiResult result = aiService.improveNote(req.getContent(), req.getTitle(), req.getAction());
+        NoteResponse.AiResult result = aiService.improveNote(
+                RichTextContent.toPlainText(req.getContent()),
+                req.getTitle(),
+                req.getAction()
+        );
 
         PackageValidationDto.incrementAiUsage(user, userRepository);
         return result;
@@ -155,13 +169,15 @@ public class NoteServiceImpl implements NoteService {
             throw new BadRequestException("Vui lòng chọn loại sơ đồ.");
         }
 
-        if (!StringUtils.hasText(note.getContent())) {
+        String plainContent = RichTextContent.toPlainText(note.getContent());
+
+        if (!StringUtils.hasText(plainContent)) {
             throw new BadRequestException("Ghi chú không có nội dung để tạo sơ đồ.");
         }
 
         String diagramCode = aiService.generateDiagramFromNote(
                 note.getTitle(),
-                note.getContent(),
+                plainContent,
                 req.getDiagramType()
         );
 
@@ -181,10 +197,39 @@ public class NoteServiceImpl implements NoteService {
     }
     // ── Private helpers ───────────────────────────────────────────────────
 
+    private void scheduleNoteEmbedding(UUID noteId) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    applicationContext.getBean(NoteServiceImpl.class).embedNoteAsync(noteId);
+                }
+            });
+        } else {
+            applicationContext.getBean(NoteServiceImpl.class).embedNoteAsync(noteId);
+        }
+    }
+
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void embedNoteAsync(UUID noteId) {
+        Note note = noteRepository.findById(noteId).orElse(null);
+        if (note == null) return;
+
+        embedNoteSafely(note);
+        noteRepository.save(note);
+    }
+
     private void embedNoteSafely(Note note) {
         try {
+            String plainNoteContent = RichTextContent.toPlainText(note.getContent());
+            if (!StringUtils.hasText(plainNoteContent)) {
+                note.setIsEmbedded(false);
+                return;
+            }
+
             String content = "# " + (note.getTitle() != null ? note.getTitle() : "")
-                    + "\n\n" + (note.getContent() != null ? note.getContent() : "");
+                    + "\n\n" + plainNoteContent;
             if (!StringUtils.hasText(content)) {
                 note.setIsEmbedded(false);
                 return;
