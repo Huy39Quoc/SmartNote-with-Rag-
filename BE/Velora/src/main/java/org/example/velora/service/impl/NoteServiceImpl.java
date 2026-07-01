@@ -1,11 +1,9 @@
 package org.example.velora.service.impl;
 
-import org.example.velora.dto.PackageValidationDto;
 import org.example.velora.dto.request.NoteRequest;
 import org.example.velora.dto.response.NoteResponse;
 import org.example.velora.entity.Note;
 import org.example.velora.entity.NoteShare;
-import org.example.velora.entity.Tag;
 import org.example.velora.entity.User;
 import org.example.velora.exception.BadRequestException;
 import org.example.velora.exception.ResourceNotFoundException;
@@ -16,6 +14,7 @@ import org.example.velora.repository.TagRepository;
 import org.example.velora.repository.UserRepository;
 import org.example.velora.service.AiService;
 import org.example.velora.service.NoteService;
+import org.example.velora.service.UserPackageService;
 import org.example.velora.util.ChromaDbClient;
 import org.example.velora.util.RichTextContent;
 import lombok.RequiredArgsConstructor;
@@ -32,13 +31,15 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
-import java.util.List;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @Transactional
 public class NoteServiceImpl implements NoteService {
+
+    private static final String FEATURE_CHECKLIST_BASIC = "CHECKLIST_BASIC";
+    private static final String FEATURE_AI_NOTE_FORMAT = "AI_NOTE_FORMAT";
 
     private final NoteRepository noteRepository;
     private final TagRepository tagRepository;
@@ -47,6 +48,7 @@ public class NoteServiceImpl implements NoteService {
     private final NoteMapper noteMapper;
     private final ChromaDbClient chromaDbClient;
     private final NoteShareRepository noteShareRepository;
+    private final UserPackageService userPackageService;
 
     @Autowired
     private ApplicationContext applicationContext;
@@ -55,10 +57,13 @@ public class NoteServiceImpl implements NoteService {
     public NoteResponse.Detail create(UUID userId, NoteRequest.Create req) {
         User user = getUser(userId);
 
-        PackageValidationDto.validateMaxNotes(user);
+        userPackageService.checkMaxNotes(user);
 
         Note note = Note.builder()
-                .user(user).title(req.getTitle()).content(RichTextContent.sanitize(req.getContent())).build();
+                .user(user)
+                .title(req.getTitle())
+                .content(RichTextContent.sanitize(req.getContent()))
+                .build();
 
         if (req.getTagIds() != null && !req.getTagIds().isEmpty()) {
             note.setTags(tagRepository.findAllById(req.getTagIds()));
@@ -66,6 +71,7 @@ public class NoteServiceImpl implements NoteService {
 
         note = noteRepository.save(note);
         scheduleNoteEmbedding(note.getId());
+
         return toDetailWithAccess(note, userId);
     }
 
@@ -76,16 +82,19 @@ public class NoteServiceImpl implements NoteService {
         if (StringUtils.hasText(req.getTitle())) {
             note.setTitle(req.getTitle());
         }
+
         if (req.getContent() != null) {
             note.setContent(RichTextContent.sanitize(req.getContent()));
             note.setIsEmbedded(false);
         }
+
         if (req.getTagIds() != null) {
             note.setTags(tagRepository.findAllById(req.getTagIds()));
         }
 
         note = noteRepository.save(note);
         scheduleNoteEmbedding(note.getId());
+
         return toDetailWithAccess(note, userId);
     }
 
@@ -120,9 +129,12 @@ public class NoteServiceImpl implements NoteService {
 
         return NoteResponse.Page.builder()
                 .content(page.getContent().stream().map(noteMapper::toSummary).toList())
-                .pageNumber(page.getNumber()).pageSize(page.getSize())
+                .pageNumber(page.getNumber())
+                .pageSize(page.getSize())
                 .totalElements(page.getTotalElements())
-                .totalPages(page.getTotalPages()).last(page.isLast()).build();
+                .totalPages(page.getTotalPages())
+                .last(page.isLast())
+                .build();
     }
 
     @Override
@@ -137,10 +149,10 @@ public class NoteServiceImpl implements NoteService {
         User user = getUser(userId);
 
         if (req.getAction() == NoteRequest.AiImprove.AiAction.CREATE_CHECKLIST) {
-            PackageValidationDto.validateFeatureAccess(user, "CHECKLIST_BASIC");
+            userPackageService.checkFeatureAccess(user, FEATURE_CHECKLIST_BASIC);
         }
 
-        PackageValidationDto.validateAiUsage(user, "AI_NOTE_FORMAT", userRepository);
+        userPackageService.checkAiUsage(user, FEATURE_AI_NOTE_FORMAT);
         getEditableNote(userId, noteId);
 
         NoteResponse.AiResult result = aiService.improveNote(
@@ -149,7 +161,7 @@ public class NoteServiceImpl implements NoteService {
                 req.getAction()
         );
 
-        PackageValidationDto.incrementAiUsage(user, userRepository);
+        userPackageService.increaseAiUsage(user);
         return result;
     }
 
@@ -161,7 +173,7 @@ public class NoteServiceImpl implements NoteService {
     ) {
         User user = getUser(userId);
 
-        PackageValidationDto.validateAiUsage(user, "AI_NOTE_FORMAT", userRepository);
+        userPackageService.checkAiUsage(user, FEATURE_AI_NOTE_FORMAT);
 
         Note note = getAccessibleNote(userId, noteId);
 
@@ -181,7 +193,7 @@ public class NoteServiceImpl implements NoteService {
                 req.getDiagramType()
         );
 
-        PackageValidationDto.incrementAiUsage(user, userRepository);
+        userPackageService.increaseAiUsage(user);
 
         String format = req.getDiagramType() == NoteRequest.GenerateDiagram.DiagramType.SKETCHNOTE
                 ? "JSON"
@@ -195,7 +207,6 @@ public class NoteServiceImpl implements NoteService {
                 .diagramCode(diagramCode)
                 .build();
     }
-    // ── Private helpers ───────────────────────────────────────────────────
 
     private void scheduleNoteEmbedding(UUID noteId) {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -214,7 +225,9 @@ public class NoteServiceImpl implements NoteService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void embedNoteAsync(UUID noteId) {
         Note note = noteRepository.findById(noteId).orElse(null);
-        if (note == null) return;
+        if (note == null) {
+            return;
+        }
 
         embedNoteSafely(note);
         noteRepository.save(note);
@@ -230,13 +243,18 @@ public class NoteServiceImpl implements NoteService {
 
             String content = "# " + (note.getTitle() != null ? note.getTitle() : "")
                     + "\n\n" + plainNoteContent;
+
             if (!StringUtils.hasText(content)) {
                 note.setIsEmbedded(false);
                 return;
             }
+
             note.setIsEmbedded(chromaDbClient.embed(
-                    note.getId().toString(), content,
-                    note.getUser().getId().toString(), "note"));
+                    note.getId().toString(),
+                    content,
+                    note.getUser().getId().toString(),
+                    "note"
+            ));
         } catch (Exception e) {
             note.setIsEmbedded(false);
         }
@@ -245,35 +263,44 @@ public class NoteServiceImpl implements NoteService {
     private Note getOwnedNote(UUID userId, UUID noteId) {
         Note note = noteRepository.findById(noteId)
                 .orElseThrow(() -> new ResourceNotFoundException("Ghi chú không tồn tại"));
+
         if (note.getUser() == null || !note.getUser().getId().equals(userId)) {
             throw new ResourceNotFoundException("Ghi chú không tồn tại");
         }
+
         return note;
     }
 
     private Note getAccessibleNote(UUID userId, UUID noteId) {
         Note note = noteRepository.findById(noteId)
                 .orElseThrow(() -> new ResourceNotFoundException("Ghi chú không tồn tại"));
+
         if (note.getUser() != null && note.getUser().getId().equals(userId)) {
             return note;
         }
+
         if (noteShareRepository.existsByNoteIdAndSharedWithId(noteId, userId)) {
             return note;
         }
+
         throw new ResourceNotFoundException("Ghi chú không tồn tại");
     }
 
     private Note getEditableNote(UUID userId, UUID noteId) {
         Note note = noteRepository.findById(noteId)
                 .orElseThrow(() -> new ResourceNotFoundException("Ghi chú không tồn tại"));
+
         if (note.getUser() != null && note.getUser().getId().equals(userId)) {
             return note;
         }
+
         NoteShare share = noteShareRepository.findByNoteIdAndSharedWithId(noteId, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Ghi chú không tồn tại"));
+
         if (share.getPermission() != NoteShare.Permission.EDIT) {
             throw new BadRequestException("Bạn không có quyền chỉnh sửa ghi chú này");
         }
+
         return note;
     }
 
@@ -292,6 +319,7 @@ public class NoteServiceImpl implements NoteService {
         if (note.getUser() != null && note.getUser().getId().equals(userId)) {
             return "OWNER";
         }
+
         return noteShareRepository.findByNoteIdAndSharedWithId(note.getId(), userId)
                 .map(s -> s.getPermission() == NoteShare.Permission.EDIT ? "EDIT" : "VIEW")
                 .orElse("VIEW");

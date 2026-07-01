@@ -1,8 +1,6 @@
-
 package org.example.velora.service.impl;
 
 import lombok.RequiredArgsConstructor;
-import org.example.velora.dto.PackageValidationDto;
 import org.example.velora.dto.request.NoteShareRequest;
 import org.example.velora.dto.response.NoteShareResponse;
 import org.example.velora.entity.Note;
@@ -14,6 +12,7 @@ import org.example.velora.repository.NoteRepository;
 import org.example.velora.repository.NoteShareRepository;
 import org.example.velora.repository.UserRepository;
 import org.example.velora.service.NoteShareService;
+import org.example.velora.service.UserPackageService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,15 +24,18 @@ import java.util.UUID;
 @Transactional
 public class NoteShareServiceImpl implements NoteShareService {
 
+    private static final String FEATURE_TEAM_WORK = "TEAM_WORK";
+
     private final NoteRepository noteRepository;
     private final UserRepository userRepository;
     private final NoteShareRepository noteShareRepository;
+    private final UserPackageService userPackageService;
 
     @Override
     public NoteShareResponse.Item shareNote(UUID ownerId, UUID noteId, NoteShareRequest.Share request) {
         User owner = getUser(ownerId);
 
-        PackageValidationDto.validateFeatureAccess(owner, "TEAM_WORK");
+        userPackageService.checkFeatureAccess(owner, FEATURE_TEAM_WORK);
 
         Note note = getOwnedNote(ownerId, noteId);
 

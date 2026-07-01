@@ -1,6 +1,5 @@
 package org.example.velora.service.impl;
 
-import org.example.velora.dto.PackageValidationDto;
 import org.example.velora.dto.request.KnowledgeGroupRequest;
 import org.example.velora.dto.response.KnowledgeGroupResponse;
 import org.example.velora.dto.response.NoteResponse;
@@ -14,6 +13,7 @@ import org.example.velora.repository.NoteRepository;
 import org.example.velora.repository.UserRepository;
 import org.example.velora.service.AiService;
 import org.example.velora.service.KnowledgeService;
+import org.example.velora.service.UserPackageService;
 import org.example.velora.util.RichTextContent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,17 +27,20 @@ import java.util.UUID;
 @Transactional
 public class KnowledgeServiceImpl implements KnowledgeService {
 
+    private static final String FEATURE_GROUP_MANAGEMENT = "GROUP_MANAGEMENT";
+
     private final KnowledgeGroupRepository groupRepository;
     private final NoteRepository noteRepository;
     private final UserRepository userRepository;
     private final AiService aiService;
     private final NoteMapper noteMapper;
+    private final UserPackageService userPackageService;
 
     @Override
     public KnowledgeGroupResponse.Detail create(UUID userId, KnowledgeGroupRequest.Create req) {
         User user = getUser(userId);
 
-        PackageValidationDto.validateFeatureAccess(user, "GROUP_MANAGEMENT");
+        userPackageService.checkFeatureAccess(user, FEATURE_GROUP_MANAGEMENT);
 
         List<Note> notes = req.getNoteIds() != null
                 ? noteRepository.findAllById(req.getNoteIds()) : List.of();

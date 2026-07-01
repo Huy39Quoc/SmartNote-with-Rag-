@@ -1,7 +1,6 @@
 package org.example.velora.service.impl;
 
 import lombok.RequiredArgsConstructor;
-import org.example.velora.dto.PackageValidationDto;
 import org.example.velora.dto.response.FlashcardResponse;
 import org.example.velora.entity.Document;
 import org.example.velora.entity.Flashcard;
@@ -15,6 +14,7 @@ import org.example.velora.repository.NoteRepository;
 import org.example.velora.repository.UserRepository;
 import org.example.velora.service.AiService;
 import org.example.velora.service.FlashcardService;
+import org.example.velora.service.UserPackageService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,25 +29,28 @@ import java.util.stream.Collectors;
 @Transactional
 public class FlashcardServiceImpl implements FlashcardService {
 
+    private static final String FEATURE_AI_FLASHCARD = "AI_FLASHCARD";
+
     private final NoteRepository noteRepository;
     private final FlashcardRepository flashcardRepository;
     private final UserRepository userRepository;
     private final DocumentRepository documentRepository;
     private final AiService aiService;
+    private final UserPackageService userPackageService;
 
     @Override
     public List<FlashcardResponse> generateFromNote(UUID userId, UUID noteId) {
         User user = getUser(userId);
         Note note = ownerOnlyNote(noteId, user);
 
-        PackageValidationDto.validateAiUsage(user, "AI_FLASHCARD", userRepository);
+        userPackageService.checkAiUsage(user, FEATURE_AI_FLASHCARD);
 
         flashcardRepository.deleteByNoteId(note.getId());
 
         List<Flashcard> saved = flashcardRepository.saveAll(
                 aiService.generateFlashcardsFromNote(note));
 
-        PackageValidationDto.incrementAiUsage(user, userRepository);
+        userPackageService.increaseAiUsage(user);
 
         return saved.stream().map(this::toResponse).collect(Collectors.toList());
     }
@@ -56,7 +59,7 @@ public class FlashcardServiceImpl implements FlashcardService {
     public Map<String, Object> generateFromDocument(UUID userId, UUID documentId) {
         User user = getUser(userId);
 
-        PackageValidationDto.validateAiUsage(user, "AI_FLASHCARD", userRepository);
+        userPackageService.checkAiUsage(user, FEATURE_AI_FLASHCARD);
 
         Document document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tài liệu không tồn tại"));
@@ -86,7 +89,7 @@ public class FlashcardServiceImpl implements FlashcardService {
         List<Flashcard> saved = flashcardRepository.saveAll(
                 aiService.generateFlashcardsFromNote(generatedNote));
 
-        PackageValidationDto.incrementAiUsage(user, userRepository);
+        userPackageService.increaseAiUsage(user);
 
         Map<String, Object> data = new HashMap<>();
         data.put("noteId",     generatedNote.getId());

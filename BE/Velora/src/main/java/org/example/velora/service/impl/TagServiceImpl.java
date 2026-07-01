@@ -1,6 +1,5 @@
 package org.example.velora.service.impl;
 
-import org.example.velora.dto.PackageValidationDto;
 import org.example.velora.dto.request.TagRequest;
 import org.example.velora.dto.response.TagResponse;
 import org.example.velora.entity.Tag;
@@ -10,6 +9,7 @@ import org.example.velora.exception.ResourceNotFoundException;
 import org.example.velora.repository.TagRepository;
 import org.example.velora.repository.UserRepository;
 import org.example.velora.service.TagService;
+import org.example.velora.service.UserPackageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,18 +17,23 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
 
-@Service @RequiredArgsConstructor @Transactional
+@Service
+@RequiredArgsConstructor
+@Transactional
 public class TagServiceImpl implements TagService {
+
+    private static final String FEATURE_TAG_SUBJECT = "TAG_SUBJECT";
 
     private final TagRepository tagRepository;
     private final UserRepository userRepository;
+    private final UserPackageService userPackageService;
 
     @Override
     public TagResponse.Detail create(UUID userId, TagRequest.Create req) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
 
-        PackageValidationDto.validateFeatureAccess(user, "TAG_SUBJECT");
+        userPackageService.checkFeatureAccess(user, FEATURE_TAG_SUBJECT);
 
         String name = req.getName().trim();
         String color = req.getColor() == null || req.getColor().isBlank()
@@ -61,14 +66,15 @@ public class TagServiceImpl implements TagService {
         tagRepository.delete(getTag(userId, tagId));
     }
 
-    @Override @Transactional(readOnly = true)
+    @Override
+    @Transactional(readOnly = true)
     public List<TagResponse.Detail> getAll(UUID userId) {
         return tagRepository.findByUserIdOrderByNameAsc(userId).stream().map(this::toDetail).toList();
     }
 
     private Tag getTag(UUID userId, UUID tagId) {
         Tag tag = tagRepository.findById(tagId)
-            .orElseThrow(() -> new ResourceNotFoundException("Tag không tồn tại"));
+                .orElseThrow(() -> new ResourceNotFoundException("Tag không tồn tại"));
         if (!tag.getUser().getId().equals(userId))
             throw new ResourceNotFoundException("Tag không tồn tại");
         return tag;
@@ -76,7 +82,7 @@ public class TagServiceImpl implements TagService {
 
     private TagResponse.Detail toDetail(Tag t) {
         return TagResponse.Detail.builder()
-            .id(t.getId()).name(t.getName()).color(t.getColor())
-            .noteCount(t.getNotes().size()).createdAt(t.getCreatedAt()).build();
+                .id(t.getId()).name(t.getName()).color(t.getColor())
+                .noteCount(t.getNotes().size()).createdAt(t.getCreatedAt()).build();
     }
 }

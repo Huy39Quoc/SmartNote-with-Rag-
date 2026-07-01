@@ -7,7 +7,6 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
 import org.apache.poi.xwpf.usermodel.*;
-import org.example.velora.dto.PackageValidationDto;
 import org.example.velora.entity.Note;
 import org.example.velora.entity.User;
 import org.example.velora.exception.BadRequestException;
@@ -15,6 +14,7 @@ import org.example.velora.exception.ResourceNotFoundException;
 import org.example.velora.repository.NoteRepository;
 import org.example.velora.repository.UserRepository;
 import org.example.velora.service.NoteExportService;
+import org.example.velora.service.UserPackageService;
 import org.example.velora.util.RichTextContent;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,15 +34,18 @@ import java.util.regex.Pattern;
 @Transactional(readOnly = true)
 public class NoteExportServiceImpl implements NoteExportService {
 
+    private static final String FEATURE_EXPORT_FILE = "EXPORT_FILE";
+
     private final NoteRepository noteRepository;
     private final UserRepository userRepository;
+    private final UserPackageService userPackageService;
 
     @Override
     public ExportedFile export(UUID userId, UUID noteId, String format) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
 
-        PackageValidationDto.validateFeatureAccess(user, "EXPORT_FILE");
+        userPackageService.checkFeatureAccess(user, FEATURE_EXPORT_FILE);
 
         Note note = noteRepository.findById(noteId)
                 .orElseThrow(() -> new ResourceNotFoundException("Ghi chú không tồn tại"));
