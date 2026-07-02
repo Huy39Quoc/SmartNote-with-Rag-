@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
     IconFileText,
@@ -8,15 +8,15 @@ import {
     IconPlus,
     IconAlertTriangle,
     IconCards,
-    IconChecklist,
-    IconTrendingUp,
-    IconClock,
-    IconTargetArrow,
+    IconSearch,
+    IconSparkles,
+    IconCloudUpload,
+    IconPin,
+    IconCalendarEvent,
 } from '@tabler/icons-react'
 import useAuthStore from '../service/authStore'
 import noteApi from '../lib/api/noteApi'
 import scheduleApi from '../lib/api/scheduleApi'
-import dashboardApi from '../lib/api/dashboardApi'
 import Spinner from '../components/ui/Spinner'
 
 export default function Overview() {
@@ -25,18 +25,17 @@ export default function Overview() {
 
     const [ghiChuGanDay, setGhiChuGanDay] = useState([])
     const [deadlineGanDay, setDeadlineGanDay] = useState([])
-    const [dashboard, setDashboard] = useState(null)
     const [dangTai, setDangTai] = useState(true)
+    const [tuKhoa, setTuKhoa] = useState('')
 
     useEffect(() => {
         const tai = async () => {
             setDangTai(true)
 
             try {
-                const [rc, sc, dc] = await Promise.all([
-                    noteApi.layTatCa({ page: 0, size: 5 }),
+                const [rc, sc] = await Promise.all([
+                    noteApi.layTatCa({ page: 0, size: 8 }),
                     scheduleApi.layUuTien(),
-                    dashboardApi.layTienDoHocTap(),
                 ])
 
                 setGhiChuGanDay(rc.data.data?.content || [])
@@ -49,7 +48,6 @@ export default function Overview() {
                 ]
 
                 setDeadlineGanDay(tatCa.slice(0, 5))
-                setDashboard(dc.data.data)
             } catch {
                 // Không chặn màn tổng quan nếu một API lỗi
             } finally {
@@ -79,34 +77,102 @@ export default function Overview() {
         return m[p] || m.MEDIUM
     }
 
-    const metricCards = [
+    const ghiChuHienThi = useMemo(() => {
+        if (!tuKhoa.trim()) return ghiChuGanDay.slice(0, 5)
+
+        const q = tuKhoa.toLowerCase().trim()
+
+        return ghiChuGanDay
+            .filter(n =>
+                `${n.title || ''} ${n.contentPreview || ''}`
+                    .toLowerCase()
+                    .includes(q)
+            )
+            .slice(0, 5)
+    }, [ghiChuGanDay, tuKhoa])
+
+    const ghiChuGhim = ghiChuGanDay.slice(0, 3)
+
+    const taiLieuGanDay = [
+        {
+            ten: 'SWD392_PE.pdf',
+            thoiGian: 'Upload lúc 10:20 hôm qua',
+            trangThai: 'Đã phân tích',
+            type: 'success',
+        },
+        {
+            ten: 'Database_System_Design.pdf',
+            thoiGian: 'Upload lúc 09:15 30/06',
+            trangThai: 'Đã phân tích',
+            type: 'success',
+        },
+        {
+            ten: 'React_Handbook.pdf',
+            thoiGian: 'Upload lúc 16:45 29/06',
+            trangThai: 'Đang xử lý',
+            type: 'processing',
+        },
+        {
+            ten: 'System_Architecture.pptx',
+            thoiGian: 'Upload lúc 14:20 28/06',
+            trangThai: 'Chưa phân tích',
+            type: 'muted',
+        },
+    ]
+
+    const quickActions = [
+        {
+            label: 'Tạo ghi chú mới',
+            icon: IconFileText,
+            path: '/notes',
+        },
+        {
+            label: 'Upload tài liệu',
+            icon: IconCloudUpload,
+            path: '/documents',
+        },
+        {
+            label: 'Tạo flashcard',
+            icon: IconCards,
+            path: '/notes',
+        },
+        {
+            label: 'Hỏi đáp AI',
+            icon: IconSparkles,
+            path: '/ai',
+        },
+    ]
+
+    const shortcutCards = [
         {
             label: 'Ghi chú',
-            value: dashboard?.totalNotes || 0,
-            sub: `+${dashboard?.notesThisWeek || 0} trong 7 ngày`,
             icon: IconFileText,
             path: '/notes',
         },
         {
             label: 'Tài liệu',
-            value: dashboard?.totalDocuments || 0,
-            sub: `+${dashboard?.documentsThisWeek || 0} trong 7 ngày`,
             icon: IconUpload,
             path: '/documents',
         },
         {
+            label: 'Lịch',
+            icon: IconCalendar,
+            path: '/schedule',
+        },
+        {
+            label: 'Kiến thức',
+            icon: IconSitemap,
+            path: '/knowledge',
+        },
+        {
             label: 'Flashcard',
-            value: dashboard?.totalFlashcards || 0,
-            sub: `+${dashboard?.flashcardsThisWeek || 0} trong 7 ngày`,
             icon: IconCards,
             path: '/notes',
         },
         {
-            label: 'Task hoàn thành',
-            value: `${dashboard?.doneTasks || 0}/${dashboard?.totalTasks || 0}`,
-            sub: `${dashboard?.taskCompletionRate || 0}% hoàn thành`,
-            icon: IconChecklist,
-            path: '/schedule',
+            label: 'Hỏi đáp AI',
+            icon: IconSparkles,
+            path: '/ai',
         },
     ]
 
@@ -136,115 +202,53 @@ export default function Overview() {
                     </p>
                 </div>
 
-                        <button className="btn-primary" onClick={() => navigate('/notes')}>
+                <button className="btn-primary" onClick={() => navigate('/notes')}>
                     <IconPlus size={14} /> Ghi chú mới
                 </button>
             </div>
 
-            <div style={styles.progressHero}>
-                <div>
-                    <div style={styles.heroLabel}>
-                        <IconTrendingUp size={14} />
-                        Tiến độ học tập
-                    </div>
+            <div style={styles.searchRow}>
+                <div style={styles.searchBox}>
+                    <IconSearch size={18} style={styles.searchIcon} />
 
-                    <div style={styles.heroScore}>
-                        {dashboard?.productivityScore || 0}/100
-                    </div>
-
-                    <p style={styles.heroText}>
-                        Điểm tiến độ được tính từ ghi chú, tài liệu, flashcard và mức độ hoàn thành task.
-                    </p>
+                    <input
+                        value={tuKhoa}
+                        onChange={e => setTuKhoa(e.target.value)}
+                        placeholder="Tìm kiếm ghi chú, tài liệu, flashcard..."
+                        style={styles.searchInput}
+                    />
                 </div>
 
-                <div style={styles.circleWrap}>
-                    <div style={styles.circle}>
-                        <span>{dashboard?.taskCompletionRate || 0}%</span>
-                    </div>
+                <button style={styles.aiSearchButton} onClick={() => navigate('/ai')}>
+                    <IconSparkles size={16} />
+                    Hỏi AI từ ghi chú của bạn
+                </button>
+            </div>
 
-                    <div style={styles.circleLabel}>
-                        Hoàn thành task
-                    </div>
+            <div style={styles.quickActionPanel}>
+                <div style={styles.sectionTitle}>Hành động nhanh</div>
+
+                <div style={styles.quickActionGrid}>
+                    {quickActions.map(({ label, icon: Icon, path }) => (
+                        <button
+                            key={label}
+                            style={styles.quickActionCard}
+                            onClick={() => navigate(path)}
+                        >
+                            <span style={styles.quickActionIcon}>
+                                <Icon size={19} />
+                            </span>
+
+                            <span>{label}</span>
+                        </button>
+                    ))}
                 </div>
             </div>
 
-            <div style={styles.metricGrid}>
-                {metricCards.map(({ label, value, sub, icon: Icon, path }) => (
-                    <div key={label} style={styles.metricCard} onClick={() => navigate(path)}>
-                        <div style={styles.metricIcon}>
-                            <Icon size={18} />
-                        </div>
-
-                        <div>
-                            <div style={styles.metricValue}>{value}</div>
-                            <div style={styles.metricLabel}>{label}</div>
-                            <div style={styles.metricSub}>{sub}</div>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            <div style={styles.statusGrid}>
-                <div style={styles.statusCard}>
-                    <div style={styles.statusTop}>
-                        <IconAlertTriangle size={16} style={{ color: 'var(--accent-red)' }} />
-                        <span>Quá hạn</span>
-                    </div>
-
-                    <strong>{dashboard?.overdueTasks || 0}</strong>
-                    <p>Task chưa hoàn thành và đã qua deadline</p>
-                </div>
-
-                <div style={styles.statusCard}>
-                    <div style={styles.statusTop}>
-                        <IconClock size={16} style={{ color: 'var(--accent-amber)' }} />
-                        <span>Sắp tới 7 ngày</span>
-                    </div>
-
-                    <strong>{dashboard?.upcomingTasks || 0}</strong>
-                    <p>Task cần xử lý trong tuần này</p>
-                </div>
-
-                <div style={styles.statusCard}>
-                    <div style={styles.statusTop}>
-                        <IconTargetArrow size={16} style={{ color: 'var(--accent-blue-dim)' }} />
-                        <span>Chưa có deadline</span>
-                    </div>
-
-                    <strong>{dashboard?.tasksWithoutDeadline || 0}</strong>
-                    <p>Task cần bổ sung thời hạn rõ ràng</p>
-                </div>
-            </div>
-
-            <div style={styles.shortcutGrid}>
-                {[
-                    { icon: IconFileText, nhan: 'Ghi chú', mau: '#1e2d3d', duong: '/notes', desc: 'Tạo và quản lý ghi chú' },
-                    { icon: IconUpload, nhan: 'Tài liệu', mau: '#251e3d', duong: '/documents', desc: 'Upload PDF, DOCX, audio' },
-                    { icon: IconCalendar, nhan: 'Lịch', mau: '#2d1e0a', duong: '/schedule', desc: 'Deadline & ưu tiên' },
-                    { icon: IconSitemap, nhan: 'Kiến thức', mau: '#1a2d1e', duong: '/knowledge', desc: 'Tổ chức theo chủ đề' },
-                ].map(({ icon: Icon, nhan, mau, duong, desc }) => (
-                    <div
-                        key={duong}
-                        style={{ ...styles.shortcutCard, background: mau }}
-                        onClick={() => navigate(duong)}
-                    >
-                        <Icon size={20} style={{ color: 'var(--text-secondary)', marginBottom: 10 }} />
-
-                        <div style={{ fontWeight: 500, marginBottom: 3 }}>
-                            {nhan}
-                        </div>
-
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                            {desc}
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-            <div style={styles.grid2}>
+            <div style={styles.topContentGrid}>
                 <div style={styles.panel}>
                     <div style={styles.panelHeader}>
-                        <span style={{ fontWeight: 500 }}>Ghi chú gần đây</span>
+                        <span style={styles.panelTitle}>Ghi chú gần đây</span>
 
                         <button
                             className="btn-ghost"
@@ -255,17 +259,25 @@ export default function Overview() {
                         </button>
                     </div>
 
-                    {ghiChuGanDay.length === 0 ? (
+                    {ghiChuHienThi.length === 0 ? (
                         <p style={styles.emptyText}>Chưa có ghi chú nào</p>
                     ) : (
-                        ghiChuGanDay.map(n => (
+                        ghiChuHienThi.map(n => (
                             <div
                                 key={n.id}
                                 style={styles.noteRow}
                                 onClick={() => navigate(`/notes/${n.id}`)}
                             >
-                                <div style={styles.noteTitle}>{n.title}</div>
-                                <div style={styles.notePreview}>{n.contentPreview || 'Không có nội dung'}</div>
+                                <div style={styles.noteIcon}>
+                                    <IconFileText size={15} />
+                                </div>
+
+                                <div style={styles.rowContent}>
+                                    <div style={styles.rowTitle}>{n.title || 'Không có tiêu đề'}</div>
+                                    <div style={styles.rowSub}>{n.contentPreview || 'Không có nội dung'}</div>
+                                </div>
+
+                                <span style={styles.noteBadge}>Note</span>
                             </div>
                         ))
                     )}
@@ -273,11 +285,48 @@ export default function Overview() {
 
                 <div style={styles.panel}>
                     <div style={styles.panelHeader}>
-                        <span style={{ fontWeight: 500 }}>Deadline sắp tới</span>
+                        <span style={styles.panelTitle}>Ghi chú đã ghim</span>
 
-                            <button
-                                className="btn-ghost"
-                                onClick={() => navigate('/schedule')}
+                        <button
+                            className="btn-ghost"
+                            onClick={() => navigate('/notes')}
+                            style={{ fontSize: 11 }}
+                        >
+                            Xem tất cả →
+                        </button>
+                    </div>
+
+                    {ghiChuGhim.length === 0 ? (
+                        <p style={styles.emptyText}>Chưa có ghi chú đã ghim</p>
+                    ) : (
+                        ghiChuGhim.map(n => (
+                            <div
+                                key={n.id}
+                                style={styles.noteRow}
+                                onClick={() => navigate(`/notes/${n.id}`)}
+                            >
+                                <div style={styles.noteIcon}>
+                                    <IconFileText size={15} />
+                                </div>
+
+                                <div style={styles.rowContent}>
+                                    <div style={styles.rowTitle}>{n.title || 'Không có tiêu đề'}</div>
+                                    <div style={styles.rowSub}>Ghim để truy cập nhanh</div>
+                                </div>
+
+                                <IconPin size={15} style={styles.pinIcon} />
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                <div style={styles.panel}>
+                    <div style={styles.panelHeader}>
+                        <span style={styles.panelTitle}>Deadline sắp tới</span>
+
+                        <button
+                            className="btn-ghost"
+                            onClick={() => navigate('/schedule')}
                             style={{ fontSize: 11 }}
                         >
                             Xem tất cả →
@@ -288,23 +337,27 @@ export default function Overview() {
                         <p style={styles.emptyText}>Không có deadline nào</p>
                     ) : (
                         deadlineGanDay.map(t => (
-                            <div key={t.id} style={styles.taskRow}>
-                                <div style={{ flex: 1 }}>
-                                    <div style={styles.taskName}>{t.taskName}</div>
+                            <div key={t.id} style={styles.deadlineRow}>
+                                <div style={styles.deadlineIcon}>
+                                    <IconCalendarEvent size={15} />
+                                </div>
 
-                                    {t.deadline && (
-                                        <div
-                                            style={{
-                                                ...styles.deadlineText,
-                                                color: t.daysUntilDeadline < 2
-                                                    ? 'var(--accent-red)'
-                                                    : 'var(--text-muted)',
-                                            }}
-                                        >
-                                            {t.daysUntilDeadline < 2 && <IconAlertTriangle size={10} />}
-                                            {t.deadline}
-                                        </div>
-                                    )}
+                                <div style={styles.rowContent}>
+                                    <div style={styles.rowTitle}>{t.taskName}</div>
+
+                                    <div
+                                        style={{
+                                            ...styles.rowSub,
+                                            color: t.daysUntilDeadline < 2
+                                                ? 'var(--accent-red)'
+                                                : 'var(--text-muted)',
+                                        }}
+                                    >
+                                        {t.daysUntilDeadline < 2 && (
+                                            <IconAlertTriangle size={10} />
+                                        )}
+                                        {t.deadline || 'Chưa có ngày'}
+                                    </div>
                                 </div>
 
                                 <span className={`tag ${mucUuTien(t.priority).cls}`}>
@@ -313,6 +366,63 @@ export default function Overview() {
                             </div>
                         ))
                     )}
+                </div>
+            </div>
+
+            <div style={styles.bottomGrid}>
+                <div style={styles.panel}>
+                    <div style={styles.panelHeader}>
+                        <span style={styles.panelTitle}>Tài liệu gần đây</span>
+
+                        <button
+                            className="btn-ghost"
+                            onClick={() => navigate('/documents')}
+                            style={{ fontSize: 11 }}
+                        >
+                            Xem tất cả →
+                        </button>
+                    </div>
+
+                    <div style={styles.documentGrid}>
+                        {taiLieuGanDay.map(d => (
+                            <div key={d.ten} style={styles.documentRow}>
+                                <div style={styles.documentIcon}>
+                                    <IconFileText size={15} />
+                                </div>
+
+                                <div style={styles.rowContent}>
+                                    <div style={styles.rowTitle}>{d.ten}</div>
+                                    <div style={styles.rowSub}>{d.thoiGian}</div>
+                                </div>
+
+                                <span style={{ ...styles.statusBadge, ...styles[`statusBadge_${d.type}`] }}>
+                                    {d.trangThai}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div style={styles.panel}>
+                    <div style={styles.panelHeader}>
+                        <span style={styles.panelTitle}>Truy cập nhanh</span>
+                    </div>
+
+                    <div style={styles.shortcutGrid}>
+                        {shortcutCards.map(({ label, icon: Icon, path }) => (
+                            <button
+                                key={label}
+                                style={styles.shortcutItem}
+                                onClick={() => navigate(path)}
+                            >
+                                <span style={styles.shortcutIcon}>
+                                    <Icon size={19} />
+                                </span>
+
+                                <span>{label}</span>
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
         </div>
@@ -329,214 +439,293 @@ const styles = {
     page: {
         flex: 1,
         overflow: 'auto',
-        padding: 24,
+        padding: '24px 28px',
+        background: 'var(--bg-base)',
     },
     header: {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 24,
+        marginBottom: 20,
     },
     greeting: {
-        fontSize: 20,
+        fontSize: 21,
         fontWeight: 600,
+        letterSpacing: '-.25px',
+        color: 'var(--text-primary)',
     },
     dateText: {
         color: 'var(--text-muted)',
         fontSize: 12,
-        marginTop: 3,
+        marginTop: 4,
     },
-    progressHero: {
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: 20,
+
+    searchRow: {
+        display: 'grid',
+        gridTemplateColumns: '1fr 260px',
+        gap: 14,
+        marginBottom: 18,
+    },
+    searchBox: {
+        height: 52,
         background: 'var(--bg-surface)',
         border: '.5px solid var(--border)',
-        borderRadius: 14,
-        padding: 20,
-        marginBottom: 16,
-    },
-    heroLabel: {
+        borderRadius: 12,
         display: 'flex',
         alignItems: 'center',
-        gap: 6,
-        fontSize: 12,
-        color: 'var(--accent-blue-dim)',
-        marginBottom: 8,
-        fontWeight: 600,
+        padding: '0 16px',
+        boxShadow: '0 4px 14px rgba(15, 23, 42, .025)',
     },
-    heroScore: {
-        fontSize: 34,
-        fontWeight: 800,
-        color: 'var(--text-primary)',
-        marginBottom: 4,
-    },
-    heroText: {
-        fontSize: 12,
+    searchIcon: {
         color: 'var(--text-muted)',
-        lineHeight: 1.5,
-        maxWidth: 520,
-    },
-    circleWrap: {
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 8,
+        marginRight: 10,
         flexShrink: 0,
     },
-    circle: {
-        width: 86,
-        height: 86,
-        borderRadius: '50%',
-        border: '8px solid var(--accent-blue-dim)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: 18,
-        fontWeight: 800,
+    searchInput: {
+        border: 'none',
+        background: 'transparent',
+        padding: 0,
+        height: '100%',
+        fontSize: 13,
         color: 'var(--text-primary)',
-        background: 'var(--bg-elevated)',
+        boxShadow: 'none',
     },
-    circleLabel: {
-        fontSize: 11,
-        color: 'var(--text-muted)',
+    aiSearchButton: {
+        height: 52,
+        justifyContent: 'center',
+        background: 'var(--bg-surface)',
+        color: 'var(--text-primary)',
+        border: '.5px solid var(--border)',
+        borderRadius: 12,
+        fontWeight: 500,
+        boxShadow: '0 4px 14px rgba(15, 23, 42, .025)',
     },
-    metricGrid: {
-        display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: 12,
+
+    quickActionPanel: {
+        background: 'var(--bg-surface)',
+        border: '.5px solid var(--border)',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+        boxShadow: '0 4px 14px rgba(15, 23, 42, .025)',
+    },
+    sectionTitle: {
+        fontSize: 14,
+        fontWeight: 600,
+        color: 'var(--text-primary)',
         marginBottom: 14,
     },
-    metricCard: {
+    quickActionGrid: {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: 14,
+    },
+    quickActionCard: {
+        height: 52,
         background: 'var(--bg-surface)',
         border: '.5px solid var(--border)',
         borderRadius: 12,
-        padding: 14,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-        cursor: 'pointer',
+        justifyContent: 'center',
+        color: 'var(--text-primary)',
+        fontWeight: 500,
+        boxShadow: 'none',
     },
-    metricIcon: {
-        width: 38,
-        height: 38,
-        borderRadius: 10,
+    quickActionIcon: {
+        width: 30,
+        height: 30,
+        borderRadius: 9,
         background: 'var(--bg-ai)',
-        color: 'var(--accent-blue-dim)',
-        display: 'flex',
+        color: 'var(--accent-blue)',
+        display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        flexShrink: 0,
     },
-    metricValue: {
-        fontSize: 19,
-        fontWeight: 700,
-        color: 'var(--text-primary)',
-    },
-    metricLabel: {
-        fontSize: 12,
-        color: 'var(--text-secondary)',
-        marginTop: 2,
-    },
-    metricSub: {
-        fontSize: 10,
-        color: 'var(--text-muted)',
-        marginTop: 3,
-    },
-    statusGrid: {
+
+    topContentGrid: {
         display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: 12,
-        marginBottom: 20,
+        gridTemplateColumns: '1.15fr 1fr 1.1fr',
+        gap: 14,
+        marginBottom: 16,
     },
-    statusCard: {
-        background: 'var(--bg-surface)',
-        border: '.5px solid var(--border)',
-        borderRadius: 12,
-        padding: 14,
-    },
-    statusTop: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: 6,
-        fontSize: 12,
-        color: 'var(--text-secondary)',
-        marginBottom: 8,
-    },
-    shortcutGrid: {
+    bottomGrid: {
         display: 'grid',
-        gridTemplateColumns: 'repeat(4,1fr)',
-        gap: 10,
-        marginBottom: 20,
-    },
-    shortcutCard: {
-        padding: '16px',
-        borderRadius: 8,
-        cursor: 'pointer',
-        border: '.5px solid var(--border)',
-        transition: 'opacity .15s',
-    },
-    grid2: {
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: 12,
+        gridTemplateColumns: '1.35fr 1fr',
+        gap: 14,
     },
     panel: {
         background: 'var(--bg-surface)',
         border: '.5px solid var(--border)',
-        borderRadius: 8,
-        padding: '14px 16px',
+        borderRadius: 12,
+        padding: '16px 18px',
+        boxShadow: '0 4px 14px rgba(15, 23, 42, .025)',
+        minHeight: 0,
     },
     panelHeader: {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 12,
-        paddingBottom: 8,
-        borderBottom: '.5px solid var(--border)',
+        paddingBottom: 10,
+        borderBottom: '.5px solid var(--border-light)',
     },
-    emptyText: {
-        color: 'var(--text-faint)',
-        padding: '16px 0',
-        fontSize: 12,
+    panelTitle: {
+        fontSize: 15,
+        fontWeight: 600,
+        color: 'var(--text-primary)',
+        letterSpacing: '-.15px',
     },
+
     noteRow: {
-        padding: '7px 0',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 11,
+        padding: '11px 0',
         borderBottom: '.5px solid var(--border-light)',
         cursor: 'pointer',
     },
-    noteTitle: {
-        fontWeight: 500,
-        fontSize: 12,
-        marginBottom: 2,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
-    },
-    notePreview: {
-        fontSize: 11,
-        color: 'var(--text-muted)',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
-    },
-    taskRow: {
+    deadlineRow: {
         display: 'flex',
         alignItems: 'center',
-        gap: 10,
-        padding: '7px 0',
+        gap: 11,
+        padding: '12px 0',
         borderBottom: '.5px solid var(--border-light)',
     },
-    taskName: {
-        fontSize: 12,
-        fontWeight: 500,
-        marginBottom: 2,
+    documentGrid: {
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        columnGap: 20,
     },
-    deadlineText: {
-        fontSize: 11,
+    documentRow: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 11,
+        padding: '11px 0',
+        borderBottom: '.5px solid var(--border-light)',
+    },
+    noteIcon: {
+        width: 34,
+        height: 34,
+        borderRadius: 9,
+        background: 'var(--bg-ai)',
+        color: 'var(--accent-blue)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+    },
+    deadlineIcon: {
+        width: 34,
+        height: 34,
+        borderRadius: 9,
+        background: 'var(--bg-ai)',
+        color: 'var(--accent-blue)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+    },
+    documentIcon: {
+        width: 34,
+        height: 34,
+        borderRadius: 9,
+        background: 'var(--bg-ai)',
+        color: 'var(--accent-blue)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+    },
+    rowContent: {
+        flex: 1,
+        minWidth: 0,
+    },
+    rowTitle: {
+        fontSize: 13,
+        fontWeight: 500,
+        color: 'var(--text-primary)',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+    },
+    rowSub: {
+        fontSize: 11.5,
+        color: 'var(--text-muted)',
+        marginTop: 2,
         display: 'flex',
         alignItems: 'center',
         gap: 3,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+    },
+    pinIcon: {
+        color: 'var(--text-muted)',
+        flexShrink: 0,
+    },
+    noteBadge: {
+        fontSize: 11,
+        padding: '4px 8px',
+        borderRadius: 999,
+        whiteSpace: 'nowrap',
+        background: 'var(--bg-ai)',
+        color: 'var(--accent-blue)',
+        border: '.5px solid var(--border-blue)',
+    },
+
+    shortcutGrid: {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(6, 1fr)',
+        gap: 12,
+        paddingTop: 6,
+    },
+    shortcutItem: {
+        minHeight: 82,
+        flexDirection: 'column',
+        justifyContent: 'center',
+        background: 'transparent',
+        border: 'none',
+        color: 'var(--text-primary)',
+        fontSize: 12,
+        fontWeight: 500,
+        gap: 9,
+    },
+    shortcutIcon: {
+        width: 46,
+        height: 46,
+        borderRadius: 13,
+        background: 'var(--bg-ai)',
+        color: 'var(--accent-blue)',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
+    statusBadge: {
+        fontSize: 11,
+        padding: '4px 8px',
+        borderRadius: 999,
+        whiteSpace: 'nowrap',
+        border: '.5px solid transparent',
+    },
+    statusBadge_success: {
+        background: 'rgba(22, 163, 74, .08)',
+        color: '#15803d',
+        borderColor: 'rgba(22, 163, 74, .14)',
+    },
+    statusBadge_processing: {
+        background: 'rgba(37, 99, 235, .08)',
+        color: 'var(--accent-blue)',
+        borderColor: 'rgba(37, 99, 235, .14)',
+    },
+    statusBadge_muted: {
+        background: 'var(--bg-elevated)',
+        color: 'var(--text-muted)',
+        borderColor: 'var(--border)',
+    },
+
+    emptyText: {
+        color: 'var(--text-faint)',
+        padding: '18px 0',
+        fontSize: 12,
     },
 }
