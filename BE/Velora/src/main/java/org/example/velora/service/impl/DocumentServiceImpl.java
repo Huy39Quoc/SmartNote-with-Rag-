@@ -301,7 +301,9 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     @Transactional(readOnly = true)
     public DocumentResponse.Detail getById(UUID userId, UUID docId) {
-        return toDetail(ownerOnly(userId, docId));
+        // Cho phép cả owner lẫn người được chia sẻ (VIEW/EDIT) xem chi tiết.
+        // Các thao tác phá hủy (delete, analyze, ask) vẫn giữ nguyên ownerOnly().
+        return toDetail(accessibleDocument(userId, docId));
     }
 
     @Override

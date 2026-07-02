@@ -13,6 +13,8 @@ import {
     IconBell,
     IconSun,
     IconMoon,
+    IconFolderShare,
+    IconBrain,
 } from '@tabler/icons-react'
 import useAuthStore from '../../service/authStore'
 import logo from '../../assets/logo.svg'
@@ -23,11 +25,12 @@ const menu = [
     { to: '/overview', label: 'Tổng quan', icon: IconLayoutDashboard },
     { to: '/service-packages', label: 'Gói Premium', icon: IconNotes },
     { to: '/notes', label: 'Ghi chú', icon: IconNotes },
-    { to: '/shared-notes', label: 'Được chia sẻ', icon: IconShare },
+    { to: '/shared-notes', label: 'Ghi chú được chia sẻ', icon: IconShare },
     { to: '/chat', label: 'Hỏi đáp AI', icon: IconMessages },
     { to: '/documents', label: 'Tài liệu', icon: IconFileText },
+    { to: '/shared-documents', label: 'Tài liệu được chia sẻ', icon: IconFolderShare },
     { to: '/schedule', label: 'Lịch & Deadline', icon: IconCalendar },
-    { to: '/knowledge', label: 'Kiến thức', icon: IconShare },
+    { to: '/knowledge', label: 'Kiến thức', icon: IconBrain },
     { to: '/account', label: 'Tài khoản', icon: IconUser },
     { to: '/notifications', label: 'Thông báo', icon: IconBell },
 ]

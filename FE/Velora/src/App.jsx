@@ -22,7 +22,7 @@ import Account from './pages/profile/Account'
 import Notifications from './pages/notifications/Notifications'
 import ServicePackages from './pages/packages/ServicePackages'
 import PaymentResult from './pages/payment/PaymentResult'
-import SharedDocuments from './pages/documents/Documents'
+import SharedDocuments from './pages/documents/SharedDocuments'
 // Admin pages
 import AdminPanel from './pages/admin/AdminPanel'
 import PackageManagement from './pages/admin/PackageManagement'

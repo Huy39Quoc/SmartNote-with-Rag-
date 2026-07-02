@@ -1,0 +1,61 @@
+1 – Narrative Charter Statement
+Project Purpose / Justification
+
+The purpose of this project is to implement a cloud-based employee onboarding management system for a mid-sized organization to improve the efficiency, consistency, and effectiveness of the employee onboarding process. The current onboarding process relies heavily on paper documents, manual approvals, and email communication, resulting in delays, incomplete documentation, and inconsistent training experiences for new employees.
+
+By implementing an automated onboarding platform, the organization expects to reduce onboarding time, improve compliance tracking, increase employee satisfaction, and reduce administrative workload for the Human Resources department.
+
+Project Objectives
+
+The objectives of this project are to:
+
+Implement a cloud-based onboarding management system within six months.
+Reduce employee onboarding processing time by 40% within three months after implementation.
+Achieve 95% completion of onboarding documentation before employee start dates.
+Train all Human Resources staff and department managers on the new system before project closure.
+Complete the project within the approved budget of $85,000.
+High-Level Scope
+In Scope
+Selection and procurement of onboarding software
+Configuration of employee onboarding workflows
+Integration with existing HR databases
+Creation of digital onboarding forms and training materials
+User acceptance testing
+Training for HR personnel and department managers
+Deployment of the onboarding system organization-wide
+Out of Scope
+Replacement of payroll systems
+Development of custom HR software
+Company-wide IT infrastructure upgrades
+Employee performance management system enhancements
+Major Deliverables
+
+The project will produce the following deliverables:
+
+Approved project charter
+Requirements documentation
+Configured cloud-based onboarding platform
+Integrated HR database connection
+Digital onboarding forms and workflows
+Training materials and user guides
+Completed staff training sessions
+User acceptance testing results
+Final implementation and deployment report
+Assumptions
+
+The following assumptions are made for this project:
+
+Key stakeholders will be available for project meetings and approvals.
+Existing HR systems are compatible with the selected onboarding platform.
+Employees will have internet access to complete onboarding activities.
+Software vendors will provide implementation support as scheduled.
+Adequate staffing resources will remain available throughout the project lifecycle.
+Constraints
+
+The project is subject to the following constraints:
+
+Total project budget cannot exceed $85,000.
+The system must be fully operational within six months.
+Limited availability of HR staff during peak hiring periods.
+The project must comply with organizational data security policies.
+Training sessions must occur during normal business hours.

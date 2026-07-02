@@ -108,12 +108,12 @@ public class DataInitializer implements CommandLineRunner {
                 "PLUS",
                 99000.0,
                 790000.0,
-                "Gói Plus dành cho nhóm học tập/team nhỏ, bao gồm toàn bộ Pro và các tính năng học nhóm, dashboard nhóm, chia sẻ ghi chú.",
+                "Gói Plus dành cho người dùng nặng và học nhóm: toàn bộ tính năng Pro, chia sẻ ghi chú & tài liệu với người khác (VIEW/EDIT), lưu trữ 10 GB, thiết bị không giới hạn và ưu tiên hỗ trợ.",
                 -1,
                 -1,
                 10,
                 -1,
-                "TAG_SUBJECT,CHECKLIST_BASIC,AI_NOTE_FORMAT,AI_SUMMARY_BASIC,AI_SUMMARY_ADVANCED,AI_CHAT,AI_ANALYZE,DOCUMENT_UPLOAD,EXTRACT_SCHEDULE,DEADLINE_MANAGEMENT,PRIORITY_SUGGESTION,AI_FLASHCARD,EXPORT_FILE,TEAM_WORK,AI_PROGRESS_ANALYTICS,TEAM_DASHBOARD,GOOGLE_CALENDAR,MANAGE_MEMBERS,CUSTOM_WORKSPACE,PRIORITY_SUPPORT,AI_AUDIO"
+                "TAG_SUBJECT,CHECKLIST_BASIC,AI_NOTE_FORMAT,AI_SUMMARY_BASIC,AI_SUMMARY_ADVANCED,AI_CHAT,AI_ANALYZE,DOCUMENT_UPLOAD,EXTRACT_SCHEDULE,DEADLINE_MANAGEMENT,PRIORITY_SUGGESTION,AI_FLASHCARD,EXPORT_FILE,AI_AUDIO,TEAM_WORK,SHARE_DOCUMENT,AI_PROGRESS_ANALYTICS,PRIORITY_SUPPORT"
         );
     }
 

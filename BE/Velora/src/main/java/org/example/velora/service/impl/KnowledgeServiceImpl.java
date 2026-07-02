@@ -27,7 +27,7 @@ import java.util.UUID;
 @Transactional
 public class KnowledgeServiceImpl implements KnowledgeService {
 
-    private static final String FEATURE_GROUP_MANAGEMENT = "GROUP_MANAGEMENT";
+    private static final String FEATURE_GROUP_MANAGEMENT = "AI_ANALYZE";
 
     private final KnowledgeGroupRepository groupRepository;
     private final NoteRepository noteRepository;
