@@ -4,15 +4,19 @@ import org.example.velora.dto.request.NoteRequest;
 import org.example.velora.dto.response.NoteResponse;
 import org.example.velora.entity.Note;
 import org.example.velora.entity.NoteShare;
+import org.example.velora.entity.NoteVersion;
 import org.example.velora.entity.User;
 import org.example.velora.exception.BadRequestException;
 import org.example.velora.exception.ResourceNotFoundException;
 import org.example.velora.mapper.NoteMapper;
 import org.example.velora.repository.NoteRepository;
 import org.example.velora.repository.NoteShareRepository;
+import org.example.velora.repository.NoteVersionRepository;
 import org.example.velora.repository.TagRepository;
 import org.example.velora.repository.UserRepository;
+import org.example.velora.security.JwtTokenProvider;
 import org.example.velora.service.AiService;
+import org.example.velora.service.NoteRealtimeService;
 import org.example.velora.service.NoteService;
 import org.example.velora.service.UserPackageService;
 import org.example.velora.util.ChromaDbClient;
@@ -30,7 +34,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -40,6 +48,7 @@ public class NoteServiceImpl implements NoteService {
 
     private static final String FEATURE_CHECKLIST_BASIC = "CHECKLIST_BASIC";
     private static final String FEATURE_AI_NOTE_FORMAT = "AI_NOTE_FORMAT";
+    private static final int VERSION_CHECKPOINT_MINUTES = 5;
 
     private final NoteRepository noteRepository;
     private final TagRepository tagRepository;
@@ -48,7 +57,10 @@ public class NoteServiceImpl implements NoteService {
     private final NoteMapper noteMapper;
     private final ChromaDbClient chromaDbClient;
     private final NoteShareRepository noteShareRepository;
+    private final NoteVersionRepository noteVersionRepository;
     private final UserPackageService userPackageService;
+    private final NoteRealtimeService noteRealtimeService;
+    private final JwtTokenProvider jwtTokenProvider;
 
     @Autowired
     private ApplicationContext applicationContext;
@@ -70,6 +82,7 @@ public class NoteServiceImpl implements NoteService {
         }
 
         note = noteRepository.save(note);
+        saveVersion(note, user, true);
         scheduleNoteEmbedding(note.getId());
 
         return toDetailWithAccess(note, userId);
@@ -77,7 +90,10 @@ public class NoteServiceImpl implements NoteService {
 
     @Override
     public NoteResponse.Detail update(UUID userId, UUID noteId, NoteRequest.Update req) {
+        User editor = getUser(userId);
         Note note = getEditableNote(userId, noteId);
+        String oldTitle = note.getTitle();
+        String oldContent = note.getContent();
 
         if (StringUtils.hasText(req.getTitle())) {
             note.setTitle(req.getTitle());
@@ -93,9 +109,18 @@ public class NoteServiceImpl implements NoteService {
         }
 
         note = noteRepository.save(note);
-        scheduleNoteEmbedding(note.getId());
+        boolean contentChanged = !Objects.equals(oldTitle, note.getTitle())
+                || !Objects.equals(oldContent, note.getContent());
 
-        return toDetailWithAccess(note, userId);
+        if (contentChanged) {
+            saveVersion(note, editor, false);
+            scheduleNoteEmbedding(note.getId());
+        }
+
+        NoteResponse.Detail detail = toDetailWithAccess(note, userId);
+        publishNoteUpdated(note.getId(), detail, editor, req.getEditorSessionId());
+
+        return detail;
     }
 
     @Override
@@ -206,6 +231,114 @@ public class NoteServiceImpl implements NoteService {
                 .format(format)
                 .diagramCode(diagramCode)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<NoteResponse.Version> getVersions(UUID userId, UUID noteId) {
+        getAccessibleNote(userId, noteId);
+
+        return noteVersionRepository.findByNoteIdOrderByVersionNumberDesc(noteId)
+                .stream()
+                .map(this::toVersionResponse)
+                .toList();
+    }
+
+    @Override
+    public NoteResponse.Detail restoreVersion(UUID userId, UUID noteId, UUID versionId) {
+        User editor = getUser(userId);
+        Note note = getEditableNote(userId, noteId);
+        NoteVersion version = noteVersionRepository.findById(versionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Phiên bản không tồn tại"));
+
+        if (version.getNote() == null || !version.getNote().getId().equals(noteId)) {
+            throw new ResourceNotFoundException("Phiên bản không tồn tại");
+        }
+
+        note.setTitle(version.getTitle());
+        note.setContent(RichTextContent.sanitize(version.getContent()));
+        note.setIsEmbedded(false);
+
+        note = noteRepository.save(note);
+        saveVersion(note, editor, true);
+        scheduleNoteEmbedding(note.getId());
+
+        NoteResponse.Detail detail = toDetailWithAccess(note, userId);
+        publishNoteUpdated(note.getId(), detail, editor, null);
+
+        return detail;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SseEmitter subscribeToNote(UUID userId, UUID noteId) {
+        getAccessibleNote(userId, noteId);
+        return noteRealtimeService.subscribe(noteId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SseEmitter subscribeToNote(String token, UUID noteId) {
+        if (!StringUtils.hasText(token) || !jwtTokenProvider.validateToken(token)) {
+            throw new BadRequestException("Token realtime không hợp lệ");
+        }
+
+        String email = jwtTokenProvider.getEmailFromToken(token);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
+
+        return subscribeToNote(user.getId(), noteId);
+    }
+
+    private void saveVersion(Note note, User editor, boolean force) {
+        if (!force) {
+            NoteVersion latest = noteVersionRepository.findTopByNoteIdOrderByVersionNumberDesc(note.getId())
+                    .orElse(null);
+
+            if (latest != null
+                    && latest.getCreatedAt() != null
+                    && latest.getCreatedAt().isAfter(LocalDateTime.now().minusMinutes(VERSION_CHECKPOINT_MINUTES))) {
+                return;
+            }
+        }
+
+        noteVersionRepository.save(NoteVersion.builder()
+                .note(note)
+                .editedBy(editor)
+                .versionNumber(noteVersionRepository.countByNoteId(note.getId()) + 1)
+                .title(note.getTitle())
+                .content(note.getContent())
+                .build());
+    }
+
+    private NoteResponse.Version toVersionResponse(NoteVersion version) {
+        User editedBy = version.getEditedBy();
+
+        return NoteResponse.Version.builder()
+                .id(version.getId())
+                .noteId(version.getNote().getId())
+                .versionNumber(version.getVersionNumber())
+                .title(version.getTitle())
+                .content(RichTextContent.sanitize(version.getContent()))
+                .editedByName(editedBy != null ? editedBy.getFullName() : null)
+                .editedByEmail(editedBy != null ? editedBy.getEmail() : null)
+                .createdAt(version.getCreatedAt())
+                .build();
+    }
+
+    private void publishNoteUpdated(
+            UUID noteId,
+            NoteResponse.Detail detail,
+            User editor,
+            String editorSessionId
+    ) {
+        noteRealtimeService.publishNoteUpdated(noteId, NoteResponse.RealtimeEvent.builder()
+                .type("NOTE_UPDATED")
+                .editorSessionId(editorSessionId)
+                .updatedByName(editor.getFullName())
+                .updatedByEmail(editor.getEmail())
+                .note(detail)
+                .build());
     }
 
     private void scheduleNoteEmbedding(UUID noteId) {

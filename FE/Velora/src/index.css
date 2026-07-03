@@ -103,6 +103,18 @@ select option { background: var(--bg-surface); }
 /* Slightly lighter elevated surface for small panels */
 .surface-sm { background: var(--bg-elevated); border: .5px solid var(--border); border-radius: 8px; padding: 10px; }
 
+.rich-text-editor,
+.rich-text-editor.ProseMirror,
+.rich-text-editor .ProseMirror {
+  height: 100%;
+  min-height: 100%;
+  outline: none;
+}
+.rich-text-editor.ProseMirror,
+.rich-text-editor .ProseMirror {
+  overflow: auto;
+  padding: 16px 20px;
+}
 .rich-text-editor p,
 .rich-text-editor div { min-height: 1.7em; }
 .rich-text-editor ul,
@@ -119,6 +131,71 @@ select option { background: var(--bg-surface); }
   color: var(--text-secondary);
   padding-left: 12px;
   margin: 8px 0;
+}
+.rich-text-editor a {
+  color: var(--accent-blue-dim);
+  text-decoration: underline;
+}
+.rich-text-editor img {
+  display: block;
+  max-width: 100%;
+  max-height: 420px;
+  border-radius: 8px;
+  margin: 10px 0;
+  border: .5px solid var(--border);
+}
+.rich-text-editor table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  margin: 10px 0;
+  overflow: hidden;
+}
+.rich-text-editor .tableWrapper {
+  overflow-x: auto;
+  padding: 1px 0;
+}
+.rich-text-editor th,
+.rich-text-editor td {
+  border: .5px solid var(--border);
+  padding: 8px;
+  min-width: 90px;
+  vertical-align: top;
+  position: relative;
+}
+.rich-text-editor th {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.rich-text-editor tr:hover > th,
+.rich-text-editor tr:hover > td {
+  border-top-color: var(--border-blue);
+  border-bottom-color: var(--border-blue);
+}
+.rich-text-editor .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: -1px;
+  width: 5px;
+  background: var(--accent-blue);
+  opacity: .72;
+  pointer-events: none;
+  z-index: 2;
+}
+.rich-text-editor .resize-cursor,
+.rich-text-editor.resize-cursor,
+.ProseMirror.resize-cursor,
+body.resize-cursor {
+  cursor: col-resize !important;
+}
+.rich-text-editor .selectedCell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(55, 138, 221, .16);
+  pointer-events: none;
 }
 
 @keyframes fadeIn { from { opacity:0; transform: translateY(4px); } to { opacity:1; transform: translateY(0); } }

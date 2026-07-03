@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import {
     IconBold,
     IconItalic,
@@ -7,7 +7,31 @@ import {
     IconListNumbers,
     IconPalette,
     IconEraser,
+    IconPhoto,
+    IconLink,
+    IconTable,
+    IconColumnInsertRight,
+    IconRowInsertBottom,
+    IconTrash,
+    IconAlignLeft,
+    IconAlignCenter,
+    IconAlignRight,
+    IconAlignJustified,
 } from '@tabler/icons-react'
+import { EditorContent, useEditor } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import Underline from '@tiptap/extension-underline'
+import { TextStyle } from '@tiptap/extension-text-style'
+import Color from '@tiptap/extension-color'
+import Link from '@tiptap/extension-link'
+import Image from '@tiptap/extension-image'
+import TextAlign from '@tiptap/extension-text-align'
+import { Table } from '@tiptap/extension-table'
+import TableRow from '@tiptap/extension-table-row'
+import TableHeader from '@tiptap/extension-table-header'
+import TableCell from '@tiptap/extension-table-cell'
+import Collaboration from '@tiptap/extension-collaboration'
+import * as Y from 'yjs'
 import { sanitizeRichText } from '../../utils/richText'
 
 const COLORS = [
@@ -22,55 +46,236 @@ const COLORS = [
     '#f472b6',
 ]
 
-export default function RichTextEditor({ value, onChange, readOnly, placeholder }) {
-    const editorRef = useRef(null)
-    const [focused, setFocused] = useState(false)
+function bytesToBase64(bytes) {
+    let binary = ''
+    const chunkSize = 0x8000
+
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
+    }
+
+    return window.btoa(binary)
+}
+
+function base64ToBytes(base64) {
+    const binary = window.atob(base64)
+    const bytes = new Uint8Array(binary.length)
+
+    for (let i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i)
+    }
+
+    return bytes
+}
+
+export default function RichTextEditor({
+    value,
+    onChange,
+    readOnly,
+    placeholder,
+    noteId,
+    collaborationUrl,
+    onPermissionChange,
+}) {
+    const fileInputRef = useRef(null)
+    const socketRef = useRef(null)
+    const suppressBroadcastRef = useRef(false)
+    const seedBroadcastRef = useRef(false)
+    const clientIdRef = useRef(
+        window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`
+    )
+
+    const ydoc = useMemo(() => new Y.Doc(), [noteId])
+    const yXmlFragment = useMemo(() => ydoc.getXmlFragment('content'), [ydoc])
+
+    const editor = useEditor({
+        extensions: [
+            StarterKit.configure({
+                history: false,
+            }),
+            Underline,
+            TextStyle,
+            Color,
+            Link.configure({
+                openOnClick: false,
+                autolink: true,
+                linkOnPaste: true,
+                HTMLAttributes: {
+                    rel: 'noopener noreferrer',
+                    target: '_blank',
+                },
+            }),
+            Image.configure({
+                inline: false,
+                allowBase64: true,
+            }),
+            TextAlign.configure({
+                types: ['heading', 'paragraph', 'tableCell', 'tableHeader'],
+            }),
+            Table.configure({
+                resizable: true,
+            }),
+            TableRow,
+            TableHeader,
+            TableCell,
+            Collaboration.configure({
+                document: ydoc,
+                field: 'content',
+            }),
+        ],
+        editable: !readOnly,
+        editorProps: {
+            attributes: {
+                class: 'rich-text-editor tiptap-editor',
+                'data-placeholder': placeholder || '',
+            },
+        },
+        onUpdate: ({ editor: currentEditor }) => {
+            onChange?.(sanitizeRichText(currentEditor.getHTML()))
+        },
+    })
 
     useEffect(() => {
-        const editor = editorRef.current
-        if (!editor) return
-
-        const safeValue = sanitizeRichText(value || '')
-
-        if (editor.innerHTML !== safeValue) {
-            editor.innerHTML = safeValue
+        return () => {
+            socketRef.current?.close()
+            ydoc.destroy()
         }
-    }, [value])
+    }, [ydoc])
 
-    const emitChange = () => {
-        const editor = editorRef.current
+    useEffect(() => {
         if (!editor) return
 
-        onChange?.(sanitizeRichText(editor.innerHTML))
-    }
+        editor.setEditable(!readOnly)
+    }, [editor, readOnly])
 
-    const runCommand = (command, commandValue = null) => {
-        if (readOnly) return
+    useEffect(() => {
+        if (!editor || collaborationUrl || yXmlFragment.length > 0) return
 
-        editorRef.current?.focus()
-        document.execCommand(command, false, commandValue)
-        emitChange()
-    }
+        suppressBroadcastRef.current = true
+        editor.commands.setContent(sanitizeRichText(value || '<p></p>'), false)
+        suppressBroadcastRef.current = false
+    }, [editor, value, yXmlFragment, collaborationUrl])
+
+    useEffect(() => {
+        if (!collaborationUrl || !noteId || !editor) return undefined
+
+        const socket = new WebSocket(collaborationUrl)
+        socketRef.current = socket
+
+        const handleYjsUpdate = (update, origin) => {
+            if (origin === 'remote') return
+            if (suppressBroadcastRef.current) return
+            if (socket.readyState !== WebSocket.OPEN) return
+
+            socket.send(JSON.stringify({
+                type: seedBroadcastRef.current ? 'yjs-seed' : 'yjs-update',
+                update: bytesToBase64(update),
+                clientId: clientIdRef.current,
+            }))
+
+            seedBroadcastRef.current = false
+        }
+
+        ydoc.on('update', handleYjsUpdate)
+
+        socket.onmessage = event => {
+            try {
+                const payload = JSON.parse(event.data)
+
+                if (payload.type === 'init') {
+                    onPermissionChange?.(payload.canEdit ? 'EDIT' : 'VIEW')
+
+                    if (Array.isArray(payload.updates) && payload.updates.length > 0) {
+                        payload.updates.forEach(update => {
+                            Y.applyUpdate(ydoc, base64ToBytes(update), 'remote')
+                        })
+                    } else if (editor && yXmlFragment.length === 0) {
+                        seedBroadcastRef.current = !!payload.shouldSeed
+                        suppressBroadcastRef.current = !payload.shouldSeed
+                        editor.commands.setContent(sanitizeRichText(payload.content || value || '<p></p>'), false)
+                        suppressBroadcastRef.current = false
+                        if (!payload.shouldSeed) {
+                            seedBroadcastRef.current = false
+                        }
+                    }
+
+                    return
+                }
+
+                if (payload.type === 'permission-updated') {
+                    onPermissionChange?.(payload.accessMode || (payload.canEdit ? 'EDIT' : 'VIEW'))
+                    return
+                }
+
+                if (payload.type !== 'yjs-update') return
+                if (payload.clientId === clientIdRef.current) return
+
+                if (payload.reset && editor) {
+                    suppressBroadcastRef.current = true
+                    editor.commands.clearContent(false)
+                    suppressBroadcastRef.current = false
+                }
+
+                Y.applyUpdate(ydoc, base64ToBytes(payload.update), 'remote')
+            } catch {
+                // Ignore malformed collaboration messages.
+            }
+        }
+
+        socket.onclose = () => {
+            if (socketRef.current === socket) {
+                socketRef.current = null
+            }
+        }
+
+        return () => {
+            ydoc.off('update', handleYjsUpdate)
+            socket.close()
+            if (socketRef.current === socket) {
+                socketRef.current = null
+            }
+        }
+    }, [collaborationUrl, noteId, onPermissionChange, editor, value, yXmlFragment, ydoc])
 
     const keepSelection = (event) => {
         event.preventDefault()
     }
 
-    const handlePaste = (event) => {
-        if (readOnly) return
-
-        event.preventDefault()
-
-        const html = event.clipboardData.getData('text/html')
-        const text = event.clipboardData.getData('text/plain')
-        const pastedContent = html || text.replace(/\n/g, '<br>')
-
-        document.execCommand('insertHTML', false, sanitizeRichText(pastedContent))
-        emitChange()
+    const runCommand = (command) => {
+        if (!editor || readOnly) return
+        command()
     }
 
-    const isEmpty = !sanitizeRichText(value || '')
-        .replace(/<br\s*\/?>|&nbsp;|\s|<[^>]+>/gi, '')
+    const setLink = () => {
+        if (!editor || readOnly) return
+
+        const previousUrl = editor.getAttributes('link').href || ''
+        const url = window.prompt('Nhập URL', previousUrl)
+
+        if (url === null) return
+
+        if (!url.trim()) {
+            editor.chain().focus().extendMarkRange('link').unsetLink().run()
+            return
+        }
+
+        editor.chain().focus().extendMarkRange('link').setLink({ href: url.trim() }).run()
+    }
+
+    const insertImageFromFile = (file) => {
+        if (!editor || readOnly || !file) return
+        if (!file.type.startsWith('image/')) return
+
+        const reader = new FileReader()
+
+        reader.onload = () => {
+            editor.chain().focus().setImage({ src: reader.result }).run()
+        }
+
+        reader.readAsDataURL(file)
+    }
+
+    const isEmpty = !editor || editor.isEmpty
 
     return (
         <div style={styles.wrap}>
@@ -81,8 +286,11 @@ export default function RichTextEditor({ value, onChange, readOnly, placeholder 
                         className="btn-ghost"
                         title="In đậm"
                         onMouseDown={keepSelection}
-                        onClick={() => runCommand('bold')}
-                        style={styles.toolButton}
+                        onClick={() => runCommand(() => editor.chain().focus().toggleBold().run())}
+                        style={{
+                            ...styles.toolButton,
+                            ...(editor?.isActive('bold') ? styles.activeButton : {}),
+                        }}
                     >
                         <IconBold size={15} />
                     </button>
@@ -92,8 +300,11 @@ export default function RichTextEditor({ value, onChange, readOnly, placeholder 
                         className="btn-ghost"
                         title="In nghiêng"
                         onMouseDown={keepSelection}
-                        onClick={() => runCommand('italic')}
-                        style={styles.toolButton}
+                        onClick={() => runCommand(() => editor.chain().focus().toggleItalic().run())}
+                        style={{
+                            ...styles.toolButton,
+                            ...(editor?.isActive('italic') ? styles.activeButton : {}),
+                        }}
                     >
                         <IconItalic size={15} />
                     </button>
@@ -103,8 +314,11 @@ export default function RichTextEditor({ value, onChange, readOnly, placeholder 
                         className="btn-ghost"
                         title="Gạch chân"
                         onMouseDown={keepSelection}
-                        onClick={() => runCommand('underline')}
-                        style={styles.toolButton}
+                        onClick={() => runCommand(() => editor.chain().focus().toggleUnderline().run())}
+                        style={{
+                            ...styles.toolButton,
+                            ...(editor?.isActive('underline') ? styles.activeButton : {}),
+                        }}
                     >
                         <IconUnderline size={15} />
                     </button>
@@ -114,9 +328,67 @@ export default function RichTextEditor({ value, onChange, readOnly, placeholder 
                     <button
                         type="button"
                         className="btn-ghost"
+                        title="Căn trái"
+                        onMouseDown={keepSelection}
+                        onClick={() => runCommand(() => editor.chain().focus().setTextAlign('left').run())}
+                        style={{
+                            ...styles.toolButton,
+                            ...(editor?.isActive({ textAlign: 'left' }) ? styles.activeButton : {}),
+                        }}
+                    >
+                        <IconAlignLeft size={15} />
+                    </button>
+
+                    <button
+                        type="button"
+                        className="btn-ghost"
+                        title="Căn giữa"
+                        onMouseDown={keepSelection}
+                        onClick={() => runCommand(() => editor.chain().focus().setTextAlign('center').run())}
+                        style={{
+                            ...styles.toolButton,
+                            ...(editor?.isActive({ textAlign: 'center' }) ? styles.activeButton : {}),
+                        }}
+                    >
+                        <IconAlignCenter size={15} />
+                    </button>
+
+                    <button
+                        type="button"
+                        className="btn-ghost"
+                        title="Căn phải"
+                        onMouseDown={keepSelection}
+                        onClick={() => runCommand(() => editor.chain().focus().setTextAlign('right').run())}
+                        style={{
+                            ...styles.toolButton,
+                            ...(editor?.isActive({ textAlign: 'right' }) ? styles.activeButton : {}),
+                        }}
+                    >
+                        <IconAlignRight size={15} />
+                    </button>
+
+                    <button
+                        type="button"
+                        className="btn-ghost"
+                        title="Căn đều"
+                        onMouseDown={keepSelection}
+                        onClick={() => runCommand(() => editor.chain().focus().setTextAlign('justify').run())}
+                        style={{
+                            ...styles.toolButton,
+                            ...(editor?.isActive({ textAlign: 'justify' }) ? styles.activeButton : {}),
+                        }}
+                    >
+                        <IconAlignJustified size={15} />
+                    </button>
+
+                    <span style={styles.divider} />
+
+                    <button
+                        type="button"
+                        className="btn-ghost"
                         title="Danh sách"
                         onMouseDown={keepSelection}
-                        onClick={() => runCommand('insertUnorderedList')}
+                        onClick={() => runCommand(() => editor.chain().focus().toggleBulletList().run())}
                         style={styles.toolButton}
                     >
                         <IconList size={15} />
@@ -127,10 +399,82 @@ export default function RichTextEditor({ value, onChange, readOnly, placeholder 
                         className="btn-ghost"
                         title="Danh sách số"
                         onMouseDown={keepSelection}
-                        onClick={() => runCommand('insertOrderedList')}
+                        onClick={() => runCommand(() => editor.chain().focus().toggleOrderedList().run())}
                         style={styles.toolButton}
                     >
                         <IconListNumbers size={15} />
+                    </button>
+
+                    <span style={styles.divider} />
+
+                    <button
+                        type="button"
+                        className="btn-ghost"
+                        title="Gắn link"
+                        onMouseDown={keepSelection}
+                        onClick={setLink}
+                        style={styles.toolButton}
+                    >
+                        <IconLink size={15} />
+                    </button>
+
+                    <button
+                        type="button"
+                        className="btn-ghost"
+                        title="Chèn ảnh"
+                        onMouseDown={keepSelection}
+                        onClick={() => fileInputRef.current?.click()}
+                        style={styles.toolButton}
+                    >
+                        <IconPhoto size={15} />
+                    </button>
+
+                    <button
+                        type="button"
+                        className="btn-ghost"
+                        title="Chèn bảng"
+                        onMouseDown={keepSelection}
+                        onClick={() => runCommand(() => editor.chain().focus().insertTable({
+                            rows: 3,
+                            cols: 3,
+                            withHeaderRow: true,
+                        }).run())}
+                        style={styles.toolButton}
+                    >
+                        <IconTable size={15} />
+                    </button>
+
+                    <button
+                        type="button"
+                        className="btn-ghost"
+                        title="Thêm cột"
+                        onMouseDown={keepSelection}
+                        onClick={() => runCommand(() => editor.chain().focus().addColumnAfter().run())}
+                        style={styles.toolButton}
+                    >
+                        <IconColumnInsertRight size={15} />
+                    </button>
+
+                    <button
+                        type="button"
+                        className="btn-ghost"
+                        title="Thêm hàng"
+                        onMouseDown={keepSelection}
+                        onClick={() => runCommand(() => editor.chain().focus().addRowAfter().run())}
+                        style={styles.toolButton}
+                    >
+                        <IconRowInsertBottom size={15} />
+                    </button>
+
+                    <button
+                        type="button"
+                        className="btn-ghost"
+                        title="Xóa bảng"
+                        onMouseDown={keepSelection}
+                        onClick={() => runCommand(() => editor.chain().focus().deleteTable().run())}
+                        style={styles.toolButton}
+                    >
+                        <IconTrash size={15} />
                     </button>
 
                     <span style={styles.divider} />
@@ -144,7 +488,7 @@ export default function RichTextEditor({ value, onChange, readOnly, placeholder 
                                 type="button"
                                 title={`Màu ${color}`}
                                 onMouseDown={keepSelection}
-                                onClick={() => runCommand('foreColor', color)}
+                                onClick={() => runCommand(() => editor.chain().focus().setColor(color).run())}
                                 style={{ ...styles.colorButton, background: color }}
                             />
                         ))}
@@ -157,33 +501,34 @@ export default function RichTextEditor({ value, onChange, readOnly, placeholder 
                         className="btn-ghost"
                         title="Xóa định dạng"
                         onMouseDown={keepSelection}
-                        onClick={() => runCommand('removeFormat')}
+                        onClick={() => runCommand(() => editor.chain().focus().unsetAllMarks().clearNodes().run())}
                         style={styles.toolButton}
                     >
                         <IconEraser size={15} />
                     </button>
+
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        onChange={event => {
+                            insertImageFromFile(event.target.files?.[0])
+                            event.target.value = ''
+                        }}
+                    />
                 </div>
             )}
 
             <div style={styles.editorShell}>
-                {isEmpty && !focused && (
+                {isEmpty && (
                     <div style={styles.placeholder}>
                         {placeholder}
                     </div>
                 )}
 
-                <div
-                    className="rich-text-editor"
-                    ref={editorRef}
-                    contentEditable={!readOnly}
-                    suppressContentEditableWarning
-                    onInput={emitChange}
-                    onBlur={() => {
-                        setFocused(false)
-                        emitChange()
-                    }}
-                    onFocus={() => setFocused(true)}
-                    onPaste={handlePaste}
+                <EditorContent
+                    editor={editor}
                     style={{
                         ...styles.editor,
                         cursor: readOnly ? 'default' : 'text',
@@ -217,6 +562,10 @@ const styles = {
         justifyContent: 'center',
         padding: 0,
     },
+    activeButton: {
+        background: 'var(--bg-ai)',
+        color: 'var(--accent-blue)',
+    },
     divider: {
         width: 1,
         height: 18,
@@ -244,7 +593,6 @@ const styles = {
     editor: {
         height: '100%',
         overflow: 'auto',
-        padding: '16px 20px',
         fontSize: 13,
         lineHeight: 1.7,
         outline: 'none',

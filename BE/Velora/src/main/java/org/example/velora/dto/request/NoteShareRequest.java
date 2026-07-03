@@ -17,4 +17,11 @@ public class NoteShareRequest {
         @NotNull(message = "Quyền chia sẻ không được để trống")
         private NoteShare.Permission permission;
     }
+
+    @Data
+    public static class UpdatePermission {
+
+        @NotNull(message = "Quyá»n chia sáº» khÃ´ng Ä‘Æ°á»£c Ä‘á»ƒ trá»‘ng")
+        private NoteShare.Permission permission;
+    }
 }

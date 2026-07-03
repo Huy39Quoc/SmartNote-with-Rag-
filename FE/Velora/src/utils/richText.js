@@ -16,6 +16,14 @@ const ALLOWED_TAGS = new Set([
     'H2',
     'H3',
     'BLOCKQUOTE',
+    'A',
+    'IMG',
+    'TABLE',
+    'THEAD',
+    'TBODY',
+    'TR',
+    'TH',
+    'TD',
 ])
 
 function normalizeColor(value = '') {
@@ -43,10 +51,22 @@ const ALLOWED_COLORS = new Set([
     '#f472b6',
 ])
 
+const ALLOWED_TEXT_ALIGN = new Set(['left', 'center', 'right', 'justify'])
+
 function decodeBasicEntities(value = '') {
     const textarea = document.createElement('textarea')
     textarea.innerHTML = value
     return textarea.value
+}
+
+function isSafeUrl(value = '') {
+    const url = value.trim()
+    return /^(https?:|mailto:|tel:)/i.test(url)
+}
+
+function isSafeImageSrc(value = '') {
+    const src = value.trim()
+    return /^(https?:|data:image\/(?:png|jpe?g|gif|webp);base64,)/i.test(src)
 }
 
 export function sanitizeRichText(html = '') {
@@ -82,6 +102,32 @@ export function sanitizeRichText(html = '') {
             const color = normalizeColor(node.style.color || node.getAttribute('color') || '')
             if (ALLOWED_COLORS.has(color)) {
                 clean.style.color = color
+            }
+        }
+
+        if (
+            ['P', 'DIV', 'H1', 'H2', 'H3', 'TH', 'TD'].includes(node.tagName) &&
+            ALLOWED_TEXT_ALIGN.has((node.style.textAlign || '').toLowerCase())
+        ) {
+            clean.style.textAlign = node.style.textAlign.toLowerCase()
+        }
+
+        if (node.tagName === 'A') {
+            const href = node.getAttribute('href') || ''
+            if (isSafeUrl(href)) {
+                clean.setAttribute('href', href.trim())
+                clean.setAttribute('target', '_blank')
+                clean.setAttribute('rel', 'noopener noreferrer')
+            }
+        }
+
+        if (node.tagName === 'IMG') {
+            const src = node.getAttribute('src') || ''
+            const alt = node.getAttribute('alt') || ''
+
+            if (isSafeImageSrc(src)) {
+                clean.setAttribute('src', src.trim())
+                if (alt) clean.setAttribute('alt', alt.slice(0, 200))
             }
         }
 

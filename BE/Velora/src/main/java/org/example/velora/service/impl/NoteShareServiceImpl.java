@@ -11,6 +11,7 @@ import org.example.velora.exception.ResourceNotFoundException;
 import org.example.velora.repository.NoteRepository;
 import org.example.velora.repository.NoteShareRepository;
 import org.example.velora.repository.UserRepository;
+import org.example.velora.service.NoteCollaborationHandler;
 import org.example.velora.service.NoteShareService;
 import org.example.velora.service.UserPackageService;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,7 @@ public class NoteShareServiceImpl implements NoteShareService {
     private final UserRepository userRepository;
     private final NoteShareRepository noteShareRepository;
     private final UserPackageService userPackageService;
+    private final NoteCollaborationHandler noteCollaborationHandler;
 
     @Override
     public NoteShareResponse.Item shareNote(UUID ownerId, UUID noteId, NoteShareRequest.Share request) {
@@ -41,18 +43,25 @@ public class NoteShareServiceImpl implements NoteShareService {
 
         String targetEmail = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase();
         User targetUser = userRepository.findByEmail(targetEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tài khoản nhận chia sẻ"));
+                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay tai khoan nhan chia se"));
 
-        if (targetUser.getId().equals(ownerId))
-            throw new BadRequestException("Không thể chia sẻ ghi chú cho chính bạn");
+        if (targetUser.getId().equals(ownerId)) {
+            throw new BadRequestException("Khong the chia se ghi chu cho chinh ban");
+        }
 
         NoteShare share = noteShareRepository
                 .findByNoteIdAndSharedWithId(noteId, targetUser.getId())
                 .orElseGet(() -> NoteShare.builder()
-                        .note(note).owner(owner).sharedWith(targetUser).build());
+                        .note(note)
+                        .owner(owner)
+                        .sharedWith(targetUser)
+                        .build());
 
         share.setPermission(request.getPermission());
-        return toResponse(noteShareRepository.save(share));
+        NoteShare saved = noteShareRepository.save(share);
+        noteCollaborationHandler.updateUserPermission(noteId, targetUser.getId(), saved.getPermission());
+
+        return toResponse(saved);
     }
 
     @Override
@@ -71,31 +80,75 @@ public class NoteShareServiceImpl implements NoteShareService {
     }
 
     @Override
+    public NoteShareResponse.Item updatePermission(
+            UUID ownerId,
+            UUID shareId,
+            NoteShareRequest.UpdatePermission request
+    ) {
+        User owner = getUser(ownerId);
+        userPackageService.checkFeatureAccess(owner, FEATURE_TEAM_WORK);
+
+        NoteShare share = noteShareRepository.findById(shareId)
+                .orElseThrow(() -> new ResourceNotFoundException("Thong tin chia se khong ton tai"));
+
+        if (share.getOwner() == null || !share.getOwner().getId().equals(ownerId)) {
+            throw new ResourceNotFoundException("Thong tin chia se khong ton tai");
+        }
+
+        share.setPermission(request.getPermission());
+        NoteShare saved = noteShareRepository.save(share);
+
+        if (saved.getNote() != null && saved.getSharedWith() != null) {
+            noteCollaborationHandler.updateUserPermission(
+                    saved.getNote().getId(),
+                    saved.getSharedWith().getId(),
+                    saved.getPermission()
+            );
+        }
+
+        return toResponse(saved);
+    }
+
+    @Override
     public void revokeShare(UUID ownerId, UUID shareId) {
         NoteShare share = noteShareRepository.findById(shareId)
-                .orElseThrow(() -> new ResourceNotFoundException("Thông tin chia sẻ không tồn tại"));
-        if (share.getOwner() == null || !share.getOwner().getId().equals(ownerId))
-            throw new ResourceNotFoundException("Thông tin chia sẻ không tồn tại");
+                .orElseThrow(() -> new ResourceNotFoundException("Thong tin chia se khong ton tai"));
+
+        if (share.getOwner() == null || !share.getOwner().getId().equals(ownerId)) {
+            throw new ResourceNotFoundException("Thong tin chia se khong ton tai");
+        }
+
+        UUID noteId = share.getNote() != null ? share.getNote().getId() : null;
+        UUID sharedWithId = share.getSharedWith() != null ? share.getSharedWith().getId() : null;
+
         noteShareRepository.delete(share);
+
+        if (noteId != null && sharedWithId != null) {
+            noteCollaborationHandler.closeUserSessions(noteId, sharedWithId);
+        }
     }
 
     private Note getOwnedNote(UUID ownerId, UUID noteId) {
         Note note = noteRepository.findById(noteId)
-                .orElseThrow(() -> new ResourceNotFoundException("Ghi chú không tồn tại"));
-        if (note.getUser() == null || !note.getUser().getId().equals(ownerId))
-            throw new ResourceNotFoundException("Ghi chú không tồn tại");
+                .orElseThrow(() -> new ResourceNotFoundException("Ghi chu khong ton tai"));
+
+        if (note.getUser() == null || !note.getUser().getId().equals(ownerId)) {
+            throw new ResourceNotFoundException("Ghi chu khong ton tai");
+        }
+
         return note;
     }
 
     private User getUser(UUID userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
+                .orElseThrow(() -> new ResourceNotFoundException("User khong ton tai"));
     }
 
     private NoteShareResponse.Item toResponse(NoteShare share) {
         Note note = share.getNote();
         User owner = share.getOwner();
         User sharedWith = share.getSharedWith();
+
         return NoteShareResponse.Item.builder()
                 .id(share.getId())
                 .noteId(note != null ? note.getId() : null)

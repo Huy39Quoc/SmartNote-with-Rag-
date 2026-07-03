@@ -30,6 +30,8 @@ public class NoteRequest {
         private String content;
 
         private List<UUID> tagIds;
+
+        private String editorSessionId;
     }
 
     @Data
