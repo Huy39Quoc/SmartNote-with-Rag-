@@ -50,7 +50,36 @@ const ALLOWED_COLORS = new Set([
     '#a78bfa',
     '#f472b6',
 ])
+const ALLOWED_FONT_SIZES = new Set([
+    '12px',
+    '14px',
+    '16px',
+    '18px',
+    '20px',
+    '24px',
+    '32px',
+])
 
+const ALLOWED_FONT_FAMILIES = new Map([
+    ['inter, sans-serif', 'Inter, sans-serif'],
+    ['arial, sans-serif', 'Arial, sans-serif'],
+    ['times new roman, serif', '"Times New Roman", serif'],
+    ['georgia, serif', 'Georgia, serif'],
+    ['courier new, monospace', '"Courier New", monospace'],
+])
+
+function normalizeFontSize(value = '') {
+    const size = value.trim().toLowerCase()
+    return ALLOWED_FONT_SIZES.has(size) ? size : ''
+}
+
+function normalizeFontFamily(value = '') {
+    return value
+        .trim()
+        .replace(/["']/g, '')
+        .replace(/\s*,\s*/g, ', ')
+        .toLowerCase()
+}
 const ALLOWED_TEXT_ALIGN = new Set(['left', 'center', 'right', 'justify'])
 
 function decodeBasicEntities(value = '') {
@@ -102,6 +131,17 @@ export function sanitizeRichText(html = '') {
             const color = normalizeColor(node.style.color || node.getAttribute('color') || '')
             if (ALLOWED_COLORS.has(color)) {
                 clean.style.color = color
+            }
+
+            const fontSize = normalizeFontSize(node.style.fontSize || '')
+            if (fontSize) {
+                clean.style.fontSize = fontSize
+            }
+
+            const fontFamilyKey = normalizeFontFamily(node.style.fontFamily || '')
+            const safeFontFamily = ALLOWED_FONT_FAMILIES.get(fontFamilyKey)
+            if (safeFontFamily) {
+                clean.style.fontFamily = safeFontFamily
             }
         }
 

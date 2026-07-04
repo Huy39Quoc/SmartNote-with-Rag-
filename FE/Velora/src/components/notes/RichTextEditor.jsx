@@ -45,7 +45,53 @@ const COLORS = [
     '#a78bfa',
     '#f472b6',
 ]
+const FONT_FAMILIES = [
+    { label: 'Inter', value: 'Inter, sans-serif' },
+    { label: 'Arial', value: 'Arial, sans-serif' },
+    { label: 'Times New Roman', value: '"Times New Roman", serif' },
+    { label: 'Georgia', value: 'Georgia, serif' },
+    { label: 'Courier New', value: '"Courier New", monospace' },
+]
 
+const FONT_SIZES = [
+    { label: '12', value: '12px' },
+    { label: '14', value: '14px' },
+    { label: '16', value: '16px' },
+    { label: '18', value: '18px' },
+    { label: '20', value: '20px' },
+    { label: '24', value: '24px' },
+    { label: '32', value: '32px' },
+]
+
+const CustomTextStyle = TextStyle.extend({
+    addAttributes() {
+        return {
+            ...(this.parent?.() || {}),
+
+            fontSize: {
+                default: null,
+                parseHTML: element => element.style.fontSize || null,
+                renderHTML: attributes => {
+                    if (!attributes.fontSize) return {}
+                    return {
+                        style: `font-size: ${attributes.fontSize}`,
+                    }
+                },
+            },
+
+            fontFamily: {
+                default: null,
+                parseHTML: element => element.style.fontFamily || null,
+                renderHTML: attributes => {
+                    if (!attributes.fontFamily) return {}
+                    return {
+                        style: `font-family: ${attributes.fontFamily}`,
+                    }
+                },
+            },
+        }
+    },
+})
 function bytesToBase64(bytes) {
     let binary = ''
     const chunkSize = 0x8000
@@ -94,7 +140,7 @@ export default function RichTextEditor({
                 history: false,
             }),
             Underline,
-            TextStyle,
+            CustomTextStyle,
             Color,
             Link.configure({
                 openOnClick: false,
@@ -274,6 +320,27 @@ export default function RichTextEditor({
 
         reader.readAsDataURL(file)
     }
+    const setFontFamily = (fontFamily) => {
+        if (!editor || readOnly) return
+
+        if (!fontFamily) {
+            editor.chain().focus().setMark('textStyle', { fontFamily: null }).removeEmptyTextStyle().run()
+            return
+        }
+
+        editor.chain().focus().setMark('textStyle', { fontFamily }).run()
+    }
+
+    const setFontSize = (fontSize) => {
+        if (!editor || readOnly) return
+
+        if (!fontSize) {
+            editor.chain().focus().setMark('textStyle', { fontSize: null }).removeEmptyTextStyle().run()
+            return
+        }
+
+        editor.chain().focus().setMark('textStyle', { fontSize }).run()
+    }
 
     const isEmpty = !editor || editor.isEmpty
 
@@ -322,7 +389,43 @@ export default function RichTextEditor({
                     >
                         <IconUnderline size={15} />
                     </button>
+                    <select
+                        title="Font chữ"
+                        value={editor?.getAttributes('textStyle')?.fontFamily || ''}
+                        onChange={e => setFontFamily(e.target.value)}
+                        style={{
+                            ...styles.toolSelect,
+                            ...styles.fontSelect,
+                        }}
+                    >
+                        <option value="">Font</option>
+                        {FONT_FAMILIES.map(font => (
+                            <option
+                                key={font.value}
+                                value={font.value}
+                                style={{ fontFamily: font.value }}
+                            >
+                                {font.label}
+                            </option>
+                        ))}
+                    </select>
 
+                    <select
+                        title="Cỡ chữ"
+                        value={editor?.getAttributes('textStyle')?.fontSize || ''}
+                        onChange={e => setFontSize(e.target.value)}
+                        style={{
+                            ...styles.toolSelect,
+                            ...styles.sizeSelect,
+                        }}
+                    >
+                        <option value="">Size</option>
+                        {FONT_SIZES.map(size => (
+                            <option key={size.value} value={size.value}>
+                                {size.label}
+                            </option>
+                        ))}
+                    </select>
                     <span style={styles.divider} />
 
                     <button
@@ -561,6 +664,24 @@ const styles = {
         height: 28,
         justifyContent: 'center',
         padding: 0,
+    },
+    toolSelect: {
+        height: 28,
+        border: '.5px solid var(--border)',
+        borderRadius: 8,
+        background: 'var(--bg-elevated)',
+        color: 'var(--text-primary)',
+        fontSize: 11,
+        padding: '0 8px',
+        outline: 'none',
+    },
+
+    fontSelect: {
+        width: 130,
+    },
+
+    sizeSelect: {
+        width: 72,
     },
     activeButton: {
         background: 'var(--bg-ai)',
