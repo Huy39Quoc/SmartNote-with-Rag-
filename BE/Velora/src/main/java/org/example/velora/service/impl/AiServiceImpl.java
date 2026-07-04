@@ -40,24 +40,20 @@ public class AiServiceImpl implements AiService {
         NoteResponse.AiResult.AiResultBuilder b = NoteResponse.AiResult.builder().action(action.name());
         try {
             switch (action) {
-                case SUMMARIZE ->
-                        b.summary(lmStudioClient.complete(
-                                getPrompt("note.summarize") + "\n\n" + content));
-                case STRUCTURE ->
-                        b.improvedContent(lmStudioClient.complete(
-                                getPrompt("note.structure") + "\n\n" + content));
+                case SUMMARIZE -> b.summary(lmStudioClient.complete(
+                        getPrompt("note.summarize") + "\n\n" + content));
+                case STRUCTURE -> b.improvedContent(lmStudioClient.complete(
+                        getPrompt("note.structure") + "\n\n" + content));
                 case SUGGEST_TITLE -> {
                     String raw = lmStudioClient.complete(getPrompt("note.suggest_title") + "\n\n" + content);
                     List<String> titles = parseJsonArray(raw);
                     b.suggestedTitle(titles.isEmpty() ? "Ghi chú mới" : titles.get(0)).keyPoints(titles);
                 }
-                case CREATE_CHECKLIST ->
-                        b.checklist(parseJsonArray(
-                                lmStudioClient.complete(getPrompt("note.checklist") + "\n\n" + content)));
-                case IMPROVE_ALL ->
-                        b
-                                .summary(lmStudioClient.complete(getPrompt("note.summarize") + "\n\n" + content))
-                                .improvedContent(lmStudioClient.complete(getPrompt("note.structure") + "\n\n" + content));
+                case CREATE_CHECKLIST -> b.checklist(parseJsonArray(
+                        lmStudioClient.complete(getPrompt("note.checklist") + "\n\n" + content)));
+                case IMPROVE_ALL -> b
+                        .summary(lmStudioClient.complete(getPrompt("note.summarize") + "\n\n" + content))
+                        .improvedContent(lmStudioClient.complete(getPrompt("note.structure") + "\n\n" + content));
             }
         } catch (Exception e) {
             log.error("improveNote error: {}", e.getMessage());
@@ -126,27 +122,27 @@ public class AiServiceImpl implements AiService {
         String context = contextBuilder.toString();
 
         String systemPrompt = """
-            Bạn là trợ lý học tập RAG của ứng dụng Velora.
-
-            Quy tắc bắt buộc:
-            - Chỉ trả lời dựa trên NGỮ CẢNH được cung cấp.
-            - Nếu ngữ cảnh không đủ thông tin, hãy nói rõ: "Tài liệu chưa có đủ thông tin để trả lời chính xác."
-            - Không bịa thêm kiến thức ngoài tài liệu.
-            - Trả lời bằng tiếng Việt.
-            - Ưu tiên trả lời rõ ràng, có gạch đầu dòng nếu phù hợp.
-            - Khi có thể, hãy nhắc nguồn theo dạng [Nguồn 1], [Nguồn 2].
-            - Không dùng markdown quá phức tạp.
-            """;
+                Bạn là trợ lý học tập RAG của ứng dụng Velora.
+                
+                Quy tắc bắt buộc:
+                - Chỉ trả lời dựa trên NGỮ CẢNH được cung cấp.
+                - Nếu ngữ cảnh không đủ thông tin, hãy nói rõ: "Tài liệu chưa có đủ thông tin để trả lời chính xác."
+                - Không bịa thêm kiến thức ngoài tài liệu.
+                - Trả lời bằng tiếng Việt.
+                - Ưu tiên trả lời rõ ràng, có gạch đầu dòng nếu phù hợp.
+                - Khi có thể, hãy nhắc nguồn theo dạng [Nguồn 1], [Nguồn 2].
+                - Không dùng markdown quá phức tạp.
+                """;
 
         String userMsg = """
-            NGỮ CẢNH TỪ TÀI LIỆU:
-            %s
-
-            CÂU HỎI:
-            %s
-
-            Hãy trả lời dựa trên ngữ cảnh trên.
-            """.formatted(context, question);
+                NGỮ CẢNH TỪ TÀI LIỆU:
+                %s
+                
+                CÂU HỎI:
+                %s
+                
+                Hãy trả lời dựa trên ngữ cảnh trên.
+                """.formatted(context, question);
 
         String answer = lmStudioClient.chatComplete(systemPrompt, userMsg);
 
@@ -164,35 +160,35 @@ public class AiServiceImpl implements AiService {
     public ScheduleResponse.ExtractResult extractSchedules(String content) {
         try {
             String prompt = """
-                Bạn là công cụ trích xuất lịch/deadline từ ghi chú tiếng Việt.
-
-                Nhiệm vụ:
-                - Chỉ trả về JSON array hợp lệ.
-                - Không giải thích.
-                - Không markdown.
-                - Không thêm chữ ngoài JSON.
-                - Nếu không tìm thấy lịch/deadline, trả về [].
-
-                Format bắt buộc:
-                [
-                  {
-                    "task": "Tên công việc",
-                    "deadline": "yyyy-MM-dd",
-                    "priority": "LOW|MEDIUM|HIGH|URGENT"
-                  }
-                ]
-
-                Quy tắc:
-                - Câu có từ: deadline, hạn nộp, nộp bài, kiểm tra, thi, thuyết trình, họp, lịch, học, hẹn
-                  thì được xem là công việc/lịch.
-                - Nếu thấy ngày dạng dd/MM/yyyy thì đổi sang yyyy-MM-dd.
-                - Nếu chỉ có ngày/tháng mà không có năm thì dùng năm hiện tại.
-                - priority mặc định là MEDIUM.
-                - Nếu có "hạn nộp", "deadline", "thi", "kiểm tra" thì priority là HIGH.
-                - Nếu có "gấp", "khẩn", "hôm nay", "quá hạn" thì priority là URGENT.
-
-                Nội dung ghi chú:
-                """ + "\n" + content;
+                    Bạn là công cụ trích xuất lịch/deadline từ ghi chú tiếng Việt.
+                    
+                    Nhiệm vụ:
+                    - Chỉ trả về JSON array hợp lệ.
+                    - Không giải thích.
+                    - Không markdown.
+                    - Không thêm chữ ngoài JSON.
+                    - Nếu không tìm thấy lịch/deadline, trả về [].
+                    
+                    Format bắt buộc:
+                    [
+                      {
+                        "task": "Tên công việc",
+                        "deadline": "yyyy-MM-dd",
+                        "priority": "LOW|MEDIUM|HIGH|URGENT"
+                      }
+                    ]
+                    
+                    Quy tắc:
+                    - Câu có từ: deadline, hạn nộp, nộp bài, kiểm tra, thi, thuyết trình, họp, lịch, học, hẹn
+                      thì được xem là công việc/lịch.
+                    - Nếu thấy ngày dạng dd/MM/yyyy thì đổi sang yyyy-MM-dd.
+                    - Nếu chỉ có ngày/tháng mà không có năm thì dùng năm hiện tại.
+                    - priority mặc định là MEDIUM.
+                    - Nếu có "hạn nộp", "deadline", "thi", "kiểm tra" thì priority là HIGH.
+                    - Nếu có "gấp", "khẩn", "hôm nay", "quá hạn" thì priority là URGENT.
+                    
+                    Nội dung ghi chú:
+                    """ + "\n" + content;
 
             String raw = lmStudioClient.complete(prompt);
 
@@ -481,32 +477,32 @@ public class AiServiceImpl implements AiService {
                     : safeContent;
 
             String prompt = """
-                Bạn là công cụ phân loại ghi chú học tập.
-
-                Nhiệm vụ:
-                - Chỉ trả về JSON object hợp lệ.
-                - Không markdown.
-                - Không giải thích ngoài JSON.
-                - Không thêm chữ trước hoặc sau JSON.
-
-                Format bắt buộc:
-                {
-                  "groupName": "Tên nhóm kiến thức ngắn gọn",
-                  "reasoning": "Lý do phân loại ngắn gọn"
-                }
-
-                Gợi ý nhóm:
-                - Lập trình Java
-                - Cơ sở dữ liệu
-                - Trí tuệ nhân tạo
-                - Lịch học & Deadline
-                - Toán học
-                - Khởi nghiệp
-                - Tiếng Anh
-                - Chung
-
-                Nội dung ghi chú:
-                """ + "\n" + truncated;
+                    Bạn là công cụ phân loại ghi chú học tập.
+                    
+                    Nhiệm vụ:
+                    - Chỉ trả về JSON object hợp lệ.
+                    - Không markdown.
+                    - Không giải thích ngoài JSON.
+                    - Không thêm chữ trước hoặc sau JSON.
+                    
+                    Format bắt buộc:
+                    {
+                      "groupName": "Tên nhóm kiến thức ngắn gọn",
+                      "reasoning": "Lý do phân loại ngắn gọn"
+                    }
+                    
+                    Gợi ý nhóm:
+                    - Lập trình Java
+                    - Cơ sở dữ liệu
+                    - Trí tuệ nhân tạo
+                    - Lịch học & Deadline
+                    - Toán học
+                    - Khởi nghiệp
+                    - Tiếng Anh
+                    - Chung
+                    
+                    Nội dung ghi chú:
+                    """ + "\n" + truncated;
 
             String raw = lmStudioClient.complete(prompt);
 
@@ -703,25 +699,25 @@ public class AiServiceImpl implements AiService {
     public List<Flashcard> generateFlashcardsFromNote(Note note) {
 
         String prompt = """
-        Bạn là một trợ lý học tập chuyên nghiệp chuyên bóc tách kiến thức.
-        Nhiệm vụ: Dựa trên nội dung ghi chú sau đây, hãy tạo ra các cặp câu hỏi và câu trả lời rút gọn (Flashcard) để phục vụ việc ôn thi.
-
-        Yêu cầu bắt buộc:
-        - Chỉ trả về DUY NHẤT một mảng JSON (JSON Array) hợp lệ.
-        - Không kèm theo bất kỳ lời giải thích, tiêu đề, hoặc ký tự markdown định dạng nào bên ngoài.
-        - Không bọc thẻ ```json ... ```.
-        - Nếu ghi chú quá ngắn hoặc không có thông tin để tạo câu hỏi, hãy trả về mảng rỗng [].
-
-        Cấu trúc JSON:
-        [
-          {
-            "question": "Nội dung câu hỏi cốt lõi",
-            "answer": "Nội dung câu trả lời rút gọn"
-          }
-        ]
-
-        Nội dung ghi chú:
-        """ + "\n" + RichTextContent.toPlainText(note.getContent());
+                Bạn là một trợ lý học tập chuyên nghiệp chuyên bóc tách kiến thức.
+                Nhiệm vụ: Dựa trên nội dung ghi chú sau đây, hãy tạo ra các cặp câu hỏi và câu trả lời rút gọn (Flashcard) để phục vụ việc ôn thi.
+                
+                Yêu cầu bắt buộc:
+                - Chỉ trả về DUY NHẤT một mảng JSON (JSON Array) hợp lệ.
+                - Không kèm theo bất kỳ lời giải thích, tiêu đề, hoặc ký tự markdown định dạng nào bên ngoài.
+                - Không bọc thẻ ```json ... ```.
+                - Nếu ghi chú quá ngắn hoặc không có thông tin để tạo câu hỏi, hãy trả về mảng rỗng [].
+                
+                Cấu trúc JSON:
+                [
+                  {
+                    "question": "Nội dung câu hỏi cốt lõi",
+                    "answer": "Nội dung câu trả lời rút gọn"
+                  }
+                ]
+                
+                Nội dung ghi chú:
+                """ + "\n" + RichTextContent.toPlainText(note.getContent());
 
         String aiRawJson = lmStudioClient.complete(prompt);
 
@@ -778,7 +774,9 @@ public class AiServiceImpl implements AiService {
             String content,
             NoteRequest.GenerateDiagram.DiagramType diagramType
     ) {
-        if (!StringUtils.hasText(content)) {
+        String plainContent = RichTextContent.toPlainText(content);
+
+        if (!StringUtils.hasText(plainContent)) {
             throw new BadRequestException("Ghi chú không có nội dung để tạo sơ đồ.");
         }
 
@@ -787,14 +785,18 @@ public class AiServiceImpl implements AiService {
         }
 
         String safeTitle = StringUtils.hasText(title) ? title.trim() : "Ghi chú";
-        String truncated = content.length() > 5000 ? content.substring(0, 5000) : content;
+        String truncated = plainContent.length() > 5000
+                ? plainContent.substring(0, 5000)
+                : plainContent;
 
         String prompt = buildDiagramPrompt(safeTitle, truncated, diagramType);
 
         try {
             String raw = lmStudioClient.complete(prompt);
 
-            if (!StringUtils.hasText(raw)) {
+            if (!StringUtils.hasText(raw)
+                    || raw.contains("AI chưa trả về nội dung")
+                    || raw.contains("Hãy kiểm tra LM Studio")) {
                 return buildFallbackDiagram(safeTitle, truncated, diagramType);
             }
 
@@ -831,189 +833,141 @@ public class AiServiceImpl implements AiService {
             NoteRequest.GenerateDiagram.DiagramType diagramType
     ) {
         String common = """
-            Bạn là công cụ tạo sơ đồ học tập.
-            QUY TẮC BẮT BUỘC:
-            - Chỉ trả về đúng nội dung sơ đồ.
-            - Không giải thích.
-            - Không viết thêm mở đầu/kết luận.
-            - Không markdown thừa ngoài nội dung cần thiết.
-            - Nội dung phải ngắn gọn, dễ học, dễ nhìn.
-            """;
+                Bạn là công cụ tạo sơ đồ học tập.
+                QUY TẮC BẮT BUỘC:
+                - Chỉ trả về đúng nội dung sơ đồ.
+                - Không giải thích.
+                - Không viết thêm mở đầu hoặc kết luận.
+                - Không dùng markdown fence như ```mermaid hoặc ```json.
+                - Không copy nguyên ASCII art từ tài liệu.
+                - Không dùng các ký tự vẽ khung như +-----+, | Actor |, =====.
+                - Nội dung node phải ngắn gọn, dễ học, dễ nhìn.
+                """;
 
         return switch (diagramType) {
             case MINDMAP -> """
-                %s
-
-                Hãy tạo sơ đồ Mermaid mindmap từ ghi chú sau.
-
-                BẮT BUỘC:
-                - Chỉ trả về code Mermaid.
-                - Dòng đầu tiên phải là: mindmap
-                - Dùng cấu trúc mindmap chuẩn Mermaid.
-                - Node gốc là tiêu đề note.
-
-                Ví dụ format:
-                mindmap
-                  root((Java OOP))
-                    Class
-                    Object
-                    Interface
-
-                Tiêu đề:
-                %s
-
-                Nội dung:
-                %s
-                """.formatted(common, title, content);
+                    %s
+                    
+                    Hãy tạo Mermaid mindmap từ ghi chú sau.
+                    
+                    BẮT BUỘC:
+                    - Chỉ trả về code Mermaid.
+                    - Dòng đầu tiên phải là: mindmap
+                    - Không dùng ASCII art.
+                    - Không dùng dấu |, +, = nhiều lần.
+                    - Không dùng dấu ngoặc vuông trong nội dung node.
+                    - Node gốc là tiêu đề ghi chú.
+                    
+                    Ví dụ đúng:
+                    mindmap
+                      root((Java OOP))
+                        Class
+                        Object
+                        Interface
+                    
+                    Tiêu đề:
+                    %s
+                    
+                    Nội dung:
+                    %s
+                    """.formatted(common, title, content);
 
             case FLOWCHART -> """
-                %s
-
-                Hãy tạo sơ đồ Mermaid flowchart từ ghi chú sau.
-
-                BẮT BUỘC:
-                - Chỉ trả về code Mermaid.
-                - Dòng đầu tiên phải là: flowchart TD
-                - Mỗi bước phải ngắn gọn.
-                - Nếu nội dung không phải quy trình, hãy tự chuyển thành luồng học/ý chính.
-
-                Ví dụ format:
-                flowchart TD
-                  A[Đọc đề] --> B[Phân tích]
-                  B --> C[Thực hiện]
-                  C --> D[Kiểm tra]
-
-                Tiêu đề:
-                %s
-
-                Nội dung:
-                %s
-                """.formatted(common, title, content);
+                    %s
+                    
+                    Hãy tạo Mermaid flowchart TD từ ghi chú sau.
+                    
+                    BẮT BUỘC:
+                    - Chỉ trả về code Mermaid.
+                    - Dòng đầu tiên phải là: flowchart TD
+                    - Mỗi node phải dùng dạng A["Nội dung"].
+                    - Không dùng dấu ngoặc tròn () trong label.
+                    - Không dùng dấu hai chấm : trong label.
+                    - Không dùng dấu chấm phẩy ;.
+                    - Không dùng dấu |, +-----+, =====.
+                    - Không dùng cú pháp A & B & C --> D.
+                    - Nếu nhiều node cùng trỏ đến một node, hãy viết từng dòng riêng.
+                    - Nếu nội dung là sequence/communication diagram, hãy chuyển thành các bước đơn giản.
+                    
+                    Ví dụ đúng:
+                    flowchart TD
+                      A["Đăng nhập"] --> B["Mở form nộp bài"]
+                      B --> C["Hệ thống hiển thị form"]
+                      C --> D["Người dùng gửi dữ liệu"]
+                    
+                    Tiêu đề:
+                    %s
+                    
+                    Nội dung:
+                    %s
+                    """.formatted(common, title, content);
 
             case ARCHITECTURE -> """
-                %s
-
-                Hãy tạo sơ đồ Mermaid flowchart mô tả cấu trúc/kiến trúc từ ghi chú sau.
-
-                BẮT BUỘC:
-                - Chỉ trả về code Mermaid.
-                - Dòng đầu tiên phải là: flowchart LR
-                - Biểu diễn dạng các khối thành phần và mối liên hệ.
-                - Nếu nội dung không phải hệ thống, hãy nhóm thành các khối kiến thức.
-
-                Ví dụ format:
-                flowchart LR
-                  A[Frontend] --> B[Backend]
-                  B --> C[Database]
-
-                Tiêu đề:
-                %s
-
-                Nội dung:
-                %s
-                """.formatted(common, title, content);
+                    %s
+                    
+                    Hãy tạo Mermaid flowchart LR từ ghi chú sau.
+                    
+                    BẮT BUỘC:
+                    - Chỉ trả về code Mermaid.
+                    - Dòng đầu tiên phải là: flowchart LR
+                    - Mỗi node phải dùng dạng A["Nội dung"].
+                    - Không dùng dấu ngoặc tròn () trong label.
+                    - Không dùng dấu hai chấm : trong label.
+                    - Không dùng dấu chấm phẩy ;.
+                    - Không dùng dấu |, +-----+, =====.
+                    - Không dùng cú pháp A & B & C --> D.
+                    - Nếu nhiều node cùng trỏ đến một node, hãy viết từng dòng riêng.
+                    - Nếu nội dung không phải kiến trúc hệ thống, hãy nhóm thành các khối kiến thức chính.
+                    
+                    Ví dụ đúng:
+                    flowchart LR
+                      A["Frontend React"] --> B["Spring Boot Backend"]
+                      B --> C["SQL Server Database"]
+                      B --> D["FastAPI AI Service"]
+                    
+                    Tiêu đề:
+                    %s
+                    
+                    Nội dung:
+                    %s
+                    """.formatted(common, title, content);
 
             case SKETCHNOTE -> """
-                %s
-
-                Hãy tạo Sketchnote JSON từ ghi chú sau.
-
-                BẮT BUỘC:
-                - Chỉ trả về JSON object hợp lệ.
-                - Không giải thích.
-                - Không thêm chữ ngoài JSON.
-                - Không dùng ```json.
-
-                Format:
-                {
-                  "title": "Tên sketchnote",
-                  "blocks": [
+                    %s
+                    
+                    Hãy tạo Sketchnote JSON từ ghi chú sau.
+                    
+                    BẮT BUỘC:
+                    - Chỉ trả về JSON object hợp lệ.
+                    - Không giải thích.
+                    - Không thêm chữ ngoài JSON.
+                    - Không dùng ```json.
+                    - Không copy ASCII art từ tài liệu.
+                    
+                    Format:
                     {
-                      "icon": "📘",
-                      "heading": "Ý chính",
-                      "content": "Nội dung ngắn gọn"
+                      "title": "Tên sketchnote",
+                      "blocks": [
+                        {
+                          "icon": "📘",
+                          "heading": "Ý chính",
+                          "content": "Nội dung ngắn gọn"
+                        }
+                      ]
                     }
-                  ]
-                }
-
-                Yêu cầu:
-                - 4 đến 8 blocks
-                - content ngắn gọn
-                - icon là emoji
-
-                Tiêu đề:
-                %s
-
-                Nội dung:
-                %s
-                """.formatted(common, title, content);
+                    
+                    Yêu cầu:
+                    - Có từ 4 đến 8 blocks.
+                    - Mỗi content phải ngắn gọn.
+                    - Icon là emoji phù hợp.
+                    
+                    Tiêu đề:
+                    %s
+                    
+                    Nội dung:
+                    %s
+                    """.formatted(common, title, content);
         };
-    }
-
-    private String cleanDiagramOutput(
-            String raw,
-            NoteRequest.GenerateDiagram.DiagramType diagramType
-    ) {
-        if (raw == null || raw.isBlank()) {
-            throw new BadRequestException("AI không trả về nội dung sơ đồ.");
-        }
-
-        String cleaned = raw.trim()
-                .replace("```mermaid", "")
-                .replace("```json", "")
-                .replace("```", "")
-                .trim();
-
-        if (diagramType == NoteRequest.GenerateDiagram.DiagramType.SKETCHNOTE) {
-            int start = cleaned.indexOf('{');
-            int end = cleaned.lastIndexOf('}');
-
-            if (start >= 0 && end > start) {
-                return cleaned.substring(start, end + 1).trim();
-            }
-
-            String safeText = cleaned
-                    .replace("\\", "\\\\")
-                    .replace("\"", "\\\"")
-                    .replace("\r", "")
-                    .replace("\n", "\\n");
-
-            return """
-                {
-                  "title": "Sketchnote",
-                  "blocks": [
-                    {
-                      "icon": "📝",
-                      "heading": "Nội dung chính",
-                      "content": "%s"
-                    }
-                  ]
-                }
-                """.formatted(safeText);
-        }
-
-        if (diagramType == NoteRequest.GenerateDiagram.DiagramType.MINDMAP) {
-            int index = cleaned.indexOf("mindmap");
-
-            if (index >= 0) {
-                return cleaned.substring(index).trim();
-            }
-
-            throw new BadRequestException("AI trả về Mindmap không đúng định dạng Mermaid.");
-        }
-
-        if (diagramType == NoteRequest.GenerateDiagram.DiagramType.FLOWCHART
-                || diagramType == NoteRequest.GenerateDiagram.DiagramType.ARCHITECTURE) {
-            int index = cleaned.indexOf("flowchart");
-
-            if (index >= 0) {
-                return cleaned.substring(index).trim();
-            }
-
-            throw new BadRequestException("AI trả về diagram không đúng định dạng Mermaid.");
-        }
-
-        return cleaned;
     }
 
     private String normalizeDiagramOutput(
@@ -1022,10 +976,11 @@ public class AiServiceImpl implements AiService {
             String content,
             NoteRequest.GenerateDiagram.DiagramType diagramType
     ) {
-        String cleaned = raw.trim()
+        String cleaned = raw == null ? "" : raw.trim()
                 .replace("```mermaid", "")
                 .replace("```json", "")
                 .replace("```", "")
+                .replace("\r", "")
                 .trim();
 
         return switch (diagramType) {
@@ -1042,6 +997,7 @@ public class AiServiceImpl implements AiService {
 
         if (start >= 0 && end > start) {
             String json = cleaned.substring(start, end + 1).trim();
+
             try {
                 objectMapper.readTree(json);
                 return json;
@@ -1054,8 +1010,14 @@ public class AiServiceImpl implements AiService {
 
     private String normalizeMindmap(String cleaned, String title, String content) {
         int index = cleaned.indexOf("mindmap");
+
         if (index >= 0) {
-            return cleaned.substring(index).trim();
+            String mermaid = cleaned.substring(index).trim();
+            String sanitized = sanitizeMindmapMermaid(mermaid, title);
+
+            if (StringUtils.hasText(sanitized)) {
+                return sanitized;
+            }
         }
 
         return buildFallbackMindmap(title, content);
@@ -1079,16 +1041,343 @@ public class AiServiceImpl implements AiService {
             index = indexLr;
         } else {
             int generic = cleaned.indexOf("flowchart");
-            if (generic >= 0) index = generic;
+            if (generic >= 0) {
+                index = generic;
+            }
         }
 
         if (index >= 0) {
-            return cleaned.substring(index).trim();
+            String mermaid = cleaned.substring(index).trim();
+            String sanitized = sanitizeFlowchartMermaid(mermaid, architecture);
+
+            if (StringUtils.hasText(sanitized)) {
+                return sanitized;
+            }
         }
 
         return architecture
                 ? buildFallbackArchitecture(title, content)
                 : buildFallbackFlowchart(title, content);
+    }
+
+    private String sanitizeFlowchartMermaid(String mermaid, boolean architecture) {
+        if (!StringUtils.hasText(mermaid)) {
+            return "";
+        }
+
+        String[] rawLines = mermaid
+                .replace("```mermaid", "")
+                .replace("```", "")
+                .replace("\r", "")
+                .replace(";", "")
+                .split("\n");
+
+        List<String> result = new ArrayList<>();
+        boolean hasHeader = false;
+
+        for (String rawLine : rawLines) {
+            String line = rawLine.trim();
+
+            if (!StringUtils.hasText(line)) {
+                continue;
+            }
+
+            if (line.startsWith("flowchart")) {
+                String direction = architecture ? "LR" : "TD";
+
+                if (line.contains("LR")) {
+                    direction = "LR";
+                } else if (line.contains("TD")) {
+                    direction = "TD";
+                }
+
+                result.add("flowchart " + direction);
+                hasHeader = true;
+                continue;
+            }
+
+            if (isPureAsciiDiagramLine(line)) {
+                continue;
+            }
+
+            List<String> expandedLines = expandAmpersandArrowLine(line);
+
+            for (String expanded : expandedLines) {
+                String safeLine = sanitizeFlowchartLine(expanded);
+
+                if (StringUtils.hasText(safeLine)) {
+                    result.add(safeLine);
+                }
+            }
+        }
+
+        if (!hasHeader) {
+            result.add(0, architecture ? "flowchart LR" : "flowchart TD");
+        }
+
+        if (result.size() <= 1) {
+            return "";
+        }
+
+        return String.join("\n", result);
+    }
+
+    private boolean isPureAsciiDiagramLine(String line) {
+        if (!StringUtils.hasText(line)) {
+            return true;
+        }
+
+        String text = line.trim();
+
+        boolean looksLikeNodeOrEdge =
+                text.contains("-->")
+                        || text.matches(".*[A-Za-z][A-Za-z0-9_]*\\s*[\\[\\(\\{].*");
+
+        if (looksLikeNodeOrEdge) {
+            return false;
+        }
+
+        if (text.matches(".*\\+[-=]{3,}\\+.*")) {
+            return true;
+        }
+
+        if (text.matches(".*={5,}.*")) {
+            return true;
+        }
+
+        long badCount = text.chars()
+                .filter(ch -> ch == '|' || ch == '=' || ch == '+')
+                .count();
+
+        return badCount >= 4;
+    }
+
+    private List<String> expandAmpersandArrowLine(String line) {
+        if (!line.contains("&") || !line.contains("-->")) {
+            return List.of(line);
+        }
+
+        String[] parts = line.split("-->", 2);
+        if (parts.length != 2) {
+            return List.of(line);
+        }
+
+        String left = parts[0].trim();
+        String right = parts[1].trim();
+
+        if (!left.contains("&")) {
+            return List.of(line);
+        }
+
+        List<String> lines = new ArrayList<>();
+        String[] sources = left.split("&");
+
+        for (String source : sources) {
+            String sourceNode = source.trim();
+
+            if (StringUtils.hasText(sourceNode)) {
+                lines.add(sourceNode + " --> " + right);
+            }
+        }
+
+        return lines.isEmpty() ? List.of(line) : lines;
+    }
+
+    private String sanitizeFlowchartLine(String line) {
+        if (!StringUtils.hasText(line)) {
+            return "";
+        }
+
+        String sanitized = line.trim()
+                .replace(";", "")
+                .replace("==>", "-->")
+                .replace("=>", "-->");
+
+        Pattern nodePattern = Pattern.compile(
+                "([A-Za-z][A-Za-z0-9_]*)\\s*[\\[\\(\\{]([^\\]\\)\\}]+)[\\]\\)\\}]"
+        );
+
+        Matcher matcher = nodePattern.matcher(sanitized);
+        StringBuffer sb = new StringBuffer();
+
+        while (matcher.find()) {
+            String nodeId = matcher.group(1);
+            String label = sanitizeMermaidLabel(matcher.group(2));
+
+            if (!StringUtils.hasText(label)) {
+                label = nodeId;
+            }
+
+            matcher.appendReplacement(
+                    sb,
+                    Matcher.quoteReplacement(nodeId + "[\"" + label + "\"]")
+            );
+        }
+
+        matcher.appendTail(sb);
+
+        String result = sb.toString()
+                .replace("|", " ")
+                .replace("+", " ")
+                .replace("=", " ")
+                .replace(";", "")
+                .replaceAll("\\s+", " ")
+                .trim();
+
+        if (!StringUtils.hasText(result)) {
+            return "";
+        }
+
+        return "  " + result;
+    }
+
+    private String sanitizeMindmapMermaid(String mermaid, String fallbackTitle) {
+        if (!StringUtils.hasText(mermaid)) {
+            return "";
+        }
+
+        String[] rawLines = mermaid
+                .replace("```mermaid", "")
+                .replace("```", "")
+                .replace("\r", "")
+                .split("\n");
+
+        List<String> result = new ArrayList<>();
+        boolean hasHeader = false;
+        boolean hasRoot = false;
+
+        for (String rawLine : rawLines) {
+            if (!StringUtils.hasText(rawLine)) {
+                continue;
+            }
+
+            String trimmed = rawLine.trim();
+
+            if (trimmed.startsWith("mindmap")) {
+                result.add("mindmap");
+                hasHeader = true;
+                continue;
+            }
+
+            if (isPureAsciiDiagramLine(trimmed)) {
+                continue;
+            }
+
+            int indent = Math.max(2, countLeadingSpaces(rawLine));
+            String prefix = " ".repeat(Math.min(indent, 8));
+
+            if (trimmed.startsWith("root")) {
+                String label = extractRootLabel(trimmed);
+                label = sanitizeMindmapLabel(StringUtils.hasText(label) ? label : fallbackTitle);
+
+                result.add("  root((" + label + "))");
+                hasRoot = true;
+                continue;
+            }
+
+            String label = sanitizeMindmapLabel(trimmed);
+
+            if (StringUtils.hasText(label)) {
+                result.add(prefix + label);
+            }
+        }
+
+        if (!hasHeader) {
+            result.add(0, "mindmap");
+        }
+
+        if (!hasRoot) {
+            result.add(1, "  root((" + sanitizeMindmapLabel(fallbackTitle) + "))");
+        }
+
+        return result.size() <= 2 ? "" : String.join("\n", result);
+    }
+
+    private int countLeadingSpaces(String text) {
+        if (text == null) {
+            return 0;
+        }
+
+        int count = 0;
+
+        while (count < text.length() && Character.isWhitespace(text.charAt(count))) {
+            count++;
+        }
+
+        return count;
+    }
+
+    private String extractRootLabel(String text) {
+        if (text == null) {
+            return "";
+        }
+
+        int start = text.indexOf("((");
+        int end = text.lastIndexOf("))");
+
+        if (start >= 0 && end > start) {
+            return text.substring(start + 2, end);
+        }
+
+        int normalStart = text.indexOf('(');
+        int normalEnd = text.lastIndexOf(')');
+
+        if (normalStart >= 0 && normalEnd > normalStart) {
+            return text.substring(normalStart + 1, normalEnd);
+        }
+
+        return text.replace("root", "").trim();
+    }
+
+    private String sanitizeMindmapLabel(String label) {
+        return sanitizeMermaidLabel(label)
+                .replace("-->", " ")
+                .replace("-", " ")
+                .replaceAll("^\\d+\\.\\s*", "")
+                .replaceAll("^[-*•]\\s*", "")
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
+
+    private String sanitizeMermaidLabel(String label) {
+        if (label == null) {
+            return "";
+        }
+
+        String cleaned = label.trim();
+
+        if ((cleaned.startsWith("\"") && cleaned.endsWith("\""))
+                || (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+            cleaned = cleaned.substring(1, cleaned.length() - 1);
+        }
+
+        cleaned = cleaned
+                .replace("\"", "'")
+                .replace(":", " - ")
+                .replace("(", " - ")
+                .replace(")", "")
+                .replace("[", " ")
+                .replace("]", " ")
+                .replace("{", " ")
+                .replace("}", " ")
+                .replace("|", " ")
+                .replace("+", " ")
+                .replace("=", " ")
+                .replace(";", " ")
+                .replace("<", " ")
+                .replace(">", " ")
+                .replace("\\", " ")
+                .replace("/", " ")
+                .replace("\n", " ")
+                .replace("\r", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+
+        if (cleaned.length() > 80) {
+            cleaned = cleaned.substring(0, 80).trim();
+        }
+
+        return cleaned;
     }
 
     private String buildFallbackDiagram(
@@ -1110,41 +1399,33 @@ public class AiServiceImpl implements AiService {
         }
 
         List<String> lines = new ArrayList<>();
+        String plainText = RichTextContent.toPlainText(content);
 
-        String[] rawLines = content.split("[\\n.!?]+");
+        String[] rawLines = plainText.split("[\\n.!?]+");
+
         for (String line : rawLines) {
             String cleaned = line.trim().replaceAll("\\s+", " ");
+
             if (cleaned.length() >= 3) {
                 lines.add(cleaned);
             }
-            if (lines.size() >= 6) break;
+
+            if (lines.size() >= 6) {
+                break;
+            }
         }
 
         if (lines.isEmpty()) {
-            String shortened = content.trim();
+            String shortened = plainText.trim();
+
             if (shortened.length() > 120) {
                 shortened = shortened.substring(0, 120);
             }
+
             lines.add(shortened);
         }
 
         return lines;
-    }
-
-    private String escapeMermaid(String text) {
-        if (text == null) return "";
-        return text
-                .replace("\"", "'")
-                .replace("[", "(")
-                .replace("]", ")")
-                .replace("{", "(")
-                .replace("}", ")")
-                .replace("<", "")
-                .replace(">", "")
-                .replace("\n", " ")
-                .replace("\r", " ")
-                .replaceAll("\\s+", " ")
-                .trim();
     }
 
     private String buildFallbackMindmap(String title, String content) {
@@ -1152,10 +1433,16 @@ public class AiServiceImpl implements AiService {
 
         StringBuilder sb = new StringBuilder();
         sb.append("mindmap\n");
-        sb.append("  root((").append(escapeMermaid(title)).append("))\n");
+        sb.append("  root((")
+                .append(sanitizeMindmapLabel(title))
+                .append("))\n");
 
         for (String line : lines) {
-            sb.append("    ").append(escapeMermaid(line)).append("\n");
+            String label = sanitizeMindmapLabel(line);
+
+            if (StringUtils.hasText(label)) {
+                sb.append("    ").append(label).append("\n");
+            }
         }
 
         return sb.toString();
@@ -1166,15 +1453,29 @@ public class AiServiceImpl implements AiService {
 
         StringBuilder sb = new StringBuilder();
         sb.append("flowchart TD\n");
-        sb.append("  A[").append(escapeMermaid(title)).append("]\n");
+        sb.append("  A[\"")
+                .append(sanitizeMermaidLabel(title))
+                .append("\"]\n");
 
         char current = 'A';
+
         for (int i = 0; i < lines.size(); i++) {
             char next = (char) ('B' + i);
-            sb.append("  ").append(next).append("[")
-                    .append(escapeMermaid(lines.get(i)))
-                    .append("]\n");
-            sb.append("  ").append(current).append(" --> ").append(next).append("\n");
+            String label = sanitizeMermaidLabel(lines.get(i));
+
+            if (!StringUtils.hasText(label)) {
+                continue;
+            }
+
+            sb.append("  ").append(next).append("[\"")
+                    .append(label)
+                    .append("\"]\n");
+
+            sb.append("  ").append(current)
+                    .append(" --> ")
+                    .append(next)
+                    .append("\n");
+
             current = next;
         }
 
@@ -1186,14 +1487,25 @@ public class AiServiceImpl implements AiService {
 
         StringBuilder sb = new StringBuilder();
         sb.append("flowchart LR\n");
-        sb.append("  A[").append(escapeMermaid(title)).append("]\n");
+        sb.append("  A[\"")
+                .append(sanitizeMermaidLabel(title))
+                .append("\"]\n");
 
         for (int i = 0; i < lines.size(); i++) {
             char node = (char) ('B' + i);
-            sb.append("  ").append(node).append("[")
-                    .append(escapeMermaid(lines.get(i)))
-                    .append("]\n");
-            sb.append("  A --> ").append(node).append("\n");
+            String label = sanitizeMermaidLabel(lines.get(i));
+
+            if (!StringUtils.hasText(label)) {
+                continue;
+            }
+
+            sb.append("  ").append(node).append("[\"")
+                    .append(label)
+                    .append("\"]\n");
+
+            sb.append("  A --> ")
+                    .append(node)
+                    .append("\n");
         }
 
         return sb.toString();
@@ -1221,17 +1533,17 @@ public class AiServiceImpl implements AiService {
             return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(result);
         } catch (Exception e) {
             return """
-                {
-                  "title": "Sketchnote",
-                  "blocks": [
                     {
-                      "icon": "📝",
-                      "heading": "Nội dung chính",
-                      "content": "Không thể chuẩn hóa dữ liệu."
+                      "title": "Sketchnote",
+                      "blocks": [
+                        {
+                          "icon": "📝",
+                          "heading": "Nội dung chính",
+                          "content": "Không thể chuẩn hóa dữ liệu."
+                        }
+                      ]
                     }
-                  ]
-                }
-                """;
+                    """;
         }
     }
 }
