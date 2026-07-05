@@ -131,16 +131,29 @@ export default function Notes() {
         return text.length > 110 ? `${text.slice(0, 110)}...` : text
     }
 
+    const parseNgayTuApi = (raw) => {
+        if (!raw) return null
+
+        if (raw instanceof Date) return raw
+
+        const value = String(raw)
+        const hasTimezone = /([zZ]|[+-]\d{2}:?\d{2})$/.test(value)
+        const normalized = hasTimezone ? value : `${value}Z`
+        const date = new Date(normalized)
+
+        return Number.isNaN(date.getTime()) ? null : date
+    }
+
     const layNgayCapNhat = (note) => {
         const raw = note?.updatedAt || note?.createdAt
 
         if (!raw) return 'Vừa xong'
 
-        const date = new Date(raw)
+        const date = parseNgayTuApi(raw)
 
-        if (Number.isNaN(date.getTime())) return 'Vừa xong'
+        if (!date) return 'Vừa xong'
 
-        const diff = Date.now() - date.getTime()
+        const diff = Math.max(0, Date.now() - date.getTime())
         const minutes = Math.floor(diff / 60000)
         const hours = Math.floor(minutes / 60)
         const days = Math.floor(hours / 24)
@@ -1342,6 +1355,7 @@ export default function Notes() {
                                     key={ghiChuHienTai.id}
                                     noteId={ghiChuHienTai.id}
                                     collaborationUrl={collaborationUrl}
+                                    currentUser={nguoiDung}
                                     value={ghiChuHienTai.content || ''}
                                     onChange={content => capNhatTruongGhiChu('content', content)}
                                     onPermissionChange={capNhatQuyenTuCongTac}
@@ -1603,8 +1617,9 @@ export default function Notes() {
                                             <div style={styles.versionList}>
                                                 {lichSuPhienBan.map(version => {
                                                     const preview = layPlainText(version.content || '').trim()
-                                                    const createdAt = version.createdAt
-                                                        ? new Date(version.createdAt).toLocaleString('vi-VN')
+                                                    const versionDate = parseNgayTuApi(version.createdAt)
+                                                    const createdAt = versionDate
+                                                        ? versionDate.toLocaleString('vi-VN')
                                                         : 'Vừa xong'
 
                                                     return (

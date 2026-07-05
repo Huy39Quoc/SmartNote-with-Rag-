@@ -170,8 +170,8 @@ select option { background: var(--bg-surface); }
 }
 .rich-text-editor tr:hover > th,
 .rich-text-editor tr:hover > td {
-  border-top-color: var(--border-blue);
-  border-bottom-color: var(--border-blue);
+  border-top-color: var(--border);
+  border-bottom-color: var(--border);
 }
 .rich-text-editor .column-resize-handle {
   position: absolute;
@@ -179,8 +179,8 @@ select option { background: var(--bg-surface); }
   top: 0;
   bottom: -1px;
   width: 5px;
-  background: var(--accent-blue);
-  opacity: .72;
+  background: var(--text-muted);
+  opacity: .45;
   pointer-events: none;
   z-index: 2;
 }
@@ -194,7 +194,7 @@ body.resize-cursor {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(55, 138, 221, .16);
+  background: transparent;
   pointer-events: none;
 }
 

@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -66,7 +67,13 @@ public class NoteCollaborationHandler extends TextWebSocketHandler {
         NoteRoom room = rooms.computeIfAbsent(note.getId(), ignored -> NoteRoom.from(note));
 
         room.sessions.add(session);
-        sessions.put(session.getId(), new SessionInfo(note.getId(), user.getId(), canEdit));
+        sessions.put(session.getId(), new SessionInfo(
+                note.getId(),
+                user.getId(),
+                user.getEmail(),
+                user.getFullName(),
+                canEdit
+        ));
 
         send(session, Map.of(
                 "type", "init",
@@ -75,22 +82,34 @@ public class NoteCollaborationHandler extends TextWebSocketHandler {
                 "updates", List.copyOf(room.updates),
                 "seeded", room.seeded,
                 "shouldSeed", !room.seeded && canEdit,
-                "canEdit", canEdit
+                "canEdit", canEdit,
+                "sessionId", session.getId()
         ));
+        broadcastPresence(room);
     }
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
         SessionInfo info = sessions.get(session.getId());
 
-        if (info == null || !info.canEdit || !canEdit(info.noteId, info.userId)) {
-            session.close(CloseStatus.NOT_ACCEPTABLE.withReason("No edit access"));
+        if (info == null) {
+            session.close(CloseStatus.NOT_ACCEPTABLE.withReason("No access"));
             return;
         }
 
         JsonNode json = objectMapper.readTree(message.getPayload());
         String type = json.path("type").asText();
+        if ("presence-update".equals(type)) {
+            updatePresence(session, info, json);
+            return;
+        }
+
         if (!"yjs-update".equals(type) && !"yjs-seed".equals(type)) {
+            return;
+        }
+
+        if (!info.canEdit || !canEdit(info.noteId, info.userId)) {
+            session.close(CloseStatus.NOT_ACCEPTABLE.withReason("No edit access"));
             return;
         }
 
@@ -147,6 +166,7 @@ public class NoteCollaborationHandler extends TextWebSocketHandler {
         }
 
         room.sessions.remove(session);
+        broadcastPresence(room);
         if (room.sessions.isEmpty() && room.updates.isEmpty()) {
             rooms.remove(info.noteId);
         }
@@ -266,6 +286,67 @@ public class NoteCollaborationHandler extends TextWebSocketHandler {
         }
     }
 
+    private void updatePresence(WebSocketSession session, SessionInfo info, JsonNode json) {
+        NoteRoom room = rooms.get(info.noteId);
+        if (room == null) {
+            return;
+        }
+
+        int maxPosition = json.path("maxPosition").asInt(0);
+        int from = clamp(json.path("from").asInt(0), 0, maxPosition);
+        int to = clamp(json.path("to").asInt(from), 0, maxPosition);
+        String nextClientId = json.path("clientId").asText(info.clientId);
+        boolean shouldRefreshParticipants = !StringUtils.hasText(info.clientId)
+                || !info.clientId.equals(nextClientId);
+
+        info.clientId = nextClientId;
+        info.from = from;
+        info.to = to;
+        info.active = json.path("active").asBoolean(true);
+
+        if (shouldRefreshParticipants) {
+            broadcastPresence(room);
+        }
+
+        broadcast(room, Map.of(
+                "type", "presence-cursor",
+                "participant", participantPayload(session.getId())
+        ));
+    }
+
+    private void broadcastPresence(NoteRoom room) {
+        broadcast(room, Map.of(
+                "type", "presence-list",
+                "participants", room.sessions.stream()
+                        .map(session -> participantPayload(session.getId()))
+                        .filter(payload -> !payload.isEmpty())
+                        .toList()
+        ));
+    }
+
+    private Map<String, Object> participantPayload(String sessionId) {
+        SessionInfo info = sessions.get(sessionId);
+        if (info == null) {
+            return Map.of();
+        }
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("sessionId", sessionId);
+        payload.put("clientId", info.clientId);
+        payload.put("userId", String.valueOf(info.userId));
+        payload.put("email", info.email);
+        payload.put("fullName", StringUtils.hasText(info.fullName) ? info.fullName : info.email);
+        payload.put("canEdit", info.canEdit);
+        payload.put("from", info.from);
+        payload.put("to", info.to);
+        payload.put("active", info.active);
+        return payload;
+    }
+
+    private int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(value, max));
+    }
+
     private void send(WebSocketSession session, Map<String, ?> payload) throws IOException {
         session.sendMessage(new TextMessage(objectMapper.writeValueAsString(payload)));
     }
@@ -295,11 +376,19 @@ public class NoteCollaborationHandler extends TextWebSocketHandler {
     private static class SessionInfo {
         private final UUID noteId;
         private final UUID userId;
+        private final String email;
+        private final String fullName;
         private boolean canEdit;
+        private String clientId = "";
+        private int from = 0;
+        private int to = 0;
+        private boolean active = true;
 
-        private SessionInfo(UUID noteId, UUID userId, boolean canEdit) {
+        private SessionInfo(UUID noteId, UUID userId, String email, String fullName, boolean canEdit) {
             this.noteId = noteId;
             this.userId = userId;
+            this.email = email;
+            this.fullName = fullName;
             this.canEdit = canEdit;
         }
     }
