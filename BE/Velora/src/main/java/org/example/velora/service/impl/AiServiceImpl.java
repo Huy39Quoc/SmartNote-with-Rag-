@@ -643,17 +643,19 @@ public class AiServiceImpl implements AiService {
     @Override
     public String transcribeAudioFile(String filePath) {
         try {
-            String transcript = chromaDbClient.transcribeAudio(filePath, "vi");
+            String rawTranscript = chromaDbClient.transcribeAudio(filePath, "vi");
 
-            if (transcript == null || transcript.isBlank()) {
+            if (!StringUtils.hasText(rawTranscript)) {
                 throw new BadRequestException("AI không trả về transcript từ file âm thanh.");
             }
 
-            if (transcript.contains("Cần cài Whisper")) {
+            if (rawTranscript.contains("Cần cài Whisper")
+                    || rawTranscript.contains("cài đặt Whisper")
+                    || rawTranscript.contains("Whisper chưa hoạt động")) {
                 throw new BadRequestException("Whisper chưa hoạt động đúng trong AI service.");
             }
 
-            return transcript;
+            return normalizeVietnameseTranscript(rawTranscript);
 
         } catch (Exception e) {
             log.error("Audio transcription failed. filePath={}", filePath, e);
@@ -663,11 +665,170 @@ public class AiServiceImpl implements AiService {
 
     @Override
     public String structureTranscript(String rawTranscript, String topic) {
-        String prompt = getPrompt("audio.transcribe");
-        if (StringUtils.hasText(topic)) {
-            prompt = "Chủ đề: " + topic + "\n\n" + prompt;
+        String cleanedTranscript = normalizeVietnameseTranscript(rawTranscript);
+
+        String safeTopic = StringUtils.hasText(topic)
+                ? topic.trim()
+                : "Ghi chú từ âm thanh";
+
+        String prompt = """
+            Bạn là trợ lý học tập trong ứng dụng Velora SmartNote.
+
+            Nhiệm vụ:
+            Hãy chuyển transcript audio thành một ghi chú học tập rõ ràng, dễ đọc.
+
+            Quy tắc bắt buộc:
+            - Viết bằng tiếng Việt tự nhiên.
+            - Nếu transcript có từ địa phương, hãy chuẩn hóa sang tiếng Việt phổ thông.
+            - Sửa lỗi nhận dạng giọng nói, lỗi dấu câu, lỗi ngắt câu.
+            - Không bịa thêm kiến thức ngoài transcript.
+            - Giữ nguyên các thuật ngữ kỹ thuật như Java, Spring Boot, React, Docker, API, database, AI, RAG.
+            - Nếu có deadline, lịch học, việc cần làm thì tách thành mục riêng.
+            - Chỉ trả về HTML hợp lệ để lưu vào rich text editor.
+            - Không dùng markdown ```.
+
+            Format HTML gợi ý:
+            <h2>Tóm tắt nội dung</h2>
+            <p>...</p>
+            <h3>Ý chính</h3>
+            <ul>
+              <li>...</li>
+            </ul>
+            <h3>Việc cần làm hoặc deadline</h3>
+            <ul>
+              <li>...</li>
+            </ul>
+
+            Chủ đề hoặc tên file:
+            %s
+
+            Transcript:
+            %s
+            """.formatted(safeTopic, cleanedTranscript);
+
+        try {
+            String result = lmStudioClient.complete(prompt);
+
+            if (!StringUtils.hasText(result)) {
+                return buildFallbackStructuredTranscript(cleanedTranscript);
+            }
+
+            return sanitizeStructuredTranscript(result);
+
+        } catch (Exception e) {
+            log.warn("structureTranscript failed, using fallback: {}", e.getMessage());
+            return buildFallbackStructuredTranscript(cleanedTranscript);
         }
-        return lmStudioClient.complete(prompt + "\n\nTranscript:\n" + rawTranscript);
+    }
+
+    private String normalizeVietnameseTranscript(String rawTranscript) {
+        if (!StringUtils.hasText(rawTranscript)) {
+            return "";
+        }
+
+        String cleaned = rawTranscript
+                .replaceAll("\\s+", " ")
+                .replace(" ,", ",")
+                .replace(" .", ".")
+                .replace(" ?", "?")
+                .replace(" !", "!")
+                .trim();
+
+        if (cleaned.length() < 20) {
+            return cleaned;
+        }
+
+        String prompt = """
+            Bạn là công cụ hậu xử lý transcript tiếng Việt.
+
+            Nhiệm vụ:
+            Chuẩn hóa transcript sau thành tiếng Việt phổ thông, rõ nghĩa và dễ đọc.
+
+            Quy tắc bắt buộc:
+            - Chỉ sửa lỗi nhận dạng giọng nói, lỗi dấu câu, lỗi chính tả.
+            - Nếu có từ địa phương phổ biến, hãy chuyển sang tiếng Việt phổ thông.
+            - Không thay đổi ý nghĩa gốc.
+            - Không bịa thêm thông tin.
+            - Giữ nguyên thuật ngữ tiếng Anh và thuật ngữ IT như Java, Spring Boot, React, Docker, API, database, AI, RAG.
+            - Chỉ trả về đoạn transcript đã chuẩn hóa.
+            - Không giải thích.
+            - Không markdown.
+
+            Ví dụ:
+            "bữa ni mình học dô spring bút" -> "Hôm nay mình học về Spring Boot."
+            "cái ni là api dùng để login" -> "Cái này là API dùng để đăng nhập."
+            "mần bài ni trước thứ hai" -> "Làm bài này trước thứ hai."
+
+            Transcript gốc:
+            %s
+            """.formatted(cleaned);
+
+        try {
+            String normalized = lmStudioClient.complete(prompt);
+
+            if (!StringUtils.hasText(normalized)) {
+                return cleaned;
+            }
+
+            return normalized
+                    .replace("```", "")
+                    .trim();
+
+        } catch (Exception e) {
+            log.warn("normalizeVietnameseTranscript failed, using raw transcript: {}", e.getMessage());
+            return cleaned;
+        }
+    }
+
+    private String sanitizeStructuredTranscript(String html) {
+        if (!StringUtils.hasText(html)) {
+            return "";
+        }
+
+        String cleaned = html
+                .replace("```html", "")
+                .replace("```", "")
+                .trim();
+
+        if (!cleaned.contains("<")) {
+            return buildFallbackStructuredTranscript(cleaned);
+        }
+
+        return cleaned;
+    }
+
+    private String buildFallbackStructuredTranscript(String transcript) {
+        String safe = transcript == null ? "" : transcript.trim();
+
+        if (!StringUtils.hasText(safe)) {
+            return """
+                <h2>Ghi chú từ âm thanh</h2>
+                <p>Không có nội dung transcript để tạo ghi chú.</p>
+                """;
+        }
+
+        return """
+            <h2>Tóm tắt nội dung</h2>
+            <p>%s</p>
+            <h3>Ý chính</h3>
+            <ul>
+              <li>Nội dung được tạo tự động từ file âm thanh.</li>
+              <li>Người dùng có thể chỉnh sửa lại ghi chú sau khi tạo.</li>
+            </ul>
+            """.formatted(escapeHtml(safe));
+    }
+
+    private String escapeHtml(String text) {
+        if (text == null) {
+            return "";
+        }
+
+        return text
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#39;");
     }
 
     @Override

@@ -239,16 +239,41 @@ async def transcribe_audio(
         shutil.copyfileobj(file.file, tmp)
 
     try:
-        model = get_whisper_model()
-        result = model.transcribe(
-            temp_path,
-            language=language,
-            fp16=False,
-        )
-        return {
-            "transcript": result.get("text", "").strip(),
-            "language": result.get("language", language),
-        }
+      initial_prompt = (
+          "Đây là audio tiếng Việt, có thể có giọng miền Bắc, miền Trung, miền Nam "
+          "hoặc một số từ địa phương. Nội dung thường liên quan đến học tập, công nghệ thông tin, "
+          "lập trình, deadline, bài tập, thuyết trình, dự án sinh viên. "
+          "Hãy nhận dạng rõ ràng, giữ đúng thuật ngữ tiếng Anh như Java, Spring Boot, React, Docker, API, database."
+      )
+
+      result = model.transcribe(
+          temp_path,
+          language=language or "vi",
+          fp16=False,
+          temperature=0,
+          initial_prompt=initial_prompt,
+          condition_on_previous_text=True,
+      )
+
+      segments = result.get("segments") or []
+      avg_logprob_values = [
+          seg.get("avg_logprob")
+          for seg in segments
+          if isinstance(seg, dict) and seg.get("avg_logprob") is not None
+      ]
+
+      avg_logprob = (
+          sum(avg_logprob_values) / len(avg_logprob_values)
+          if avg_logprob_values
+          else None
+      )
+
+      return {
+          "transcript": result.get("text", "").strip(),
+          "language": result.get("language", language),
+          "segments": len(segments),
+          "avgLogprob": avg_logprob,
+      }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Whisper error: {e}")
     finally:
