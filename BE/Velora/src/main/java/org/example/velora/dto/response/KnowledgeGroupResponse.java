@@ -12,6 +12,7 @@ public class KnowledgeGroupResponse {
     @Data
     @Builder
     public static class Summary {
+
         private UUID id;
         private String groupName;
         private Boolean suggestedByAi;
@@ -22,6 +23,7 @@ public class KnowledgeGroupResponse {
     @Data
     @Builder
     public static class Detail {
+
         private UUID id;
         private String groupName;
         private Boolean suggestedByAi;
@@ -34,9 +36,34 @@ public class KnowledgeGroupResponse {
     @Data
     @Builder
     public static class ClassifyResult {
+
         private String suggestedGroupName;
         private String reasoning;
         private List<UUID> relatedNoteIds;
         private List<String> relatedNoteTitles;
+    }
+
+    @Data
+    @Builder
+    public static class FeedbackResult {
+
+        private UUID id;
+        private UUID noteId;
+        private UUID groupId;
+        private String suggestedGroupName;
+        private String correctedGroupName;
+        private Boolean correct;
+        private String message;
+        private LocalDateTime createdAt;
+    }
+
+    @Data
+    @Builder
+    public static class FeedbackStats {
+
+        private long total;
+        private long correct;
+        private long incorrect;
+        private double accuracyPercent;
     }
 }

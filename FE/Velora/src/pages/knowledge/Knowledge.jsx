@@ -30,7 +30,8 @@ export default function Knowledge() {
     const [hienThemGhiChu, setHienThemGhiChu] = useState(false)
     const [timGhiChu, setTimGhiChu] = useState('')
     const [dangLuuNhom, setDangLuuNhom] = useState(false)
-
+    const [feedbackStats, setFeedbackStats] = useState(null)
+    const [dangGuiFeedbackIds, setDangGuiFeedbackIds] = useState(new Set())
     const tai = async () => {
         setDangTai(true)
         try {
@@ -53,10 +54,18 @@ export default function Knowledge() {
             console.error(error)
         }
     }
-
+    const taiThongKeFeedback = async () => {
+        try {
+            const { data } = await knowledgeApi.layThongKeFeedback()
+            setFeedbackStats(data.data)
+        } catch {
+            setFeedbackStats(null)
+        }
+    }
     useEffect(() => {
         tai()
         taiGhiChu()
+        taiThongKeFeedback()
     }, [])
 
     const chonNhom = async (id) => {
@@ -154,6 +163,74 @@ export default function Knowledge() {
         }
         setDangPhanLoai(false)
     }
+
+    const guiFeedbackPhanLoai = async (note, correct) => {
+        if (!chiTiet || !note) return
+
+        let correctedGroupName = chiTiet.groupName
+
+        if (!correct) {
+            const input = window.prompt(
+                `AI đã phân loại "${note.title}" vào nhóm "${chiTiet.groupName}".\nNhập tên nhóm đúng:`,
+                chiTiet.groupName
+            )
+
+            if (input === null) return
+
+            correctedGroupName = input.trim()
+
+            if (!correctedGroupName) {
+                toast.error('Vui lòng nhập tên nhóm đúng')
+                return
+            }
+        }
+
+        setDangGuiFeedbackIds(prev => {
+            const next = new Set(prev)
+            next.add(note.id)
+            return next
+        })
+
+        try {
+            await knowledgeApi.guiFeedbackPhanLoai({
+                noteId: note.id,
+                groupId: chiTiet.id,
+                suggestedGroupName: chiTiet.groupName,
+                correctedGroupName,
+                correct,
+                aiReasoning: chiTiet.aiReasoning,
+                comment: correct
+                    ? 'Người dùng xác nhận AI phân loại đúng'
+                    : 'Người dùng sửa lại nhóm phân loại AI',
+            })
+
+            toast.success(correct
+                ? 'Đã ghi nhận AI phân loại đúng'
+                : 'Đã ghi nhận và chuyển ghi chú sang nhóm đúng'
+            )
+
+            await tai()
+            await taiThongKeFeedback()
+
+            if (chon) {
+                try {
+                    const { data } = await knowledgeApi.layTheoId(chon)
+                    setChiTiet(data.data)
+                } catch {
+                    setChiTiet(null)
+                }
+            }
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Không thể gửi đánh giá')
+        } finally {
+            setDangGuiFeedbackIds(prev => {
+                const next = new Set(prev)
+                next.delete(note.id)
+                return next
+            })
+        }
+    }
+
     const noteIdsTrongNhom = new Set(chiTiet?.notes?.map(n => n.id) || [])
 
     const ghiChuCoTheThem = tatCaGhiChu.filter(note => {
@@ -196,7 +273,29 @@ export default function Knowledge() {
                     {dangPhanLoai ? <Spinner size={12}/> : <IconSparkles size={12}/>}
                     AI phân loại lại tất cả
                 </button>
+                {feedbackStats && (
+                    <div style={styles.feedbackStats}>
+                        <div style={styles.feedbackStatsTitle}>
+                            Độ chính xác AI
+                        </div>
 
+                        {feedbackStats.total === 0 ? (
+                            <div style={styles.feedbackStatsText}>
+                                Chưa có đánh giá
+                            </div>
+                        ) : (
+                            <>
+                                <div style={styles.feedbackStatsNumber}>
+                                    {feedbackStats.accuracyPercent}%
+                                </div>
+
+                                <div style={styles.feedbackStatsText}>
+                                    Đúng {feedbackStats.correct}/{feedbackStats.total} · Sai {feedbackStats.incorrect}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )}
                 <div style={{flex: 1, overflowY: 'auto'}}>
                     {dangTai
                         ? <div style={{display: 'flex', justifyContent: 'center', padding: 20}}><Spinner/></div>
@@ -380,6 +479,36 @@ export default function Knowledge() {
                                                 >
                                                     <IconX size={12}/>
                                                 </button>
+
+                                                {chiTiet.suggestedByAi && (
+                                                    <div style={styles.feedbackActions}>
+                                                        <button
+                                                            className="btn-ghost"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                guiFeedbackPhanLoai(n, true)
+                                                            }}
+                                                            disabled={dangGuiFeedbackIds.has(n.id)}
+                                                            style={styles.feedbackOkButton}
+                                                            title="AI phân loại đúng"
+                                                        >
+                                                            Đúng
+                                                        </button>
+
+                                                        <button
+                                                            className="btn-ghost"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                guiFeedbackPhanLoai(n, false)
+                                                            }}
+                                                            disabled={dangGuiFeedbackIds.has(n.id)}
+                                                            style={styles.feedbackWrongButton}
+                                                            title="AI phân loại sai"
+                                                        >
+                                                            Sai
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
@@ -478,5 +607,52 @@ const styles = {
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap',
         marginTop: 2,
+    },
+
+    feedbackStats: {
+        margin: '0 10px 8px',
+        padding: '8px 10px',
+        border: '.5px solid var(--border)',
+        borderRadius: 8,
+        background: 'var(--bg-elevated)',
+    },
+
+    feedbackStatsTitle: {
+        fontSize: 10,
+        color: 'var(--text-muted)',
+        marginBottom: 4,
+    },
+
+    feedbackStatsNumber: {
+        fontSize: 18,
+        fontWeight: 700,
+        color: 'var(--accent-green)',
+        lineHeight: 1.1,
+    },
+
+    feedbackStatsText: {
+        fontSize: 10,
+        color: 'var(--text-muted)',
+        marginTop: 3,
+    },
+
+    feedbackActions: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4,
+        alignSelf: 'center',
+        flexShrink: 0,
+    },
+
+    feedbackOkButton: {
+        padding: '3px 7px',
+        fontSize: 10,
+        color: 'var(--accent-green)',
+    },
+
+    feedbackWrongButton: {
+        padding: '3px 7px',
+        fontSize: 10,
+        color: 'var(--accent-red)',
     },
 }
