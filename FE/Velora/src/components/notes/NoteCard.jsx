@@ -1,6 +1,9 @@
 import { IconBookmark, IconBookmarkFilled } from '@tabler/icons-react'
+import { richTextToPlainText } from '../../utils/richText'
 
 export default function NoteCard({ note, onClick, active }) {
+  const preview = richTextToPlainText(note.contentPreview || note.content || '')
+
   return (
     <div onClick={onClick} style={{
       ...styles.card,
@@ -8,7 +11,7 @@ export default function NoteCard({ note, onClick, active }) {
       borderLeft: active ? '2px solid var(--accent-blue)' : '2px solid transparent',
     }}>
       <div style={styles.title}>{note.title || 'Ghi chú không có tiêu đề'}</div>
-      <div style={styles.preview}>{note.contentPreview || '—'}</div>
+      <div style={styles.preview}>{preview || '—'}</div>
       <div style={styles.meta}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {note.tags?.slice(0, 3).map(t => (

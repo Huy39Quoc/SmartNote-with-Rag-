@@ -12,9 +12,11 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -31,8 +33,6 @@ public class NoteController {
             @Valid @RequestBody NoteRequest.Create req
     ) {
 
-        System.out.println("noi dung " + req.getContent());
-        System.out.println("tieu de " + req.getTitle());
         return ResponseEntity.ok(ApiResponse.ok(noteService.create(u.getUserId(), req)));
     }
 
@@ -59,6 +59,31 @@ public class NoteController {
             @Valid @RequestBody NoteRequest.Update req
     ) {
         return ResponseEntity.ok(ApiResponse.ok(noteService.update(u.getUserId(), id, req)));
+    }
+
+    @GetMapping("/{id}/versions")
+    public ResponseEntity<ApiResponse<List<NoteResponse.Version>>> getVersions(
+            @AuthenticationPrincipal UserDetailsImpl.UserDetailsWithId u,
+            @PathVariable UUID id
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(noteService.getVersions(u.getUserId(), id)));
+    }
+
+    @PostMapping("/{id}/versions/{versionId}/restore")
+    public ResponseEntity<ApiResponse<NoteResponse.Detail>> restoreVersion(
+            @AuthenticationPrincipal UserDetailsImpl.UserDetailsWithId u,
+            @PathVariable UUID id,
+            @PathVariable UUID versionId
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(noteService.restoreVersion(u.getUserId(), id, versionId)));
+    }
+
+    @GetMapping("/{id}/events")
+    public SseEmitter subscribe(
+            @PathVariable UUID id,
+            @RequestParam String token
+    ) {
+        return noteService.subscribeToNote(token, id);
     }
 
     @DeleteMapping("/{id}")

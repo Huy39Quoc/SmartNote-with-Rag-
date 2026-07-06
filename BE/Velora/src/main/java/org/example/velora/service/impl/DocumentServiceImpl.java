@@ -1,7 +1,6 @@
 package org.example.velora.service.impl;
 
 import org.example.velora.util.ChromaDbClient;
-import org.example.velora.dto.PackageValidationDto;
 import org.example.velora.dto.request.DocumentRequest;
 import org.example.velora.dto.response.DocumentResponse;
 import org.example.velora.entity.Document;
@@ -10,10 +9,12 @@ import org.example.velora.entity.User;
 import org.example.velora.exception.BadRequestException;
 import org.example.velora.exception.ResourceNotFoundException;
 import org.example.velora.repository.DocumentRepository;
+import org.example.velora.repository.DocumentShareRepository;
 import org.example.velora.repository.NoteRepository;
 import org.example.velora.repository.UserRepository;
 import org.example.velora.service.AiService;
 import org.example.velora.service.DocumentService;
+import org.example.velora.service.UserPackageService;
 import org.example.velora.util.FileExtractor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,16 +30,22 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.example.velora.repository.DocumentShareRepository;
+
 import java.io.IOException;
 import java.nio.file.*;
-import java.util.*;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @Transactional
 @Slf4j
 public class DocumentServiceImpl implements DocumentService {
+
+    private static final String FEATURE_AI_AUDIO = "AI_AUDIO";
+    private static final String FEATURE_AI_ANALYZE = "AI_ANALYZE";
+    private static final String FEATURE_AI_CHAT = "AI_CHAT";
 
     private final DocumentRepository documentRepository;
     private final UserRepository userRepository;
@@ -47,6 +54,8 @@ public class DocumentServiceImpl implements DocumentService {
     private final ChromaDbClient chromaDbClient;
     private final FileExtractor fileExtractor;
     private final DocumentShareRepository documentShareRepository;
+    private final UserPackageService userPackageService;
+
     @Autowired
     private ApplicationContext applicationContext;
 
@@ -56,14 +65,11 @@ public class DocumentServiceImpl implements DocumentService {
             ".mp3", ".wav", ".m4a", ".webm", ".ogg", ".flac", ".aac"
     );
 
-    // ── Upload ────────────────────────────────────────────────────────────
-
     @Override
     public DocumentResponse.Summary upload(UUID userId, MultipartFile file) {
         User user = getUser(userId);
 
-        // Validate storage TRƯỚC khi lưu — tránh file rác trên disk khi limit vượt
-        PackageValidationDto.validateStorageLimit(user, file.getSize());
+        userPackageService.checkStorageLimit(user, file.getSize());
 
         String originalName = file.getOriginalFilename();
         Document.FileType fileType = resolveFileType(originalName);
@@ -105,8 +111,6 @@ public class DocumentServiceImpl implements DocumentService {
         return toSummary(doc);
     }
 
-    // ── Async processing — internal only, không cần userId ───────────────
-
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void processAsync(UUID docId) {
@@ -144,8 +148,12 @@ public class DocumentServiceImpl implements DocumentService {
                 String text = fileExtractor.extract(doc.getStoragePath(), doc.getFileType());
                 doc.setExtractedText(text);
                 log.info("Text extracted length={} for doc={}", text == null ? 0 : text.length(), docId);
-                embedded = chromaDbClient.embed(docId.toString(), text,
-                        doc.getUser().getId().toString(), "document");
+                embedded = chromaDbClient.embed(
+                        docId.toString(),
+                        text,
+                        doc.getUser().getId().toString(),
+                        "document"
+                );
             }
 
             doc.setIsEmbedded(embedded);
@@ -161,19 +169,24 @@ public class DocumentServiceImpl implements DocumentService {
         documentRepository.save(doc);
     }
 
-    // ── Business methods — tất cả đi qua ownerOnly() ─────────────────────
-
     @Override
-    public DocumentResponse.AudioResult transcribeAudio(UUID userId, UUID docId,
-                                                        DocumentRequest.TranscribeAudio req) {
+    public DocumentResponse.AudioResult transcribeAudio(
+            UUID userId,
+            UUID docId,
+            DocumentRequest.TranscribeAudio req
+    ) {
         User user = getUser(userId);
-        PackageValidationDto.validateAiUsage(user, "AI_AUDIO", userRepository);
+        userPackageService.checkAiUsage(user, FEATURE_AI_AUDIO);
 
         Document doc = ownerOnly(userId, docId);
-        if (doc.getFileType() != Document.FileType.AUDIO)
+
+        if (doc.getFileType() != Document.FileType.AUDIO) {
             throw new BadRequestException("File này không phải audio");
-        if (doc.getStatus() != Document.Status.DONE)
+        }
+
+        if (doc.getStatus() != Document.Status.DONE) {
             throw new BadRequestException("Audio chưa xử lý xong (trạng thái: " + doc.getStatus() + ")");
+        }
 
         String raw = doc.getAudioTranscript();
 
@@ -208,51 +221,67 @@ public class DocumentServiceImpl implements DocumentService {
             createdNoteId = note.getId();
         }
 
-        PackageValidationDto.incrementAiUsage(user, userRepository);
+        userPackageService.increaseAiUsage(user);
 
         return DocumentResponse.AudioResult.builder()
-                .documentId(docId).rawTranscript(raw)
-                .structuredNote(structured).noteTitle(title)
-                .createdNoteId(createdNoteId).build();
+                .documentId(docId)
+                .rawTranscript(raw)
+                .structuredNote(structured)
+                .noteTitle(title)
+                .createdNoteId(createdNoteId)
+                .build();
     }
 
     @Override
-    public DocumentResponse.AnalysisResult analyze(UUID userId, UUID docId,
-                                                   DocumentRequest.Analyze req) {
+    public DocumentResponse.AnalysisResult analyze(
+            UUID userId,
+            UUID docId,
+            DocumentRequest.Analyze req
+    ) {
         User user = getUser(userId);
-        PackageValidationDto.validateAiUsage(user, "AI_ANALYZE", userRepository);
+        userPackageService.checkAiUsage(user, FEATURE_AI_ANALYZE);
 
         Document doc = ownerOnly(userId, docId);
-        if (doc.getStatus() != Document.Status.DONE)
+
+        if (doc.getStatus() != Document.Status.DONE) {
             throw new BadRequestException("Tài liệu chưa xử lý xong");
+        }
 
         String content = doc.getFileType() == Document.FileType.AUDIO
-                ? doc.getAudioTranscript() : doc.getExtractedText();
-        if (content == null)
+                ? doc.getAudioTranscript()
+                : doc.getExtractedText();
+
+        if (content == null) {
             throw new BadRequestException("Không có nội dung để phân tích");
+        }
 
         DocumentResponse.AnalysisResult result = aiService.analyzeDocument(content, req.getInstruction());
-        PackageValidationDto.incrementAiUsage(user, userRepository);
+        userPackageService.increaseAiUsage(user);
+
         return result;
     }
 
     @Override
     public DocumentResponse.AskResult ask(UUID userId, UUID docId, DocumentRequest.Ask req) {
         User user = getUser(userId);
-        PackageValidationDto.validateAiUsage(user, "AI_CHAT", userRepository);
+        userPackageService.checkAiUsage(user, FEATURE_AI_CHAT);
 
         Document doc = ownerOnly(userId, docId);
-        if (doc.getStatus() != Document.Status.DONE || !Boolean.TRUE.equals(doc.getIsEmbedded()))
+
+        if (doc.getStatus() != Document.Status.DONE || !Boolean.TRUE.equals(doc.getIsEmbedded())) {
             throw new BadRequestException("Tài liệu chưa xử lý xong hoặc chưa được embedding");
+        }
 
         List<String> chunks = chromaDbClient.search(req.getQuestion(), userId.toString(), docId.toString());
         String answer = aiService.chatWithContext(req.getQuestion(), chunks);
 
-        PackageValidationDto.incrementAiUsage(user, userRepository);
+        userPackageService.increaseAiUsage(user);
 
         return DocumentResponse.AskResult.builder()
-                .answer(answer).sourceParagraphs(chunks)
-                .confidence(chunks.isEmpty() ? 0.3 : 0.85).build();
+                .answer(answer)
+                .sourceParagraphs(chunks)
+                .confidence(chunks.isEmpty() ? 0.3 : 0.85)
+                .build();
     }
 
     @Override
@@ -261,26 +290,35 @@ public class DocumentServiceImpl implements DocumentService {
         Page<Document> page = documentRepository.findByUserIdOrderByUploadedAtDesc(userId, pageable);
         return DocumentResponse.Page.builder()
                 .content(page.getContent().stream().map(this::toSummary).toList())
-                .pageNumber(page.getNumber()).pageSize(page.getSize())
+                .pageNumber(page.getNumber())
+                .pageSize(page.getSize())
                 .totalElements(page.getTotalElements())
-                .totalPages(page.getTotalPages()).last(page.isLast()).build();
+                .totalPages(page.getTotalPages())
+                .last(page.isLast())
+                .build();
     }
 
     @Override
     @Transactional(readOnly = true)
     public DocumentResponse.Detail getById(UUID userId, UUID docId) {
-        return toDetail(ownerOnly(userId, docId));
+        // Cho phép cả owner lẫn người được chia sẻ (VIEW/EDIT) xem chi tiết.
+        // Các thao tác phá hủy (delete, analyze, ask) vẫn giữ nguyên ownerOnly().
+        return toDetail(accessibleDocument(userId, docId));
     }
 
     @Override
     public void delete(UUID userId, UUID docId) {
         Document doc = ownerOnly(userId, docId);
-        try { Files.deleteIfExists(Paths.get(doc.getStoragePath())); } catch (IOException ignored) {}
+
+        try {
+            Files.deleteIfExists(Paths.get(doc.getStoragePath()));
+        } catch (IOException ignored) {
+        }
+
         chromaDbClient.delete(docId.toString());
         documentRepository.delete(doc);
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────
     private Document accessibleDocument(UUID userId, UUID docId) {
         Document doc = documentRepository.findById(docId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tài liệu không tồn tại"));
@@ -289,10 +327,7 @@ public class DocumentServiceImpl implements DocumentService {
             return doc;
         }
 
-        boolean shared = documentShareRepository.existsByDocumentIdAndSharedWithId(
-                docId,
-                userId
-        );
+        boolean shared = documentShareRepository.existsByDocumentIdAndSharedWithId(docId, userId);
 
         if (!shared) {
             throw new ResourceNotFoundException("Tài liệu không tồn tại");
@@ -300,16 +335,15 @@ public class DocumentServiceImpl implements DocumentService {
 
         return doc;
     }
-    /**
-     * Ownership check: chỉ đúng owner mới được truy cập.
-     * Admin KHÔNG bypass được — trả 404 thay vì 403
-     * để không lộ sự tồn tại của tài liệu (security by obscurity).
-     */
+
     private Document ownerOnly(UUID userId, UUID docId) {
         Document doc = documentRepository.findById(docId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tài liệu không tồn tại"));
-        if (!doc.getUser().getId().equals(userId))
+
+        if (!doc.getUser().getId().equals(userId)) {
             throw new ResourceNotFoundException("Tài liệu không tồn tại");
+        }
+
         return doc;
     }
 
@@ -319,30 +353,58 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     private Document.FileType resolveFileType(String name) {
-        if (name == null) throw new BadRequestException("Tên file không hợp lệ");
-        String lower = name.toLowerCase();
-        if (lower.endsWith(".pdf"))  return Document.FileType.PDF;
-        if (lower.endsWith(".docx")) return Document.FileType.DOCX;
-        if (lower.endsWith(".txt"))  return Document.FileType.TXT;
-        for (String ext : AUDIO_EXTENSIONS) {
-            if (lower.endsWith(ext)) return Document.FileType.AUDIO;
+        if (name == null) {
+            throw new BadRequestException("Tên file không hợp lệ");
         }
+
+        String lower = name.toLowerCase();
+
+        if (lower.endsWith(".pdf")) {
+            return Document.FileType.PDF;
+        }
+
+        if (lower.endsWith(".docx")) {
+            return Document.FileType.DOCX;
+        }
+
+        if (lower.endsWith(".txt")) {
+            return Document.FileType.TXT;
+        }
+
+        for (String ext : AUDIO_EXTENSIONS) {
+            if (lower.endsWith(ext)) {
+                return Document.FileType.AUDIO;
+            }
+        }
+
         throw new BadRequestException("Chỉ hỗ trợ PDF, DOCX, TXT, MP3, WAV, M4A, WEBM, OGG");
     }
 
     private DocumentResponse.Summary toSummary(Document d) {
         return DocumentResponse.Summary.builder()
-                .id(d.getId()).originalName(d.getOriginalName()).fileType(d.getFileType())
-                .fileSize(d.getFileSize()).status(d.getStatus())
-                .isEmbedded(d.getIsEmbedded()).uploadedAt(d.getUploadedAt()).build();
+                .id(d.getId())
+                .originalName(d.getOriginalName())
+                .fileType(d.getFileType())
+                .fileSize(d.getFileSize())
+                .status(d.getStatus())
+                .isEmbedded(d.getIsEmbedded())
+                .uploadedAt(d.getUploadedAt())
+                .build();
     }
 
     private DocumentResponse.Detail toDetail(Document d) {
         return DocumentResponse.Detail.builder()
-                .id(d.getId()).originalName(d.getOriginalName()).fileType(d.getFileType())
-                .fileSize(d.getFileSize()).status(d.getStatus()).isEmbedded(d.getIsEmbedded())
-                .aiSummary(d.getAiSummary()).audioTranscript(d.getAudioTranscript())
+                .id(d.getId())
+                .originalName(d.getOriginalName())
+                .fileType(d.getFileType())
+                .fileSize(d.getFileSize())
+                .status(d.getStatus())
+                .isEmbedded(d.getIsEmbedded())
+                .aiSummary(d.getAiSummary())
+                .audioTranscript(d.getAudioTranscript())
                 .audioDurationSeconds(d.getAudioDurationSeconds())
-                .uploadedAt(d.getUploadedAt()).updatedAt(d.getUpdatedAt()).build();
+                .uploadedAt(d.getUploadedAt())
+                .updatedAt(d.getUpdatedAt())
+                .build();
     }
 }

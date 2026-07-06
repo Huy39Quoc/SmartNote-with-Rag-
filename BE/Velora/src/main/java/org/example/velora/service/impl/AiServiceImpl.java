@@ -35,28 +35,28 @@ public class AiServiceImpl implements AiService {
 
     @Override
     public NoteResponse.AiResult improveNote(String content, String title,
-                                             NoteRequest.AiImprove.AiAction action) {
+            NoteRequest.AiImprove.AiAction action) {
         NoteResponse.AiResult.AiResultBuilder b = NoteResponse.AiResult.builder().action(action.name());
         try {
             switch (action) {
                 case SUMMARIZE ->
-                        b.summary(lmStudioClient.complete(
-                                getPrompt("note.summarize") + "\n\n" + content));
+                    b.summary(lmStudioClient.complete(
+                            getPrompt("note.summarize") + "\n\n" + content));
                 case STRUCTURE ->
-                        b.improvedContent(lmStudioClient.complete(
-                                getPrompt("note.structure") + "\n\n" + content));
+                    b.improvedContent(lmStudioClient.complete(
+                            getPrompt("note.structure") + "\n\n" + content));
                 case SUGGEST_TITLE -> {
                     String raw = lmStudioClient.complete(getPrompt("note.suggest_title") + "\n\n" + content);
                     List<String> titles = parseJsonArray(raw);
                     b.suggestedTitle(titles.isEmpty() ? "Ghi chú mới" : titles.get(0)).keyPoints(titles);
                 }
                 case CREATE_CHECKLIST ->
-                        b.checklist(parseJsonArray(
-                                lmStudioClient.complete(getPrompt("note.checklist") + "\n\n" + content)));
+                    b.checklist(parseJsonArray(
+                            lmStudioClient.complete(getPrompt("note.checklist") + "\n\n" + content)));
                 case IMPROVE_ALL ->
-                        b
-                                .summary(lmStudioClient.complete(getPrompt("note.summarize") + "\n\n" + content))
-                                .improvedContent(lmStudioClient.complete(getPrompt("note.structure") + "\n\n" + content));
+                    b
+                            .summary(lmStudioClient.complete(getPrompt("note.summarize") + "\n\n" + content))
+                            .improvedContent(lmStudioClient.complete(getPrompt("note.structure") + "\n\n" + content));
             }
         } catch (Exception e) {
             log.error("improveNote error: {}", e.getMessage());
@@ -79,7 +79,7 @@ public class AiServiceImpl implements AiService {
             Map<String, Object> parsed = objectMapper.readValue(
                     cleanJson(raw, '{'),
                     new TypeReference<Map<String, Object>>() {
-                    }
+            }
             );
 
             @SuppressWarnings("unchecked")
@@ -223,7 +223,7 @@ public class AiServiceImpl implements AiService {
             List<Map<String, Object>> items = objectMapper.readValue(
                     json,
                     new TypeReference<List<Map<String, Object>>>() {
-                    }
+            }
             );
 
             List<ScheduleResponse.Item> extracted = new ArrayList<>();
@@ -512,7 +512,7 @@ public class AiServiceImpl implements AiService {
             Map<String, Object> parsed = objectMapper.readValue(
                     extractJsonObject(raw),
                     new TypeReference<Map<String, Object>>() {
-                    }
+            }
             );
 
             String groupName = asText(parsed.get("groupName"));
@@ -732,9 +732,9 @@ public class AiServiceImpl implements AiService {
 
             AiFlashcardItem[] items
                     = objectMapper.readValue(
-                    cleanJson,
-                    AiFlashcardItem[].class
-            );
+                            cleanJson,
+                            AiFlashcardItem[].class
+                    );
 
             for (AiFlashcardItem item : items) {
 
@@ -840,7 +840,8 @@ public class AiServiceImpl implements AiService {
             """;
 
         return switch (diagramType) {
-            case MINDMAP -> """
+            case MINDMAP ->
+                """
                 %s
 
                 Hãy tạo sơ đồ Mermaid mindmap từ ghi chú sau.
@@ -865,7 +866,8 @@ public class AiServiceImpl implements AiService {
                 %s
                 """.formatted(common, title, content);
 
-            case FLOWCHART -> """
+            case FLOWCHART ->
+                """
                 %s
 
                 Hãy tạo sơ đồ Mermaid flowchart từ ghi chú sau.
@@ -889,30 +891,38 @@ public class AiServiceImpl implements AiService {
                 %s
                 """.formatted(common, title, content);
 
-            case ARCHITECTURE -> """
-                %s
+            case ARCHITECTURE ->
+                """
+    %s
 
-                Hãy tạo sơ đồ Mermaid flowchart mô tả cấu trúc/kiến trúc từ ghi chú sau.
+    Hãy tạo Mermaid flowchart LR từ ghi chú sau.
 
-                BẮT BUỘC:
-                - Chỉ trả về code Mermaid.
-                - Dòng đầu tiên phải là: flowchart LR
-                - Biểu diễn dạng các khối thành phần và mối liên hệ.
-                - Nếu nội dung không phải hệ thống, hãy nhóm thành các khối kiến thức.
+    BẮT BUỘC:
+    - Chỉ trả về code Mermaid.
+    - Dòng đầu tiên phải là: flowchart LR
+    - Mỗi node phải dùng dạng: A["Nội dung"]
+    - Không dùng dấu ngoặc tròn () trong label.
+    - Không dùng dấu hai chấm : trong label.
+    - Không dùng dấu chấm phẩy ;.
+    - Không dùng cú pháp A & B & C --> D.
+    - Nếu nhiều node cùng trỏ đến một node, hãy viết từng dòng riêng.
+    - Dùng dấu gạch ngang - thay cho dấu ngoặc hoặc dấu hai chấm.
 
-                Ví dụ format:
-                flowchart LR
-                  A[Frontend] --> B[Backend]
-                  B --> C[Database]
+    Ví dụ đúng:
+    flowchart LR
+      A["Frontend React"] --> B["Spring Boot Backend"]
+      B --> C["SQL Server Database"]
+      B --> D["FastAPI AI Service"]
 
-                Tiêu đề:
-                %s
+    Tiêu đề:
+    %s
 
-                Nội dung:
-                %s
-                """.formatted(common, title, content);
+    Nội dung:
+    %s
+    """.formatted(common, title, content);
 
-            case SKETCHNOTE -> """
+            case SKETCHNOTE ->
+                """
                 %s
 
                 Hãy tạo Sketchnote JSON từ ghi chú sau.
@@ -1028,10 +1038,14 @@ public class AiServiceImpl implements AiService {
                 .trim();
 
         return switch (diagramType) {
-            case SKETCHNOTE -> normalizeSketchnote(cleaned, title, content);
-            case MINDMAP -> normalizeMindmap(cleaned, title, content);
-            case FLOWCHART -> normalizeFlowchart(cleaned, title, content, false);
-            case ARCHITECTURE -> normalizeFlowchart(cleaned, title, content, true);
+            case SKETCHNOTE ->
+                normalizeSketchnote(cleaned, title, content);
+            case MINDMAP ->
+                normalizeMindmap(cleaned, title, content);
+            case FLOWCHART ->
+                normalizeFlowchart(cleaned, title, content, false);
+            case ARCHITECTURE ->
+                normalizeFlowchart(cleaned, title, content, true);
         };
     }
 
@@ -1078,11 +1092,14 @@ public class AiServiceImpl implements AiService {
             index = indexLr;
         } else {
             int generic = cleaned.indexOf("flowchart");
-            if (generic >= 0) index = generic;
+            if (generic >= 0) {
+                index = generic;
+            }
         }
 
         if (index >= 0) {
-            return cleaned.substring(index).trim();
+            String mermaid = cleaned.substring(index).trim();
+            return sanitizeFlowchartMermaid(mermaid);
         }
 
         return architecture
@@ -1096,10 +1113,14 @@ public class AiServiceImpl implements AiService {
             NoteRequest.GenerateDiagram.DiagramType diagramType
     ) {
         return switch (diagramType) {
-            case MINDMAP -> buildFallbackMindmap(title, content);
-            case FLOWCHART -> buildFallbackFlowchart(title, content);
-            case ARCHITECTURE -> buildFallbackArchitecture(title, content);
-            case SKETCHNOTE -> buildFallbackSketchnote(title, content);
+            case MINDMAP ->
+                buildFallbackMindmap(title, content);
+            case FLOWCHART ->
+                buildFallbackFlowchart(title, content);
+            case ARCHITECTURE ->
+                buildFallbackArchitecture(title, content);
+            case SKETCHNOTE ->
+                buildFallbackSketchnote(title, content);
         };
     }
 
@@ -1116,7 +1137,9 @@ public class AiServiceImpl implements AiService {
             if (cleaned.length() >= 3) {
                 lines.add(cleaned);
             }
-            if (lines.size() >= 6) break;
+            if (lines.size() >= 6) {
+                break;
+            }
         }
 
         if (lines.isEmpty()) {
@@ -1131,7 +1154,9 @@ public class AiServiceImpl implements AiService {
     }
 
     private String escapeMermaid(String text) {
-        if (text == null) return "";
+        if (text == null) {
+            return "";
+        }
         return text
                 .replace("\"", "'")
                 .replace("[", "(")
@@ -1165,14 +1190,14 @@ public class AiServiceImpl implements AiService {
 
         StringBuilder sb = new StringBuilder();
         sb.append("flowchart TD\n");
-        sb.append("  A[").append(escapeMermaid(title)).append("]\n");
+        sb.append("  A[\"").append(escapeMermaid(title)).append("\"]\n");
 
         char current = 'A';
         for (int i = 0; i < lines.size(); i++) {
             char next = (char) ('B' + i);
-            sb.append("  ").append(next).append("[")
+            sb.append("  ").append(next).append("[\"")
                     .append(escapeMermaid(lines.get(i)))
-                    .append("]\n");
+                    .append("\"]\n");
             sb.append("  ").append(current).append(" --> ").append(next).append("\n");
             current = next;
         }
@@ -1232,5 +1257,137 @@ public class AiServiceImpl implements AiService {
                 }
                 """;
         }
+    }
+
+    private String sanitizeMermaid(String mermaid) {
+        if (mermaid == null) {
+            return "";
+        }
+
+        return mermaid
+                .replace("(", " - ")
+                .replace(")", "")
+                .replace(":", " - ")
+                .replaceAll("\\s+", " ")
+                .replace("flowchart LR ", "flowchart LR\n  ")
+                .replace("flowchart TD ", "flowchart TD\n  ")
+                .trim();
+    }
+
+    private String sanitizeFlowchartMermaid(String mermaid) {
+        if (!StringUtils.hasText(mermaid)) {
+            return "";
+        }
+
+        String[] lines = mermaid
+                .replace("```mermaid", "")
+                .replace("```", "")
+                .replace("\r", "")
+                .split("\n");
+
+        List<String> result = new ArrayList<>();
+
+        for (String rawLine : lines) {
+            String line = rawLine.trim();
+
+            if (!StringUtils.hasText(line)) {
+                continue;
+            }
+
+            line = line.replace(";", "");
+
+            if (line.startsWith("flowchart")) {
+                result.add(line);
+                continue;
+            }
+
+            List<String> expanded = expandAmpersandArrowLine(line);
+
+            for (String item : expanded) {
+                result.add(sanitizeFlowchartLine(item));
+            }
+        }
+
+        if (result.isEmpty()) {
+            return "flowchart TD\n  A[\"Không thể tạo sơ đồ\"]";
+        }
+
+        return String.join("\n", result);
+    }
+
+    private List<String> expandAmpersandArrowLine(String line) {
+        if (!line.contains("&") || !line.contains("-->")) {
+            return List.of(line);
+        }
+
+        String[] parts = line.split("-->", 2);
+        if (parts.length != 2) {
+            return List.of(line);
+        }
+
+        String left = parts[0].trim();
+        String right = parts[1].trim();
+
+        if (!left.contains("&")) {
+            return List.of(line);
+        }
+
+        List<String> lines = new ArrayList<>();
+        String[] sources = left.split("&");
+
+        for (String source : sources) {
+            String sourceNode = source.trim();
+            if (StringUtils.hasText(sourceNode)) {
+                lines.add(sourceNode + " --> " + right);
+            }
+        }
+
+        return lines.isEmpty() ? List.of(line) : lines;
+    }
+
+    private String sanitizeFlowchartLine(String line) {
+        String sanitized = line;
+
+        Pattern nodePattern = Pattern.compile("([A-Za-z][A-Za-z0-9_]*)\\s*[\\[\\(\\{]([^\\]\\)\\}]+)[\\]\\)\\}]");
+        Matcher matcher = nodePattern.matcher(sanitized);
+
+        StringBuffer sb = new StringBuffer();
+
+        while (matcher.find()) {
+            String nodeId = matcher.group(1);
+            String label = sanitizeMermaidLabel(matcher.group(2));
+
+            matcher.appendReplacement(
+                    sb,
+                    Matcher.quoteReplacement(nodeId + "[\"" + label + "\"]")
+            );
+        }
+
+        matcher.appendTail(sb);
+
+        return "  " + sb.toString().trim();
+    }
+
+    private String sanitizeMermaidLabel(String label) {
+        if (label == null) {
+            return "";
+        }
+
+        return label
+                .replace("\"", "'")
+                .replace(":", " - ")
+                .replace("(", " - ")
+                .replace(")", "")
+                .replace("[", "")
+                .replace("]", "")
+                .replace("{", "")
+                .replace("}", "")
+                .replace(";", "")
+                .replace("<", "")
+                .replace(">", "")
+                .replace("\n", " ")
+                .replace("\r", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 }

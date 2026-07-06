@@ -14,5 +14,7 @@ public interface NoteShareService {
 
     List<NoteShareResponse.Item> getSharedWithMe(UUID userId);
 
+    NoteShareResponse.Item updatePermission(UUID ownerId, UUID shareId, NoteShareRequest.UpdatePermission request);
+
     void revokeShare(UUID ownerId, UUID shareId);
 }

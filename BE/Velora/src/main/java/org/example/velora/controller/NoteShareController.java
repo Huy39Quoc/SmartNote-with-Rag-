@@ -52,6 +52,18 @@ public class NoteShareController {
         ));
     }
 
+    @PatchMapping("/{shareId}")
+    public ResponseEntity<ApiResponse<NoteShareResponse.Item>> updatePermission(
+            @AuthenticationPrincipal UserDetailsImpl.UserDetailsWithId user,
+            @PathVariable UUID shareId,
+            @Valid @RequestBody NoteShareRequest.UpdatePermission request
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                "ÄÃ£ cáº­p nháº­t quyá»n chia sáº»",
+                noteShareService.updatePermission(user.getUserId(), shareId, request)
+        ));
+    }
+
     @DeleteMapping("/{shareId}")
     public ResponseEntity<ApiResponse<Void>> revokeShare(
             @AuthenticationPrincipal UserDetailsImpl.UserDetailsWithId user,

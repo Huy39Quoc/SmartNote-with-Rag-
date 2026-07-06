@@ -63,6 +63,31 @@ public class NoteResponse {
 
     @Data
     @Builder
+    public static class Version {
+
+        private UUID id;
+        private UUID noteId;
+        private Integer versionNumber;
+        private String title;
+        private String content;
+        private String editedByName;
+        private String editedByEmail;
+        private LocalDateTime createdAt;
+    }
+
+    @Data
+    @Builder
+    public static class RealtimeEvent {
+
+        private String type;
+        private String editorSessionId;
+        private String updatedByName;
+        private String updatedByEmail;
+        private Detail note;
+    }
+
+    @Data
+    @Builder
     public static class DiagramResult {
 
         private UUID noteId;

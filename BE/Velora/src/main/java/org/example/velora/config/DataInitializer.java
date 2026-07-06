@@ -93,28 +93,28 @@ public class DataInitializer implements CommandLineRunner {
         );
 
         upsertPackage(
-                "PRO",
-                49000.0,
-                390000.0,
-                "Gói Pro mở khóa ghi chú không giới hạn, AI nâng cao, flashcard, deadline thông minh và export tài liệu.",
-                -1,
-                -1,
-                2,
-                3,
-                "TAG_SUBJECT,CHECKLIST_BASIC,AI_NOTE_FORMAT,AI_SUMMARY_BASIC,AI_SUMMARY_ADVANCED,AI_CHAT,AI_ANALYZE,DOCUMENT_UPLOAD,EXTRACT_SCHEDULE,DEADLINE_MANAGEMENT,PRIORITY_SUGGESTION,AI_FLASHCARD,EXPORT_FILE,AI_AUDIO"
-        );
+        "PRO",
+        49000.0,
+        390000.0,
+        "Gói Pro mở khóa ghi chú không giới hạn, AI nâng cao, flashcard, deadline thông minh và export tài liệu.",
+        -1,
+        -1,
+        2,
+        3,
+        "TAG_SUBJECT,CHECKLIST_BASIC,AI_NOTE_FORMAT,AI_SUMMARY_BASIC,AI_SUMMARY_ADVANCED,AI_CHAT,AI_ANALYZE,DOCUMENT_UPLOAD,EXTRACT_SCHEDULE,DEADLINE_MANAGEMENT,PRIORITY_SUGGESTION,AI_FLASHCARD,EXPORT_FILE,AI_AUDIO"
+);
 
         upsertPackage(
-                "PLUS",
-                99000.0,
-                790000.0,
-                "Gói Plus dành cho nhóm học tập/team nhỏ, bao gồm toàn bộ Pro và các tính năng học nhóm, dashboard nhóm, chia sẻ ghi chú.",
-                -1,
-                -1,
-                10,
-                -1,
-                "TAG_SUBJECT,CHECKLIST_BASIC,AI_NOTE_FORMAT,AI_SUMMARY_BASIC,AI_SUMMARY_ADVANCED,AI_CHAT,AI_ANALYZE,DOCUMENT_UPLOAD,EXTRACT_SCHEDULE,DEADLINE_MANAGEMENT,PRIORITY_SUGGESTION,AI_FLASHCARD,EXPORT_FILE,TEAM_WORK,AI_PROGRESS_ANALYTICS,TEAM_DASHBOARD,GOOGLE_CALENDAR,MANAGE_MEMBERS,CUSTOM_WORKSPACE,PRIORITY_SUPPORT,AI_AUDIO"
-        );
+        "PLUS",
+        99000.0,
+        790000.0,
+        "Gói Plus dành cho nhóm học tập/team nhỏ, bao gồm toàn bộ Pro và các tính năng học nhóm, dashboard nhóm, chia sẻ ghi chú.",
+        -1,
+        -1,
+        10,
+        -1,
+        "TAG_SUBJECT,CHECKLIST_BASIC,AI_NOTE_FORMAT,AI_SUMMARY_BASIC,AI_SUMMARY_ADVANCED,AI_CHAT,AI_ANALYZE,DOCUMENT_UPLOAD,EXTRACT_SCHEDULE,DEADLINE_MANAGEMENT,PRIORITY_SUGGESTION,AI_FLASHCARD,EXPORT_FILE,TEAM_WORK,AI_PROGRESS_ANALYTICS,TEAM_DASHBOARD,GOOGLE_CALENDAR,MANAGE_MEMBERS,CUSTOM_WORKSPACE,PRIORITY_SUPPORT,AI_AUDIO"
+);
     }
 
     private void upsertPackage(

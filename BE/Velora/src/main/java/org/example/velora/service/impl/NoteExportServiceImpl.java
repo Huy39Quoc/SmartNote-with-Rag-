@@ -7,7 +7,6 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
 import org.apache.poi.xwpf.usermodel.*;
-import org.example.velora.dto.PackageValidationDto;
 import org.example.velora.entity.Note;
 import org.example.velora.entity.User;
 import org.example.velora.exception.BadRequestException;
@@ -15,6 +14,8 @@ import org.example.velora.exception.ResourceNotFoundException;
 import org.example.velora.repository.NoteRepository;
 import org.example.velora.repository.UserRepository;
 import org.example.velora.service.NoteExportService;
+import org.example.velora.service.UserPackageService;
+import org.example.velora.util.RichTextContent;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,21 +26,26 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class NoteExportServiceImpl implements NoteExportService {
 
+    private static final String FEATURE_EXPORT_FILE = "EXPORT_FILE";
+
     private final NoteRepository noteRepository;
     private final UserRepository userRepository;
+    private final UserPackageService userPackageService;
 
     @Override
     public ExportedFile export(UUID userId, UUID noteId, String format) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User không tồn tại"));
 
-        PackageValidationDto.validateFeatureAccess(user, "EXPORT_FILE");
+        userPackageService.checkFeatureAccess(user, FEATURE_EXPORT_FILE);
 
         Note note = noteRepository.findById(noteId)
                 .orElseThrow(() -> new ResourceNotFoundException("Ghi chú không tồn tại"));
@@ -78,20 +84,14 @@ public class NoteExportServiceImpl implements NoteExportService {
             document.createParagraph();
 
             String content = safeText(note.getContent());
-            if (content.isBlank()) {
+            if (!RichTextContent.hasText(content)) {
                 XWPFParagraph p = document.createParagraph();
                 XWPFRun r = p.createRun();
                 r.setFontFamily("Arial");
                 r.setFontSize(12);
                 r.setText("(Ghi chú chưa có nội dung)");
             } else {
-                for (String line : content.split("\\R", -1)) {
-                    XWPFParagraph p = document.createParagraph();
-                    XWPFRun r = p.createRun();
-                    r.setFontFamily("Arial");
-                    r.setFontSize(12);
-                    r.setText(line);
-                }
+                appendRichContentToDocx(document, content);
             }
 
             document.write(out);
@@ -142,7 +142,7 @@ public class NoteExportServiceImpl implements NoteExportService {
 
             stream.setFont(font, fontSize);
 
-            String content = safeText(note.getContent());
+            String content = RichTextContent.toPlainText(note.getContent());
             if (content.isBlank()) content = "(Ghi chú chưa có nội dung)";
 
             for (String rawLine : content.split("\\R", -1)) {
@@ -183,6 +183,72 @@ public class NoteExportServiceImpl implements NoteExportService {
         } catch (Exception e) {
             throw new RuntimeException("Không thể export PDF", e);
         }
+    }
+
+    private void appendRichContentToDocx(XWPFDocument document, String html) {
+        String content = RichTextContent.sanitize(html);
+        Pattern tokenPattern = Pattern.compile("(?is)<[^>]+>|[^<]+");
+        Matcher matcher = tokenPattern.matcher(content);
+
+        XWPFParagraph paragraph = document.createParagraph();
+        boolean bold = false;
+        boolean italic = false;
+        boolean underline = false;
+        String color = null;
+
+        while (matcher.find()) {
+            String token = matcher.group();
+
+            if (token.startsWith("<")) {
+                String lower = token.toLowerCase();
+
+                if (lower.matches("</?(p|div|h1|h2|h3|blockquote)[^>]*>") || lower.matches("</?li[^>]*>")) {
+                    if (lower.startsWith("</") || lower.startsWith("<li")) {
+                        paragraph = document.createParagraph();
+                    }
+                    if (lower.startsWith("<li")) {
+                        XWPFRun bulletRun = paragraph.createRun();
+                        bulletRun.setFontFamily("Arial");
+                        bulletRun.setFontSize(12);
+                        bulletRun.setText("- ");
+                    }
+                    continue;
+                }
+
+                if (lower.matches("<br\\s*/?>")) {
+                    paragraph = document.createParagraph();
+                    continue;
+                }
+
+                if (lower.matches("<(b|strong)>")) bold = true;
+                else if (lower.matches("</(b|strong)>")) bold = false;
+                else if (lower.matches("<(i|em)>")) italic = true;
+                else if (lower.matches("</(i|em)>")) italic = false;
+                else if (lower.equals("<u>")) underline = true;
+                else if (lower.equals("</u>")) underline = false;
+                else if (lower.startsWith("<span")) color = extractDocxColor(lower);
+                else if (lower.equals("</span>")) color = null;
+
+                continue;
+            }
+
+            String text = decodeBasicEntities(token);
+            if (text.isBlank()) continue;
+
+            XWPFRun run = paragraph.createRun();
+            run.setFontFamily("Arial");
+            run.setFontSize(12);
+            run.setBold(bold);
+            run.setItalic(italic);
+            if (underline) run.setUnderline(UnderlinePatterns.SINGLE);
+            if (color != null) run.setColor(color);
+            run.setText(text);
+        }
+    }
+
+    private String extractDocxColor(String tag) {
+        Matcher matcher = Pattern.compile("color:\\s*#([0-9a-f]{6})").matcher(tag);
+        return matcher.find() ? matcher.group(1).toUpperCase() : null;
     }
 
     private PDType0Font loadUnicodeFont(PDDocument document) throws IOException {
@@ -246,6 +312,16 @@ public class NoteExportServiceImpl implements NoteExportService {
         }
         if (!current.isEmpty()) result.add(current.toString());
         return result;
+    }
+
+    private String decodeBasicEntities(String value) {
+        return value
+                .replace("&nbsp;", " ")
+                .replace("&amp;", "&")
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&quot;", "\"")
+                .replace("&#39;", "'");
     }
 
     private String safeText(String value) {

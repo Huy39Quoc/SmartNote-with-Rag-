@@ -1,7 +1,6 @@
 package org.example.velora.service.impl;
 
 import lombok.RequiredArgsConstructor;
-import org.example.velora.dto.PackageValidationDto;
 import org.example.velora.dto.request.DocumentShareRequest;
 import org.example.velora.dto.response.DocumentShareResponse;
 import org.example.velora.entity.Document;
@@ -13,6 +12,7 @@ import org.example.velora.repository.DocumentRepository;
 import org.example.velora.repository.DocumentShareRepository;
 import org.example.velora.repository.UserRepository;
 import org.example.velora.service.DocumentShareService;
+import org.example.velora.service.UserPackageService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,9 +24,12 @@ import java.util.UUID;
 @Transactional
 public class DocumentShareServiceImpl implements DocumentShareService {
 
+    private static final String FEATURE_TEAM_WORK = "TEAM_WORK";
+
     private final DocumentRepository documentRepository;
     private final DocumentShareRepository documentShareRepository;
     private final UserRepository userRepository;
+    private final UserPackageService userPackageService;
 
     @Override
     public DocumentShareResponse.Item shareDocument(
@@ -36,7 +39,7 @@ public class DocumentShareServiceImpl implements DocumentShareService {
     ) {
         User owner = getUser(ownerId);
 
-        PackageValidationDto.validateFeatureAccess(owner, "TEAM_WORK");
+        userPackageService.checkFeatureAccess(owner, FEATURE_TEAM_WORK);
 
         Document document = getOwnedDocument(ownerId, documentId);
 

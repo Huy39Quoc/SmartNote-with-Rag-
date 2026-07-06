@@ -6,5 +6,8 @@ const chatApi = {
   capNhatSession:     (id, data)  => client.patch(`/chat/sessions/${id}`, data),
   xoaSession:         (id)        => client.delete(`/chat/sessions/${id}`),
   hoiDap:             (id, data)  => client.post(`/chat/sessions/${id}/ask`, data),
+  nhanDangGiongNoi:   (formData)  => client.post('/chat/transcribe', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
 }
 export default chatApi

@@ -1,6 +1,5 @@
 package org.example.velora.service.impl;
 
-import org.example.velora.dto.PackageValidationDto;
 import org.example.velora.dto.request.AuthRequest;
 import org.example.velora.dto.response.AuthResponse;
 import org.example.velora.entity.PackageService;
@@ -10,11 +9,11 @@ import org.example.velora.exception.BadRequestException;
 import org.example.velora.exception.ResourceNotFoundException;
 import org.example.velora.exception.UnauthorizedException;
 import org.example.velora.mapper.UserMapper;
-import org.example.velora.repository.PackageServiceRepository;
 import org.example.velora.repository.RefreshTokenRepository;
 import org.example.velora.repository.UserRepository;
 import org.example.velora.security.JwtTokenProvider;
 import org.example.velora.service.AuthService;
+import org.example.velora.service.UserPackageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -35,8 +34,8 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthenticationManager authenticationManager;
-    private final PackageServiceRepository packageServiceRepository;
     private final UserMapper userMapper;
+    private final UserPackageService userPackageService;
 
     @Value("${jwt.refresh-token-expiry}") private long refreshExpiry;
     @Value("${jwt.access-token-expiry}")  private long accessExpiry;
@@ -60,17 +59,14 @@ public class AuthServiceImpl implements AuthService {
         if (userRepository.existsByEmail(email))
             throw new BadRequestException("Email đã được sử dụng!");
 
+        PackageService freePackage = userPackageService.getDefaultFreePackage();
+
         User user = new User();
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(password));
         user.setFullName(fullName);
         user.setRole(User.Role.USER);
         user.setAiUsedThisMonth(0);
-
-        PackageService freePackage = packageServiceRepository.findByName("FREE")
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Không tìm thấy cấu hình gói mặc định FREE trong hệ thống."));
-
         user.setCurrentPackage(freePackage);
         user.setPackageExpiryDate(LocalDateTime.now().plusYears(99));
 
@@ -100,9 +96,7 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         refreshTokenRepository.deleteExpired();
-
-        // ── Thay packageValidationService.validateMaxDevices → static call ──
-        PackageValidationDto.validateMaxDevices(user, refreshTokenRepository);
+        userPackageService.checkMaxDevices(user);
 
         return buildTokenPair(user);
     }

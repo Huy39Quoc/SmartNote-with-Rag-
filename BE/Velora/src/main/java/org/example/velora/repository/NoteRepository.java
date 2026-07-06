@@ -27,4 +27,6 @@ public interface NoteRepository extends JpaRepository<Note, UUID> {
     long countByUserId(UUID userId);
     List<Note> findByUserIdOrderByUpdatedAtDesc(UUID userId);
     long countByUserIdAndCreatedAtAfter(UUID userId, LocalDateTime from);
+
+    boolean existsByIdAndUserId(UUID id, UUID userId);
 }

@@ -11,21 +11,26 @@ import {
     IconNotes,
     IconShare,
     IconBell,
+    IconSun,
+    IconMoon,
+    IconFolderShare,
+    IconBrain,
 } from '@tabler/icons-react'
 import useAuthStore from '../../service/authStore'
 import logo from '../../assets/logo.svg'
 import notificationApi from '../../lib/api/notificationApi'
-
+import useThemeStore from '../../service/themeStore'
 
 const menu = [
     { to: '/overview', label: 'Tổng quan', icon: IconLayoutDashboard },
     { to: '/service-packages', label: 'Gói Premium', icon: IconNotes },
     { to: '/notes', label: 'Ghi chú', icon: IconNotes },
-    { to: '/shared-notes', label: 'Được chia sẻ', icon: IconShare },
+    { to: '/shared-notes', label: 'Ghi chú được chia sẻ', icon: IconShare },
     { to: '/chat', label: 'Hỏi đáp AI', icon: IconMessages },
     { to: '/documents', label: 'Tài liệu', icon: IconFileText },
+    { to: '/shared-documents', label: 'Tài liệu được chia sẻ', icon: IconFolderShare },
     { to: '/schedule', label: 'Lịch & Deadline', icon: IconCalendar },
-    { to: '/knowledge', label: 'Kiến thức', icon: IconShare },
+    { to: '/knowledge', label: 'Kiến thức', icon: IconBrain },
     { to: '/account', label: 'Tài khoản', icon: IconUser },
     { to: '/notifications', label: 'Thông báo', icon: IconBell },
 ]
@@ -35,6 +40,8 @@ export default function Sidebar() {
     const navigate = useNavigate()
     const location = useLocation()
     const [soThongBaoChuaDoc, setSoThongBaoChuaDoc] = useState(0)
+    const { isDark, toggleTheme } = useThemeStore()
+    const ThemeIcon = isDark ? IconSun : IconMoon
     const handleDangXuat = async () => {
         await dangXuat()
         setSoThongBaoChuaDoc(0)
@@ -152,6 +159,21 @@ export default function Sidebar() {
                         </div>
                     </div>
                 </div>
+                <button
+                    className="btn-ghost"
+                    onClick={toggleTheme}
+                    style={{
+                        width: '100%',
+                        justifyContent: 'flex-start',
+                        padding: '6px 8px',
+                        marginTop: 2,
+                    }}
+                >
+                    <ThemeIcon size={14} />
+                    <span style={{ fontSize: 13 }}>
+    {isDark ? 'Giao diện sáng' : 'Giao diện tối'}
+  </span>
+                </button>
 
                 <button
                     className="btn-ghost"
