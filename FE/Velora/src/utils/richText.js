@@ -2,6 +2,7 @@ const ALLOWED_TAGS = new Set([
     'B',
     'I',
     'U',
+    'S',
     'STRONG',
     'EM',
     'FONT',

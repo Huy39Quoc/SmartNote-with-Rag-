@@ -50,21 +50,21 @@ export default function Register() {
       }
   }
   return (
-    <div style={styles.wrap}>
-      <div style={styles.left}>
-        <div style={styles.leftContent}>
-          <img src={logo} alt="Velora" style={{ height: 32, marginBottom: 24 }} />
-          <h1 style={{ fontSize: 26, fontWeight: 600, marginBottom: 12 }}>Bắt đầu miễn phí</h1>
-          <p style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+    <div className="flex" style={{ height: '100vh', overflow: 'hidden', background: 'var(--bg-base)' }}>
+      <div className="hidden md:flex flex-1 items-center justify-center p-12" style={{ background: 'var(--bg-surface)', borderRight: '1px solid var(--border)' }}>
+        <div style={{ maxWidth: 380 }}>
+          <img src={logo} alt="Velora" style={{ height: 34, marginBottom: 26 }} />
+          <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 14, color: 'var(--text-primary)' }}>Bắt đầu miễn phí</h1>
+          <p style={{ color: 'var(--text-secondary)', lineHeight: 1.7, fontSize: 14.5 }}>
             Tạo tài khoản để sử dụng đầy đủ tính năng AI của Velora.
             Dữ liệu của bạn được lưu trữ an toàn trên server của nhóm.
           </p>
         </div>
       </div>
-      <div style={styles.right}>
-        <div style={styles.form}>
-          <h2 style={{ marginBottom: 6 }}>Tạo tài khoản</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 24 }}>Điền thông tin để đăng ký</p>
+      <div className="flex items-center justify-center p-10" style={{ width: 440 }}>
+        <div className="w-full">
+          <h2 style={{ marginBottom: 6, fontSize: 22, fontWeight: 700, color: 'var(--text-primary)' }}>Tạo tài khoản</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 24 }}>Điền thông tin để đăng ký</p>
 
           <form onSubmit={xuLyDangKy} noValidate>
             {[
@@ -76,6 +76,7 @@ export default function Register() {
                 <input type={type} placeholder={placeholder}
                   value={form[key]}
                   onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
+                  className="rounded-xl"
                   style={loi[key] ? styles.inputLoi : {}} />
                 {loi[key] && <span style={styles.loiText}>{loi[key]}</span>}
               </div>
@@ -89,6 +90,7 @@ export default function Register() {
                     placeholder={key === 'matKhau' ? 'Ít nhất 6 ký tự' : 'Nhập lại mật khẩu'}
                     value={form[key]}
                     onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
+                    className="rounded-xl"
                     style={{ ...loi[key] ? styles.inputLoi : {}, paddingRight: 36 }} />
                   {key === 'matKhau' && (
                     <button type="button" className="btn-ghost"
@@ -102,8 +104,8 @@ export default function Register() {
               </div>
             ))}
 
-            <button type="submit" className="btn-primary"
-              style={{ width: '100%', justifyContent: 'center', padding: 10, marginTop: 8 }}
+            <button type="submit" className="btn-primary rounded-xl"
+              style={{ width: '100%', justifyContent: 'center', padding: 11, marginTop: 8 }}
               disabled={dangTai}>
               {dangTai ? <><div className="spinner" style={{ width: 14, height: 14 }} />Đang đăng ký...</> : 'Tạo tài khoản'}
             </button>

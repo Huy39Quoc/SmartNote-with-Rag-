@@ -1067,11 +1067,86 @@ public class AiServiceImpl implements AiService {
 
     private String normalizeMindmap(String cleaned, String title, String content) {
         int index = cleaned.indexOf("mindmap");
-        if (index >= 0) {
-            return cleaned.substring(index).trim();
+
+        if (index < 0) {
+            return buildFallbackMindmap(title, content);
         }
 
-        return buildFallbackMindmap(title, content);
+        String body = cleaned.substring(index).trim();
+        return sanitizeMindmapMermaid(body, title);
+    }
+
+    private String sanitizeMindmapMermaid(String mermaid, String title) {
+        String safeTitle = escapeMermaid(title).replace("(", "-").replace(")", "");
+
+        if (!StringUtils.hasText(mermaid)) {
+            return "mindmap\n  root((" + safeTitle + "))\n";
+        }
+
+        String[] lines = mermaid.replace("\r", "").split("\n");
+        List<String> result = new ArrayList<>();
+        boolean rootHandled = false;
+
+        Pattern rootPattern = Pattern.compile("^[A-Za-z0-9_]*\\(\\((.*)\\)\\)$");
+
+        for (String rawLine : lines) {
+            if (!StringUtils.hasText(rawLine)) {
+                continue;
+            }
+
+            String trimmed = rawLine.trim();
+
+            if (trimmed.equalsIgnoreCase("mindmap")) {
+                result.add("mindmap");
+                continue;
+            }
+
+            // Giữ nguyên độ thụt lề (dựa vào số khoảng trắng đầu dòng) để bảo toàn cấp bậc.
+            int indentSpaces = rawLine.length() - rawLine.replaceAll("^\\s+", "").length();
+            String prefix = "  ".repeat(Math.max(1, indentSpaces / 2 + 1));
+
+            Matcher rootMatcher = rootPattern.matcher(trimmed);
+
+            if (!rootHandled && rootMatcher.matches()) {
+                String label = sanitizeMermaidLabel(rootMatcher.group(1)).replace("(", "-").replace(")", "");
+                result.add("  root((" + (StringUtils.hasText(label) ? label : safeTitle) + "))");
+                rootHandled = true;
+                continue;
+            }
+
+            // Loại bỏ id node + mọi ký tự bao hình (ngoặc vuông/tròn/nhọn) còn sót lại,
+            // chỉ giữ lại phần chữ để tránh vỡ cú pháp mindmap khi nội dung dài/phức tạp.
+            String textOnly = trimmed
+                    .replaceAll("^[A-Za-z][A-Za-z0-9_]*", "")
+                    .replaceAll("^[\\[\\(\\{]+", "")
+                    .replaceAll("[\\]\\)\\}]+$", "");
+
+            String label = sanitizeMermaidLabel(textOnly);
+
+            if (!StringUtils.hasText(label)) {
+                continue;
+            }
+
+            // Nếu AI chưa từng khai báo root, node hợp lệ đầu tiên sẽ được dùng làm root
+            // để đảm bảo mindmap luôn có đúng 1 gốc (bắt buộc với cú pháp Mermaid mindmap).
+            if (!rootHandled) {
+                result.add("  root((" + label.replace("(", "-").replace(")", "") + "))");
+                rootHandled = true;
+                continue;
+            }
+
+            result.add(prefix + label);
+        }
+
+        if (!rootHandled) {
+            result.add(1, "  root((" + safeTitle + "))");
+        }
+
+        if (result.size() <= 1) {
+            return "mindmap\n  root((" + safeTitle + "))\n";
+        }
+
+        return String.join("\n", result);
     }
 
     private String normalizeFlowchart(
@@ -1176,7 +1251,8 @@ public class AiServiceImpl implements AiService {
 
         StringBuilder sb = new StringBuilder();
         sb.append("mindmap\n");
-        sb.append("  root((").append(escapeMermaid(title)).append("))\n");
+        String safeTitle = escapeMermaid(title).replace("(", "-").replace(")", "");
+        sb.append("  root((").append(safeTitle).append("))\n");
 
         for (String line : lines) {
             sb.append("    ").append(escapeMermaid(line)).append("\n");
@@ -1348,9 +1424,27 @@ public class AiServiceImpl implements AiService {
     private String sanitizeFlowchartLine(String line) {
         String sanitized = line;
 
-        Pattern nodePattern = Pattern.compile("([A-Za-z][A-Za-z0-9_]*)\\s*[\\[\\(\\{]([^\\]\\)\\}]+)[\\]\\)\\}]");
-        Matcher matcher = nodePattern.matcher(sanitized);
+        // Xử lý riêng từng loại ngoặc (tròn / vuông / nhọn) để tránh bắt nhầm
+        // ngoặc đóng của loại khác nhau -> sinh ký tự thừa gây lỗi cú pháp Mermaid.
+        sanitized = replaceNodeShape(sanitized, '{', '}');
+        sanitized = replaceNodeShape(sanitized, '(', ')');
+        sanitized = replaceNodeShape(sanitized, '[', ']');
 
+        // Lưới an toàn cuối cùng: sau khi chuẩn hoá, không được còn dấu ngoặc nhọn nào.
+        sanitized = sanitized.replace("{", "").replace("}", "");
+
+        return "  " + sanitized.trim();
+    }
+
+    private String replaceNodeShape(String line, char open, char close) {
+        String openEsc = "\\" + open;
+        String closeEsc = "\\" + close;
+
+        Pattern nodePattern = Pattern.compile(
+                "([A-Za-z][A-Za-z0-9_]*)\\s*" + openEsc + "([^" + closeEsc + "]*)" + closeEsc
+        );
+
+        Matcher matcher = nodePattern.matcher(line);
         StringBuffer sb = new StringBuffer();
 
         while (matcher.find()) {
@@ -1365,7 +1459,7 @@ public class AiServiceImpl implements AiService {
 
         matcher.appendTail(sb);
 
-        return "  " + sb.toString().trim();
+        return sb.toString();
     }
 
     private String sanitizeMermaidLabel(String label) {

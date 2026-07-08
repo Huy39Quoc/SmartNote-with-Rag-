@@ -15,6 +15,8 @@ import {
     IconMoon,
     IconFolderShare,
     IconBrain,
+    IconPlus,
+    IconSparkles,
 } from '@tabler/icons-react'
 import useAuthStore from '../../service/authStore'
 import logo from '../../assets/logo.svg'
@@ -23,7 +25,7 @@ import useThemeStore from '../../service/themeStore'
 
 const menu = [
     { to: '/overview', label: 'Tổng quan', icon: IconLayoutDashboard },
-    { to: '/service-packages', label: 'Gói Premium', icon: IconNotes },
+    { to: '/service-packages', label: 'Gói Premium', icon: IconSparkles },
     { to: '/notes', label: 'Ghi chú', icon: IconNotes },
     { to: '/shared-notes', label: 'Ghi chú được chia sẻ', icon: IconShare },
     { to: '/chat', label: 'Hỏi đáp AI', icon: IconMessages },
@@ -42,6 +44,7 @@ export default function Sidebar() {
     const [soThongBaoChuaDoc, setSoThongBaoChuaDoc] = useState(0)
     const { isDark, toggleTheme } = useThemeStore()
     const ThemeIcon = isDark ? IconSun : IconMoon
+
     const handleDangXuat = async () => {
         await dangXuat()
         setSoThongBaoChuaDoc(0)
@@ -85,12 +88,36 @@ export default function Sidebar() {
     }, [nguoiDung?.id])
 
     return (
-        <aside style={styles.sidebar}>
-            <div style={styles.logo}>
-                <img src={logo} alt="Velora" style={{ height: 20 }} />
+        <aside
+            className="flex flex-col h-screen shrink-0 overflow-hidden"
+            style={{
+                width: 'var(--sidebar-w)',
+                background: 'var(--bg-surface)',
+                borderRight: '1px solid var(--border)',
+            }}
+        >
+            {/* Logo */}
+            <div
+                className="flex items-center gap-2 px-5 py-4 shrink-0"
+                style={{ borderBottom: '1px solid var(--border)' }}
+            >
+                <img src={logo} alt="Velora" style={{ height: 24 }} />
             </div>
 
-            <nav style={styles.nav}>
+            {/* Quick create */}
+            <div className="px-4 pt-4 pb-2">
+                <button
+                    onClick={() => navigate('/notes')}
+                    className="w-full justify-center py-2.5 rounded-xl font-semibold text-[13px]"
+                    style={{ background: 'var(--accent-blue)', color: '#fff', borderColor: 'var(--accent-blue)' }}
+                >
+                    <IconPlus size={16} />
+                    Tạo ghi chú mới
+                </button>
+            </div>
+
+            {/* Nav */}
+            <nav className="flex-1 px-3 py-2 flex flex-col gap-0.5 overflow-y-auto">
                 {menu.map(({ to, icon: Icon, label }) => {
                     const laThongBao = to === '/notifications'
 
@@ -98,16 +125,33 @@ export default function Sidebar() {
                         <NavLink
                             key={to}
                             to={to}
-                            style={navStyle}
-                            className={({ isActive }) => isActive ? 'active' : ''}
+                            className={({ isActive }) =>
+                                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] no-underline transition-colors ${
+                                    isActive ? 'font-semibold' : 'font-normal'
+                                }`
+                            }
+                            style={({ isActive }) => ({
+                                color: isActive ? 'var(--accent-blue-dim)' : 'var(--text-secondary)',
+                                background: isActive ? 'var(--bg-selected)' : 'transparent',
+                            })}
                         >
-                            <Icon size={16} />
-                            <span>{label}</span>
+                            <Icon size={17} style={{ flexShrink: 0 }} />
+                            <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{label}</span>
 
                             {laThongBao && soThongBaoChuaDoc > 0 && (
-                                <span style={styles.badge}>
-                    {soThongBaoChuaDoc > 99 ? '99+' : soThongBaoChuaDoc}
-                </span>
+                                <span
+                                    className="flex items-center justify-center rounded-full text-[10px] font-semibold"
+                                    style={{
+                                        minWidth: 18,
+                                        height: 18,
+                                        padding: '0 5px',
+                                        background: 'var(--accent-red)',
+                                        color: '#fff',
+                                        lineHeight: 1,
+                                    }}
+                                >
+                                    {soThongBaoChuaDoc > 99 ? '99+' : soThongBaoChuaDoc}
+                                </span>
                             )}
                         </NavLink>
                     )
@@ -115,157 +159,96 @@ export default function Sidebar() {
 
                 {laAdmin() && (
                     <>
-                        <NavLink to="/admin" style={navStyle} className={({ isActive }) => isActive ? 'active' : ''}>
-                            <IconShield size={16} />
+                        <div className="my-1.5 mx-1" style={{ height: 1, background: 'var(--border)' }} />
+                        <NavLink
+                            to="/admin"
+                            className={({ isActive }) =>
+                                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] no-underline transition-colors ${isActive ? 'font-semibold' : 'font-normal'}`
+                            }
+                            style={({ isActive }) => ({
+                                color: isActive ? 'var(--accent-blue-dim)' : 'var(--text-secondary)',
+                                background: isActive ? 'var(--bg-selected)' : 'transparent',
+                            })}
+                        >
+                            <IconShield size={17} />
                             <span>Quản trị</span>
                         </NavLink>
-                        <NavLink to="/admin/service-packages" style={navStyle} className={({ isActive }) => isActive ? 'active' : ''}>
-                            <IconShield size={16} />
+                        <NavLink
+                            to="/admin/service-packages"
+                            className={({ isActive }) =>
+                                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] no-underline transition-colors ${isActive ? 'font-semibold' : 'font-normal'}`
+                            }
+                            style={({ isActive }) => ({
+                                color: isActive ? 'var(--accent-blue-dim)' : 'var(--text-secondary)',
+                                background: isActive ? 'var(--bg-selected)' : 'transparent',
+                            })}
+                        >
+                            <IconShield size={17} />
                             <span>Quản lý Gói</span>
                         </NavLink>
                     </>
                 )}
             </nav>
 
-            <div style={styles.bottom}>
-                <div style={styles.userRow}>
-                    <div style={styles.avatar}>
+            {/* Bottom: user + plan card + actions */}
+            <div className="px-3 pb-3 pt-2 shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
+                <div className="flex items-center gap-2.5 px-2 py-2 mb-1">
+                    <div
+                        className="flex items-center justify-center rounded-full font-semibold shrink-0"
+                        style={{ width: 32, height: 32, background: 'var(--bg-ai)', color: 'var(--accent-blue-dim)', fontSize: 13 }}
+                    >
                         {nguoiDung?.fullName?.[0]?.toUpperCase() || 'U'}
                     </div>
 
-                    <div style={{ flex: 1, overflow: 'hidden' }}>
+                    <div className="flex-1 overflow-hidden">
                         <div
-                            style={{
-                                fontSize: 12,
-                                fontWeight: 500,
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                            }}
+                            className="overflow-hidden text-ellipsis whitespace-nowrap"
+                            style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)' }}
                         >
                             {nguoiDung?.fullName || 'Người dùng'}
                         </div>
-
                         <div
-                            style={{
-                                fontSize: 10,
-                                color: 'var(--text-faint)',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                            }}
+                            className="overflow-hidden text-ellipsis whitespace-nowrap"
+                            style={{ fontSize: 10.5, color: 'var(--text-faint)' }}
                         >
                             {nguoiDung?.email}
                         </div>
                     </div>
                 </div>
-                <button
-                    className="btn-ghost"
-                    onClick={toggleTheme}
-                    style={{
-                        width: '100%',
-                        justifyContent: 'flex-start',
-                        padding: '6px 8px',
-                        marginTop: 2,
-                    }}
+
+                <div
+                    className="rounded-2xl px-3 py-2.5 mb-2"
+                    style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}
                 >
-                    <ThemeIcon size={14} />
-                    <span style={{ fontSize: 13 }}>
-    {isDark ? 'Giao diện sáng' : 'Giao diện tối'}
-  </span>
+                    <div
+                        className="font-bold uppercase tracking-wide"
+                        style={{ fontSize: 10, color: 'var(--text-muted)' }}
+                    >
+                        PLUS
+                    </div>
+                    <p style={{ fontSize: 10, color: 'var(--text-faint)', marginTop: 2 }}>
+                        AI không giới hạn • 10GB
+                    </p>
+                </div>
+
+                <button
+                    className="btn-ghost w-full justify-start"
+                    onClick={toggleTheme}
+                    style={{ padding: '7px 10px', marginBottom: 2 }}
+                >
+                    <ThemeIcon size={15} />
+                    <span style={{ fontSize: 13 }}>{isDark ? 'Giao diện sáng' : 'Giao diện tối'}</span>
                 </button>
 
                 <button
-                    className="btn-ghost"
+                    className="btn-ghost w-full justify-start"
                     onClick={handleDangXuat}
-                    style={{
-                        width: '100%',
-                        justifyContent: 'flex-start',
-                        padding: '6px 8px',
-                        marginTop: 2,
-                    }}
+                    style={{ padding: '7px 10px' }}
                 >
-                    <IconLogout size={14} />
+                    <IconLogout size={15} />
                     <span style={{ fontSize: 13 }}>Đăng xuất</span>
                 </button>
             </div>
         </aside>
     )
-}
-
-const navStyle = ({ isActive }) => ({
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    padding: '6px 8px',
-    borderRadius: 6,
-    fontSize: 13,
-    color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
-    background: isActive ? 'var(--bg-elevated)' : 'transparent',
-    textDecoration: 'none',
-    transition: 'all .12s',
-})
-
-const styles = {
-    sidebar: {
-        width: 'var(--sidebar-w)',
-        flexShrink: 0,
-        background: 'var(--bg-surface)',
-        borderRight: '.5px solid var(--border)',
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100vh',
-        overflow: 'hidden',
-    },
-    logo: {
-        padding: '10px 10px',
-        borderBottom: '.5px solid var(--border)',
-    },
-    nav: {
-        flex: 1,
-        padding: '6px 6px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 1,
-        overflowY: 'auto',
-    },
-    bottom: {
-        padding: '8px',
-        borderTop: '.5px solid var(--border)',
-    },
-    userRow: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        padding: '6px 8px',
-    },
-    avatar: {
-        width: 28,
-        height: 28,
-        borderRadius: '50%',
-        background: 'var(--bg-ai)',
-        color: 'var(--accent-blue-dim)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: 12,
-        fontWeight: 600,
-        flexShrink: 0,
-    },
-
-    badge: {
-        marginLeft: 'auto',
-        minWidth: 18,
-        height: 18,
-        padding: '0 5px',
-        borderRadius: 999,
-        background: 'var(--accent-red, #ef4444)',
-        color: '#fff',
-        fontSize: 10,
-        fontWeight: 600,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        lineHeight: 1,
-    },
 }

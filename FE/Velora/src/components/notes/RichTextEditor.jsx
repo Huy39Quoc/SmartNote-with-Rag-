@@ -1,8 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import {
     IconBold,
     IconItalic,
     IconUnderline,
+    IconStrikethrough,
+    IconBlockquote,
+    IconArrowBackUp,
+    IconArrowForwardUp,
     IconList,
     IconListNumbers,
     IconPalette,
@@ -180,7 +184,7 @@ function base64ToBytes(base64) {
     return bytes
 }
 
-export default function RichTextEditor({
+const RichTextEditor = forwardRef(function RichTextEditor({
     value,
     onChange,
     readOnly,
@@ -189,7 +193,7 @@ export default function RichTextEditor({
     collaborationUrl,
     onPermissionChange,
     currentUser,
-}) {
+}, ref) {
     const fileInputRef = useRef(null)
     const editorRef = useRef(null)
     const editorShellRef = useRef(null)
@@ -393,6 +397,7 @@ export default function RichTextEditor({
         extensions: [
             StarterKit.configure({
                 history: false,
+                heading: { levels: [1, 2, 3] },
             }),
             Underline,
             CustomTextStyle,
@@ -453,6 +458,20 @@ export default function RichTextEditor({
             }
         }
     }, [editor])
+
+    useImperativeHandle(ref, () => ({
+        insertHtmlAtEnd: (html) => {
+            const currentEditor = editorRef.current
+            if (!currentEditor || !html) return
+
+            currentEditor
+                .chain()
+                .focus('end')
+                .insertContent('<p></p>')
+                .insertContent(html)
+                .run()
+        },
+    }), [])
 
     useEffect(() => {
         return () => {
@@ -705,6 +724,25 @@ export default function RichTextEditor({
         editor.chain().focus().setMark('textStyle', { fontSize }).run()
     }
 
+    const setHeading = (value) => {
+        if (!editor || readOnly) return
+
+        if (!value) {
+            editor.chain().focus().setParagraph().run()
+            return
+        }
+
+        editor.chain().focus().toggleHeading({ level: Number(value) }).run()
+    }
+
+    const headingValue = (() => {
+        if (!editor) return ''
+        for (const level of [1, 2, 3]) {
+            if (editor.isActive('heading', { level })) return String(level)
+        }
+        return ''
+    })()
+
     const hasStructuredContent = useMemo(() => {
         if (!editor) return false
 
@@ -727,6 +765,29 @@ export default function RichTextEditor({
         <div style={styles.wrap}>
             {!readOnly && (
                 <div style={styles.toolbar}>
+                    <button
+                        type="button"
+                        className="btn-ghost"
+                        title="Hoàn tác (Ctrl+Z)"
+                        onMouseDown={keepSelection}
+                        onClick={() => runCommand(() => editor.chain().focus().undo().run())}
+                        disabled={!editor?.can().undo()}
+                        style={styles.toolButton}
+                    >
+                        <IconArrowBackUp size={15} />
+                    </button>
+                    <button
+                        type="button"
+                        className="btn-ghost"
+                        title="Làm lại (Ctrl+Y)"
+                        onMouseDown={keepSelection}
+                        onClick={() => runCommand(() => editor.chain().focus().redo().run())}
+                        disabled={!editor?.can().redo()}
+                        style={styles.toolButton}
+                    >
+                        <IconArrowForwardUp size={15} />
+                    </button>
+                    <span style={styles.divider} />
                     <button
                         type="button"
                         className="btn-ghost"
@@ -768,6 +829,50 @@ export default function RichTextEditor({
                     >
                         <IconUnderline size={15} />
                     </button>
+
+                    <button
+                        type="button"
+                        className="btn-ghost"
+                        title="Gạch ngang"
+                        onMouseDown={keepSelection}
+                        onClick={() => runCommand(() => editor.chain().focus().toggleStrike().run())}
+                        style={{
+                            ...styles.toolButton,
+                            ...(editor?.isActive('strike') ? styles.activeButton : {}),
+                        }}
+                    >
+                        <IconStrikethrough size={15} />
+                    </button>
+
+                    <button
+                        type="button"
+                        className="btn-ghost"
+                        title="Trích dẫn"
+                        onMouseDown={keepSelection}
+                        onClick={() => runCommand(() => editor.chain().focus().toggleBlockquote().run())}
+                        style={{
+                            ...styles.toolButton,
+                            ...(editor?.isActive('blockquote') ? styles.activeButton : {}),
+                        }}
+                    >
+                        <IconBlockquote size={15} />
+                    </button>
+
+                    <select
+                        title="Tiêu đề"
+                        value={headingValue}
+                        onChange={e => setHeading(e.target.value)}
+                        style={{
+                            ...styles.toolSelect,
+                            ...styles.fontSelect,
+                        }}
+                    >
+                        <option value="">Văn bản thường</option>
+                        <option value="1">Tiêu đề 1</option>
+                        <option value="2">Tiêu đề 2</option>
+                        <option value="3">Tiêu đề 3</option>
+                    </select>
+
                     <select
                         title="Font chữ"
                         value={editor?.getAttributes('textStyle')?.fontFamily || ''}
@@ -1156,7 +1261,9 @@ export default function RichTextEditor({
             </div>
         </div>
     )
-}
+})
+
+export default RichTextEditor
 
 const styles = {
     wrap: {

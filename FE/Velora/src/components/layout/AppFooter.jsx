@@ -1,50 +1,26 @@
 export default function AppFooter() {
     return (
-        <footer style={styles.footer}>
-            <div style={styles.left}>
+        <footer
+            className="flex items-center justify-between gap-2.5 px-4 shrink-0"
+            style={{
+                height: 32,
+                background: 'var(--bg-surface)',
+                borderTop: '1px solid var(--border)',
+                color: 'var(--text-faint)',
+                fontSize: 10.5,
+            }}
+        >
+            <div className="whitespace-nowrap" style={{ fontWeight: 600 }}>
                 Velora SmartNote
             </div>
 
-            <div style={styles.center}>
+            <div className="flex-1 text-center whitespace-nowrap overflow-hidden text-ellipsis">
                 AI Notes · RAG Chat · Speech to Text · Knowledge Grouping
             </div>
 
-            <div style={styles.right}>
+            <div className="whitespace-nowrap">
                 Student Learning Workspace
             </div>
         </footer>
     )
-}
-
-const styles = {
-    footer: {
-        height: 28,
-        flexShrink: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 10,
-        padding: '0 14px',
-        background: 'var(--bg-surface)',
-        borderTop: '.5px solid var(--border)',
-        color: 'var(--text-faint)',
-        fontSize: 10,
-    },
-
-    left: {
-        whiteSpace: 'nowrap',
-        fontWeight: 500,
-    },
-
-    center: {
-        flex: 1,
-        textAlign: 'center',
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-    },
-
-    right: {
-        whiteSpace: 'nowrap',
-    },
 }

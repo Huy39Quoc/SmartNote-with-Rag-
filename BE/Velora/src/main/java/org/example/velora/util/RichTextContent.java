@@ -7,7 +7,7 @@ import java.util.regex.Pattern;
 public final class RichTextContent {
 
     private static final Set<String> ALLOWED_TAGS = Set.of(
-            "b", "i", "u", "strong", "em", "span", "p", "div", "br",
+            "b", "i", "u", "s", "strong", "em", "span", "p", "div", "br",
             "ul", "ol", "li", "h1", "h2", "h3", "blockquote",
             "a", "img", "table", "thead", "tbody", "tr", "th", "td"
     );
@@ -15,6 +15,18 @@ public final class RichTextContent {
     private static final Set<String> ALLOWED_COLORS = Set.of(
             "#e8e6de", "#ffffff", "#f87171", "#fb923c", "#facc15",
             "#4ade80", "#38bdf8", "#a78bfa", "#f472b6"
+    );
+
+    private static final Set<String> ALLOWED_FONT_FAMILIES = Set.of(
+            "inter, sans-serif",
+            "arial, sans-serif",
+            "\"times new roman\", serif",
+            "georgia, serif",
+            "\"courier new\", monospace"
+    );
+
+    private static final Set<String> ALLOWED_FONT_SIZES = Set.of(
+            "12px", "14px", "16px", "18px", "20px", "24px", "32px"
     );
 
     private static final Set<String> ALLOWED_TEXT_ALIGN = Set.of(
@@ -26,6 +38,12 @@ public final class RichTextContent {
     private static final Pattern COLOR_ATTR_PATTERN = Pattern.compile("(?i)\\bcolor\\s*=\\s*([\"']?)(#[0-9a-f]{6}|rgb\\(\\s*\\d{1,3}\\s*,\\s*\\d{1,3}\\s*,\\s*\\d{1,3}\\s*\\))\\1");
     private static final Pattern COLOR_STYLE_PATTERN = Pattern.compile(
             "(?i)(?:^|;)\\s*color\\s*:\\s*(#[0-9a-f]{6}|rgb\\(\\s*\\d{1,3}\\s*,\\s*\\d{1,3}\\s*,\\s*\\d{1,3}\\s*\\))\\s*(?:;|$)"
+    );
+    private static final Pattern FONT_FAMILY_STYLE_PATTERN = Pattern.compile(
+            "(?i)(?:^|;)\\s*font-family\\s*:\\s*([^;]+?)\\s*(?:;|$)"
+    );
+    private static final Pattern FONT_SIZE_STYLE_PATTERN = Pattern.compile(
+            "(?i)(?:^|;)\\s*font-size\\s*:\\s*([^;]+?)\\s*(?:;|$)"
     );
     private static final Pattern TEXT_ALIGN_STYLE_PATTERN = Pattern.compile(
             "(?i)(?:^|;)\\s*text-align\\s*:\\s*(left|center|right|justify)\\s*(?:;|$)"
@@ -66,8 +84,7 @@ public final class RichTextContent {
                 } else if ("br".equals(tag)) {
                     replacement = "<br>";
                 } else if ("span".equals(tag)) {
-                    String color = extractAllowedColor(attrs);
-                    replacement = color == null ? "<span>" : "<span style=\"color: " + color + "\">";
+                    replacement = buildSpanReplacement(attrs);
                 } else if (allowsTextAlign(tag)) {
                     String textAlign = extractAllowedTextAlign(attrs);
                     replacement = textAlign == null ? "<" + tag + ">" : "<" + tag + " style=\"text-align: " + textAlign + "\">";
@@ -112,6 +129,32 @@ public final class RichTextContent {
         return !toPlainText(html).isBlank();
     }
 
+    private static String buildSpanReplacement(String attrs) {
+        String color = extractAllowedColor(attrs);
+        String fontFamily = extractAllowedFontFamily(attrs);
+        String fontSize = extractAllowedFontSize(attrs);
+
+        if (color == null && fontFamily == null && fontSize == null) {
+            return "<span>";
+        }
+
+        StringBuilder style = new StringBuilder();
+
+        if (color != null) {
+            style.append("color: ").append(color).append("; ");
+        }
+
+        if (fontFamily != null) {
+            style.append("font-family: ").append(fontFamily).append("; ");
+        }
+
+        if (fontSize != null) {
+            style.append("font-size: ").append(fontSize).append("; ");
+        }
+
+        return "<span style=\"" + style.toString().trim() + "\">";
+    }
+
     private static String extractAllowedColor(String attrs) {
         if (attrs == null || attrs.isBlank()) return null;
 
@@ -132,6 +175,35 @@ public final class RichTextContent {
         }
 
         return null;
+    }
+
+    private static String extractAllowedFontFamily(String attrs) {
+        if (attrs == null || attrs.isBlank()) return null;
+
+        Matcher styleMatcher = STYLE_ATTR_PATTERN.matcher(attrs);
+        if (!styleMatcher.find()) return null;
+
+        Matcher fontFamilyMatcher = FONT_FAMILY_STYLE_PATTERN.matcher(styleMatcher.group(2));
+        if (!fontFamilyMatcher.find()) return null;
+
+        String fontFamily = fontFamilyMatcher.group(1).trim();
+        String normalized = fontFamily.toLowerCase();
+
+        return ALLOWED_FONT_FAMILIES.contains(normalized) ? fontFamily : null;
+    }
+
+    private static String extractAllowedFontSize(String attrs) {
+        if (attrs == null || attrs.isBlank()) return null;
+
+        Matcher styleMatcher = STYLE_ATTR_PATTERN.matcher(attrs);
+        if (!styleMatcher.find()) return null;
+
+        Matcher fontSizeMatcher = FONT_SIZE_STYLE_PATTERN.matcher(styleMatcher.group(2));
+        if (!fontSizeMatcher.find()) return null;
+
+        String fontSize = fontSizeMatcher.group(1).trim().toLowerCase();
+
+        return ALLOWED_FONT_SIZES.contains(fontSize) ? fontSize : null;
     }
 
     private static String normalizeColor(String color) {

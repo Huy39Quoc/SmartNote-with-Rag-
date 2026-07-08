@@ -89,6 +89,7 @@ export default function Notes() {
     const banDaLuuRef = useRef('')
     const idParamRef = useRef(idParam)
     const ghiChuHienTaiRef = useRef(ghiChuHienTai)
+    const richTextEditorRef = useRef(null)
     const editorSessionIdRef = useRef(
         window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`
     )
@@ -1352,6 +1353,7 @@ export default function Notes() {
                                 </div>
 
                                 <RichTextEditor
+                                    ref={richTextEditorRef}
                                     key={ghiChuHienTai.id}
                                     noteId={ghiChuHienTai.id}
                                     collaborationUrl={collaborationUrl}
@@ -1678,6 +1680,14 @@ export default function Notes() {
                                 <NoteDiagramGenerator
                                     noteId={ghiChuHienTai.id}
                                     onDong={() => setHienSoDo(false)}
+                                    onChenVaoGhiChu={(html) => {
+                                        if (!coTheChinhSua) {
+                                            toast.error('Bạn không có quyền chỉnh sửa ghi chú này')
+                                            return
+                                        }
+                                        richTextEditorRef.current?.insertHtmlAtEnd(html)
+                                        toast.success('Đã chèn sơ đồ vào ghi chú')
+                                    }}
                                 />
                             )}
                         </div>

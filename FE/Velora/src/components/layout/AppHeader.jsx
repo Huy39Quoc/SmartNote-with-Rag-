@@ -127,103 +127,50 @@ export default function AppHeader() {
     const Icon = meta.icon
 
     return (
-        <header style={styles.header}>
-            <div style={styles.left}>
-                <div style={styles.iconBox}>
-                    <Icon size={18} />
+        <header
+            className="flex items-center justify-between gap-3 px-5 shrink-0"
+            style={{ height: 64, background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}
+        >
+            <div className="flex items-center gap-3 min-w-0">
+                <div
+                    className="flex items-center justify-center rounded-xl shrink-0"
+                    style={{ width: 38, height: 38, background: 'var(--bg-ai)', color: 'var(--accent-blue)' }}
+                >
+                    <Icon size={19} />
                 </div>
 
-                <div style={styles.textBox}>
-                    <h1 style={styles.title}>
+                <div className="min-w-0">
+                    <h1
+                        className="whitespace-nowrap overflow-hidden text-ellipsis"
+                        style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}
+                    >
                         {meta.title}
                     </h1>
 
-                    <p style={styles.desc}>
+                    <p
+                        className="whitespace-nowrap overflow-hidden text-ellipsis"
+                        style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--text-muted)', maxWidth: 680 }}
+                    >
                         {meta.desc}
                     </p>
                 </div>
             </div>
 
-            <div style={styles.right}>
-                <span style={styles.badge}>
+            <div className="flex items-center gap-2 shrink-0">
+                <span
+                    className="rounded-full whitespace-nowrap"
+                    style={{
+                        padding: '6px 12px',
+                        background: 'var(--bg-elevated)',
+                        border: '1px solid var(--border)',
+                        color: 'var(--text-muted)',
+                        fontSize: 11.5,
+                        fontWeight: 500,
+                    }}
+                >
                     SmartNote Workspace
                 </span>
             </div>
         </header>
     )
-}
-
-const styles = {
-    header: {
-        height: 54,
-        flexShrink: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 12,
-        padding: '8px 14px',
-        background: 'var(--bg-surface)',
-        borderBottom: '.5px solid var(--border)',
-    },
-
-    left: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        minWidth: 0,
-    },
-
-    iconBox: {
-        width: 34,
-        height: 34,
-        borderRadius: 10,
-        background: 'var(--bg-ai)',
-        color: 'var(--accent-blue)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
-    },
-
-    textBox: {
-        minWidth: 0,
-    },
-
-    title: {
-        margin: 0,
-        fontSize: 15,
-        fontWeight: 700,
-        color: 'var(--text-primary)',
-        lineHeight: 1.2,
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-    },
-
-    desc: {
-        margin: '2px 0 0',
-        fontSize: 11,
-        color: 'var(--text-muted)',
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        maxWidth: 680,
-    },
-
-    right: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        flexShrink: 0,
-    },
-
-    badge: {
-        padding: '5px 9px',
-        borderRadius: 999,
-        background: 'var(--bg-elevated)',
-        border: '.5px solid var(--border)',
-        color: 'var(--text-muted)',
-        fontSize: 11,
-        whiteSpace: 'nowrap',
-    },
 }
