@@ -34,6 +34,12 @@ const documentApi = {
     hoiDap: (id, data) =>
         client.post(`/documents/${id}/ask`, data),
 
+    layLichSuChat: (id) =>
+        client.get(`/documents/${id}/chat`),
+
+    xoaLichSuChat: (id) =>
+        client.delete(`/documents/${id}/chat`),
+
     xoa: (id) =>
         client.delete(`/documents/${id}`),
 

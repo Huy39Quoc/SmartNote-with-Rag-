@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
     IconFolderShare,
     IconSearch,
@@ -46,6 +47,7 @@ const permissionInfo = (permission) => {
 }
 
 export default function SharedDocuments() {
+    const navigate = useNavigate()
     const [danhSach, setDanhSach] = useState([])
     const [dangTai, setDangTai] = useState(true)
     const [tuKhoa, setTuKhoa] = useState('')
@@ -185,7 +187,7 @@ export default function SharedDocuments() {
                                     <button
                                         className="btn-primary"
                                         style={styles.openBtn}
-                                        onClick={e => { e.stopPropagation(); moChiTiet(item) }}
+                                        onClick={e => { e.stopPropagation(); navigate(`/documents?documentId=${item.documentId}`) }}
                                     >
                                         Xem tài liệu
                                     </button>

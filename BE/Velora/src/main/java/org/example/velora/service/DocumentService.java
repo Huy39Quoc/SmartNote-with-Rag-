@@ -16,4 +16,6 @@ public interface DocumentService {
     void delete(UUID userId, UUID docId);
     DocumentResponse.Summary reprocess(UUID userId, UUID docId);
     org.springframework.core.io.Resource loadFileResource(UUID userId, UUID docId);
+    DocumentResponse.ChatHistory getChatHistory(UUID userId, UUID docId);
+    void clearChatHistory(UUID userId, UUID docId);
 }

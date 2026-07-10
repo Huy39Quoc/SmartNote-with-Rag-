@@ -65,6 +65,8 @@ export default function TaiLieu() {
     const [cauHoi, setCauHoi] = useState('')
     const [phanHoiChat, setPhanHoiChat] = useState(null)
     const [lichSuChatTaiLieu, setLichSuChatTaiLieu] = useState([])
+    const [dangTaiChat, setDangTaiChat] = useState(false)
+    const [canAskChat, setCanAskChat] = useState(true)
 
     const [lichGoiY, setLichGoiY] = useState(false)
     const [dangTrichLich, setDangTrichLich] = useState(false)
@@ -113,15 +115,53 @@ export default function TaiLieu() {
         return `${gb.toFixed(2)} GB`
     }
 
-    const getDocumentChatStorageKey = (documentId = chon?.id) => {
-        const userKey = nguoiDung?.userId || nguoiDung?.id || 'me'
-        return `velora_document_chat_${userKey}_${documentId}`
+    const taiLichSuChat = async (documentId) => {
+        if (!documentId) {
+            setLichSuChatTaiLieu([])
+            setCanAskChat(true)
+            return
+        }
+
+        setDangTaiChat(true)
+
+        try {
+            const { data } = await documentApi.layLichSuChat(documentId)
+            const messages = data.data?.messages || []
+
+            // BE lưu từng dòng USER/ASSISTANT riêng theo thứ tự thời gian ->
+            // ghép lại thành từng cặp hỏi/đáp để hiển thị giống giao diện cũ.
+            const cap = []
+            for (let i = 0; i < messages.length; i++) {
+                const msg = messages[i]
+                if (msg.role !== 'USER') continue
+
+                const traLoi = messages[i + 1]?.role === 'ASSISTANT' ? messages[i + 1] : null
+
+                cap.push({
+                    id: msg.id,
+                    question: msg.content,
+                    answer: traLoi?.content || '',
+                    loading: false,
+                    error: !traLoi,
+                    senderName: msg.senderName,
+                    createdAt: msg.createdAt,
+                })
+            }
+
+            setLichSuChatTaiLieu(cap)
+            setCanAskChat(data.data?.canAsk !== false)
+        } catch {
+            setLichSuChatTaiLieu([])
+        } finally {
+            setDangTaiChat(false)
+        }
     }
 
     const resetRightPanel = () => {
         setKetQuaAi(null)
         setPhanHoiChat(null)
         setLichGoiY(false)
+        setCanAskChat(true)
         setHienShareTaiLieu(false)
         setDocumentShareEmail('')
         setDocumentSharePermission('VIEW')
@@ -183,13 +223,17 @@ export default function TaiLieu() {
         }
     }
 
-    const xoaLichSuChatTaiLieu = () => {
+    const xoaLichSuChatTaiLieu = async () => {
         if (!chon?.id) return
 
-        localStorage.removeItem(getDocumentChatStorageKey(chon.id))
-        setLichSuChatTaiLieu([])
-        setPhanHoiChat(null)
-        toast.success('Đã xóa lịch sử hỏi đáp')
+        try {
+            await documentApi.xoaLichSuChat(chon.id)
+            setLichSuChatTaiLieu([])
+            setPhanHoiChat(null)
+            toast.success('Đã xóa lịch sử hỏi đáp')
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Không thể xóa lịch sử hỏi đáp')
+        }
     }
 
     useEffect(() => {
@@ -201,29 +245,26 @@ export default function TaiLieu() {
     }, [selectedDocumentId])
 
     useEffect(() => {
-        if (!chon?.id) {
-            setLichSuChatTaiLieu([])
-            return
-        }
+        taiLichSuChat(chon?.id)
+    }, [chon?.id])
 
-        try {
-            const raw = localStorage.getItem(getDocumentChatStorageKey(chon.id))
-            const saved = raw ? JSON.parse(raw) : []
-
-            setLichSuChatTaiLieu(Array.isArray(saved) ? saved : [])
-        } catch {
-            setLichSuChatTaiLieu([])
-        }
-    }, [chon?.id, nguoiDung?.userId, nguoiDung?.id])
-
+    // Danh sách tài liệu (Summary) không có aiSummary/audioTranscript/myPermission
+    // -> luôn lấy lại chi tiết đầy đủ khi chọn 1 tài liệu, để hiển thị đúng kết
+    // quả phân tích AI đã lưu trước đó và đúng quyền hạn của người xem hiện tại.
     useEffect(() => {
         if (!chon?.id) return
 
-        localStorage.setItem(
-            getDocumentChatStorageKey(chon.id),
-            JSON.stringify(lichSuChatTaiLieu)
-        )
-    }, [lichSuChatTaiLieu, chon?.id, nguoiDung?.userId, nguoiDung?.id])
+        let huy = false
+
+        documentApi.layTheoId(chon.id)
+            .then(({ data }) => {
+                if (huy) return
+                setChon(prev => (prev && prev.id === chon.id ? { ...prev, ...data.data } : prev))
+            })
+            .catch(() => {})
+
+        return () => { huy = true }
+    }, [chon?.id])
 
     useEffect(() => {
         const xuLy = danhSach.filter(
@@ -438,6 +479,7 @@ export default function TaiLieu() {
             answer: '',
             loading: true,
             error: false,
+            senderName: nguoiDung?.fullName || 'Bạn',
             createdAt: new Date().toISOString(),
         }
 
@@ -817,7 +859,7 @@ export default function TaiLieu() {
                                 {dangMoFile ? 'Đang mở...' : 'Xem file gốc'}
                             </button>
 
-                            {isDocumentReady(chon) && coAiAnalyze && (
+                            {isDocumentReady(chon) && coAiAnalyze && chon.myPermission !== 'VIEW' && (
                                 <div style={{ display: 'flex', gap: 6 }}>
                                     {chon.fileType === 'AUDIO' ? (
                                         <button
@@ -841,7 +883,7 @@ export default function TaiLieu() {
                                 </div>
                             )}
 
-                            {isDocumentReady(chon) && coAiFlashcard && (
+                            {isDocumentReady(chon) && coAiFlashcard && chon.myPermission !== 'VIEW' && (
                                 <button
                                     className="btn-ghost"
                                     onClick={taoFlashcardTuTaiLieu}
@@ -1134,7 +1176,7 @@ export default function TaiLieu() {
                                             <div key={item.id} style={styles.chatTurn}>
                                                 <div style={styles.questionBubble}>
                                                     <div style={styles.bubbleLabel}>
-                                                        Bạn hỏi
+                                                        {item.senderName ? `${item.senderName} hỏi` : 'Câu hỏi'}
                                                     </div>
 
                                                     <div style={styles.bubbleText}>
@@ -1189,7 +1231,14 @@ export default function TaiLieu() {
                             )}
                         </div>
 
-                        {isDocumentReady(chon) && coAiChat && (
+                        {isDocumentReady(chon) && coAiChat && !canAskChat && (
+                            <div style={styles.lockedBox}>
+                                Bạn chỉ có quyền <strong>xem</strong> tài liệu này nên có thể đọc lại lịch sử hỏi đáp,
+                                nhưng không thể đặt câu hỏi mới. Nhờ chủ sở hữu đổi quyền thành "Có thể chỉnh sửa" để tham gia hỏi đáp.
+                            </div>
+                        )}
+
+                        {isDocumentReady(chon) && coAiChat && canAskChat && (
                             <div style={styles.chatInput}>
                                 <textarea
                                     value={cauHoi}

@@ -4,10 +4,12 @@ import org.example.velora.util.ChromaDbClient;
 import org.example.velora.dto.request.DocumentRequest;
 import org.example.velora.dto.response.DocumentResponse;
 import org.example.velora.entity.Document;
+import org.example.velora.entity.DocumentChatMessage;
 import org.example.velora.entity.Note;
 import org.example.velora.entity.User;
 import org.example.velora.exception.BadRequestException;
 import org.example.velora.exception.ResourceNotFoundException;
+import org.example.velora.repository.DocumentChatMessageRepository;
 import org.example.velora.repository.DocumentRepository;
 import org.example.velora.repository.DocumentShareRepository;
 import org.example.velora.repository.NoteRepository;
@@ -54,6 +56,7 @@ public class DocumentServiceImpl implements DocumentService {
     private final ChromaDbClient chromaDbClient;
     private final FileExtractor fileExtractor;
     private final DocumentShareRepository documentShareRepository;
+    private final DocumentChatMessageRepository documentChatMessageRepository;
     private final UserPackageService userPackageService;
 
     @Autowired
@@ -178,7 +181,8 @@ public class DocumentServiceImpl implements DocumentService {
         User user = getUser(userId);
         userPackageService.checkAiUsage(user, FEATURE_AI_AUDIO);
 
-        Document doc = ownerOnly(userId, docId);
+        Document doc = accessibleDocument(userId, docId);
+        requireCanOperate(userId, doc);
 
         if (doc.getFileType() != Document.FileType.AUDIO) {
             throw new BadRequestException("File này không phải audio");
@@ -241,7 +245,8 @@ public class DocumentServiceImpl implements DocumentService {
         User user = getUser(userId);
         userPackageService.checkAiUsage(user, FEATURE_AI_ANALYZE);
 
-        Document doc = ownerOnly(userId, docId);
+        Document doc = accessibleDocument(userId, docId);
+        requireCanOperate(userId, doc);
 
         if (doc.getStatus() != Document.Status.DONE) {
             throw new BadRequestException("Tài liệu chưa xử lý xong");
@@ -258,7 +263,23 @@ public class DocumentServiceImpl implements DocumentService {
         DocumentResponse.AnalysisResult result = aiService.analyzeDocument(content, req.getInstruction());
         userPackageService.increaseAiUsage(user);
 
+        // Lưu lại kết quả phân tích vào tài liệu -> mọi người có quyền xem
+        // (kể cả người được chia sẻ) đều thấy lại được, không cần phân tích lại mỗi lần mở.
+        StringBuilder combined = new StringBuilder(result.getSummary() == null ? "" : result.getSummary());
+        if (result.getKeyPoints() != null && !result.getKeyPoints().isEmpty()) {
+            combined.append("\n\nÝ chính:\n");
+            result.getKeyPoints().forEach(p -> combined.append("- ").append(p).append("\n"));
+        }
+        doc.setAiSummary(combined.toString().trim());
+        documentRepository.save(doc);
+
         return result;
+    }
+
+    private void requireCanOperate(UUID userId, Document doc) {
+        if ("VIEW".equals(resolvePermission(userId, doc))) {
+            throw new BadRequestException("Bạn chỉ có quyền xem tài liệu này. Nhờ chủ sở hữu đổi quyền thành \"Có thể chỉnh sửa\" để dùng tính năng này.");
+        }
     }
 
     @Override
@@ -266,22 +287,67 @@ public class DocumentServiceImpl implements DocumentService {
         User user = getUser(userId);
         userPackageService.checkAiUsage(user, FEATURE_AI_CHAT);
 
-        Document doc = ownerOnly(userId, docId);
+        Document doc = accessibleDocument(userId, docId);
+
+        // Khung chat hỏi đáp AI của tài liệu giờ được CHIA SẺ thật sự: người
+        // được chia sẻ quyền EDIT có thể cùng đặt câu hỏi (không chỉ chủ sở
+        // hữu như trước đây); quyền VIEW chỉ được đọc lại lịch sử, không hỏi mới.
+        requireCanOperate(userId, doc);
 
         if (doc.getStatus() != Document.Status.DONE || !Boolean.TRUE.equals(doc.getIsEmbedded())) {
             throw new BadRequestException("Tài liệu chưa xử lý xong hoặc chưa được embedding");
         }
 
-        List<String> chunks = chromaDbClient.search(req.getQuestion(), userId.toString(), docId.toString());
+        List<String> chunks = chromaDbClient.search(req.getQuestion(), doc.getUser().getId().toString(), docId.toString());
         String answer = aiService.chatWithContext(req.getQuestion(), chunks);
 
         userPackageService.increaseAiUsage(user);
+
+        documentChatMessageRepository.save(DocumentChatMessage.builder()
+                .document(doc).user(user).role(DocumentChatMessage.Role.USER)
+                .content(req.getQuestion()).build());
+        documentChatMessageRepository.save(DocumentChatMessage.builder()
+                .document(doc).user(user).role(DocumentChatMessage.Role.ASSISTANT)
+                .content(answer).build());
 
         return DocumentResponse.AskResult.builder()
                 .answer(answer)
                 .sourceParagraphs(chunks)
                 .confidence(chunks.isEmpty() ? 0.3 : 0.85)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DocumentResponse.ChatHistory getChatHistory(UUID userId, UUID docId) {
+        Document doc = accessibleDocument(userId, docId);
+        String permission = resolvePermission(userId, doc);
+
+        List<DocumentResponse.ChatMessage> messages = documentChatMessageRepository
+                .findByDocumentIdOrderByCreatedAtAsc(docId)
+                .stream()
+                .map(m -> DocumentResponse.ChatMessage.builder()
+                        .id(m.getId())
+                        .role(m.getRole().name())
+                        .content(m.getContent())
+                        .senderId(m.getUser() != null ? m.getUser().getId() : null)
+                        .senderName(m.getUser() != null ? m.getUser().getFullName() : null)
+                        .createdAt(m.getCreatedAt())
+                        .build())
+                .toList();
+
+        return DocumentResponse.ChatHistory.builder()
+                .messages(messages)
+                .canAsk(!"VIEW".equals(permission))
+                .build();
+    }
+
+    @Override
+    public void clearChatHistory(UUID userId, UUID docId) {
+        // Chỉ chủ sở hữu được xoá lịch sử chat chung, tránh 1 người được chia
+        // sẻ vô tình xoá mất hội thoại của cả nhóm.
+        ownerOnly(userId, docId);
+        documentChatMessageRepository.deleteByDocumentId(docId);
     }
 
     @Override
@@ -302,8 +368,22 @@ public class DocumentServiceImpl implements DocumentService {
     @Transactional(readOnly = true)
     public DocumentResponse.Detail getById(UUID userId, UUID docId) {
         // Cho phép cả owner lẫn người được chia sẻ (VIEW/EDIT) xem chi tiết.
-        // Các thao tác phá hủy (delete, analyze, ask) vẫn giữ nguyên ownerOnly().
-        return toDetail(accessibleDocument(userId, docId));
+        // Thao tác phá hủy (delete) vẫn giữ nguyên ownerOnly(); ask()/chat giờ
+        // cho phép người được chia sẻ quyền EDIT cùng hỏi đáp AI với tài liệu.
+        Document doc = accessibleDocument(userId, docId);
+        DocumentResponse.Detail detail = toDetail(doc);
+        detail.setMyPermission(resolvePermission(userId, doc));
+        return detail;
+    }
+
+    private String resolvePermission(UUID userId, Document doc) {
+        if (doc.getUser() != null && doc.getUser().getId().equals(userId)) {
+            return "OWNER";
+        }
+
+        return documentShareRepository.findByDocumentIdAndSharedWithId(doc.getId(), userId)
+                .map(s -> s.getPermission().name())
+                .orElse("VIEW");
     }
 
     @Override

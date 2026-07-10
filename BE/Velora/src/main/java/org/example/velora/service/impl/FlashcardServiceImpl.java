@@ -9,6 +9,7 @@ import org.example.velora.entity.User;
 import org.example.velora.exception.BadRequestException;
 import org.example.velora.exception.ResourceNotFoundException;
 import org.example.velora.repository.DocumentRepository;
+import org.example.velora.repository.DocumentShareRepository;
 import org.example.velora.repository.FlashcardRepository;
 import org.example.velora.repository.NoteRepository;
 import org.example.velora.repository.UserRepository;
@@ -35,6 +36,7 @@ public class FlashcardServiceImpl implements FlashcardService {
     private final FlashcardRepository flashcardRepository;
     private final UserRepository userRepository;
     private final DocumentRepository documentRepository;
+    private final DocumentShareRepository documentShareRepository;
     private final AiService aiService;
     private final UserPackageService userPackageService;
 
@@ -64,8 +66,16 @@ public class FlashcardServiceImpl implements FlashcardService {
         Document document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tài liệu không tồn tại"));
 
-        // Ownership check — chỉ owner mới được dùng, trả 404 để không lộ sự tồn tại
-        if (document.getUser() == null || !document.getUser().getId().equals(userId))
+        // Cho phép chủ sở hữu, hoặc người được chia sẻ quyền EDIT (nhất quán với
+        // quyền hỏi đáp AI / phân tích AI của tài liệu). Người chỉ có quyền VIEW
+        // hoặc không liên quan gì tới tài liệu đều bị chặn (404 để không lộ tồn tại).
+        boolean isOwner = document.getUser() != null && document.getUser().getId().equals(userId);
+        boolean canEdit = !isOwner && documentShareRepository
+                .findByDocumentIdAndSharedWithId(documentId, userId)
+                .map(s -> s.getPermission() == org.example.velora.entity.DocumentShare.Permission.EDIT)
+                .orElse(false);
+
+        if (!isOwner && !canEdit)
             throw new ResourceNotFoundException("Tài liệu không tồn tại");
 
         if (document.getStatus() != Document.Status.DONE && document.getStatus() != Document.Status.SUCCESS)

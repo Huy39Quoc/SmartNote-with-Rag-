@@ -839,7 +839,30 @@ export default function Notes() {
     const coTheTrichLich = (text) => {
         if (!text) return false
 
-        return /\b(?:\d{1,2}[:.][0-5]\d|[0-2]?\d\s*giờ?|ngày\s*\d{1,2}|thứ\s*(?:hai|ba|tư|năm|sáu|bảy)|deadline|hạn)\b/i.test(text)
+        return new RegExp(
+            '\\b(?:' +
+            // Giờ cụ thể: 14:30, 9.00, 20 giờ
+            '\\d{1,2}[:.][0-5]\\d' +
+            '|[0-2]?\\d\\s*(?:giờ|h)\\b' +
+            // Ngày tương đối: hôm nay, ngày mai, ngày mốt/kia, hôm qua
+            '|(?:ngày\\s*)?(?:hôm\\s*nay|hôm\\s*qua)' +
+            '|ngày\\s*(?:mai|mốt|kia)' +
+            // Tuần/tháng tương đối
+            '|tuần\\s*(?:này|sau|tới|trước)' +
+            '|tháng\\s*(?:này|sau|tới|trước)' +
+            '|cuối\\s*tuần' +
+            // Ngày cụ thể dạng số: ngày 20, 20/7, 20-07-2026, 20/07
+            '|ngày\\s*\\d{1,2}' +
+            '|\\d{1,2}[/\\-]\\d{1,2}(?:[/\\-]\\d{2,4})?' +
+            '|tháng\\s*\\d{1,2}' +
+            // Thứ trong tuần
+            '|thứ\\s*(?:hai|ba|tư|năm|sáu|bảy)\\b' +
+            '|chủ\\s*nhật' +
+            // Từ khoá deadline/hạn chót trực tiếp
+            '|deadline|hạn\\s*(?:chót|nộp)?|nộp\\s*(?:bài|báo\\s*cáo)' +
+            ')',
+            'i'
+        ).test(text)
     }
 
     useEffect(() => {

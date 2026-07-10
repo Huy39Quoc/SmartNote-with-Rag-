@@ -67,6 +67,27 @@ public class DocumentController {
             documentService.ask(u.getUserId(), id, req)));
     }
 
+    /**
+     * Lịch sử hỏi đáp AI của tài liệu — DÙNG CHUNG cho chủ sở hữu và người
+     * được chia sẻ (thay vì lưu riêng từng người), để chia sẻ tài liệu thực
+     * sự có ý nghĩa: quyền VIEW xem được (canAsk=false), quyền EDIT hỏi được.
+     */
+    @GetMapping("/{id}/chat")
+    public ResponseEntity<ApiResponse<DocumentResponse.ChatHistory>> getChatHistory(
+            @AuthenticationPrincipal UserDetailsImpl.UserDetailsWithId u,
+            @PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.ok(
+            documentService.getChatHistory(u.getUserId(), id)));
+    }
+
+    @DeleteMapping("/{id}/chat")
+    public ResponseEntity<ApiResponse<Void>> clearChatHistory(
+            @AuthenticationPrincipal UserDetailsImpl.UserDetailsWithId u,
+            @PathVariable UUID id) {
+        documentService.clearChatHistory(u.getUserId(), id);
+        return ResponseEntity.ok(ApiResponse.ok("Đã xoá lịch sử hỏi đáp", null));
+    }
+
     @GetMapping
     public ResponseEntity<ApiResponse<DocumentResponse.Page>> getAll(
             @AuthenticationPrincipal UserDetailsImpl.UserDetailsWithId u,

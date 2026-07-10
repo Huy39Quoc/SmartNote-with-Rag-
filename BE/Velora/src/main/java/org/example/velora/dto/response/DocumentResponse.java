@@ -34,6 +34,25 @@ public class DocumentResponse {
         private Integer audioDurationSeconds;
         private LocalDateTime uploadedAt;
         private LocalDateTime updatedAt;
+        /** OWNER / VIEW / EDIT — quyền của người đang xem đối với tài liệu này */
+        private String myPermission;
+    }
+
+    @Data @Builder
+    public static class ChatMessage {
+        private UUID id;
+        private String role;
+        private String content;
+        private UUID senderId;
+        private String senderName;
+        private LocalDateTime createdAt;
+    }
+
+    @Data @Builder
+    public static class ChatHistory {
+        private List<ChatMessage> messages;
+        /** Người xem chỉ có quyền VIEW thì không được gửi câu hỏi mới, chỉ đọc lại lịch sử. */
+        private boolean canAsk;
     }
 
     @Data @Builder
