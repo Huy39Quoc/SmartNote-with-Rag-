@@ -5,6 +5,7 @@ import org.example.velora.dto.request.KnowledgeGroupRequest;
 import org.example.velora.dto.response.KnowledgeGroupResponse;
 import org.example.velora.dto.response.NoteResponse;
 import org.example.velora.entity.AiClassificationFeedback;
+import org.example.velora.entity.Document;
 import org.example.velora.entity.KnowledgeGroup;
 import org.example.velora.entity.Note;
 import org.example.velora.entity.User;
@@ -12,18 +13,22 @@ import org.example.velora.exception.BadRequestException;
 import org.example.velora.exception.ResourceNotFoundException;
 import org.example.velora.mapper.NoteMapper;
 import org.example.velora.repository.AiClassificationFeedbackRepository;
+import org.example.velora.repository.DocumentRepository;
 import org.example.velora.repository.KnowledgeGroupRepository;
 import org.example.velora.repository.NoteRepository;
 import org.example.velora.repository.UserRepository;
 import org.example.velora.service.AiService;
 import org.example.velora.service.KnowledgeService;
 import org.example.velora.service.UserPackageService;
+import org.example.velora.util.ChromaDbClient;
 import org.example.velora.util.RichTextContent;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -35,13 +40,75 @@ public class KnowledgeServiceImpl implements KnowledgeService {
 
     private final KnowledgeGroupRepository groupRepository;
     private final NoteRepository noteRepository;
+    private final DocumentRepository documentRepository;
     private final UserRepository userRepository;
     private final AiService aiService;
     private final NoteMapper noteMapper;
     private final UserPackageService userPackageService;
     private final AiClassificationFeedbackRepository feedbackRepository;
+    private final ChromaDbClient chromaDbClient;
 
     @Override
+    @Transactional(readOnly = true)
+    public KnowledgeGroupResponse.GraphResult getKnowledgeGraph(UUID userId) {
+        List<Map<String, Object>> rawEdges = chromaDbClient.buildKnowledgeGraph(userId.toString());
+
+        if (rawEdges.isEmpty()) {
+            return KnowledgeGroupResponse.GraphResult.builder()
+                    .nodes(List.of())
+                    .edges(List.of())
+                    .build();
+        }
+
+        Map<String, String> noteTitles = new HashMap<>();
+        for (Note n : noteRepository.findByUserIdOrderByUpdatedAtDesc(userId)) {
+            noteTitles.put(n.getId().toString(), n.getTitle());
+        }
+
+        Map<String, String> docTitles = new HashMap<>();
+        for (Document d : documentRepository.findByUserIdOrderByUploadedAtDesc(userId)) {
+            docTitles.put(d.getId().toString(), d.getOriginalName());
+        }
+
+        java.util.Set<String> contextIds = new java.util.LinkedHashSet<>();
+        List<KnowledgeGroupResponse.GraphEdge> edges = new java.util.ArrayList<>();
+
+        for (Map<String, Object> e : rawEdges) {
+            String from = String.valueOf(e.get("from"));
+            String to = String.valueOf(e.get("to"));
+            double weight = e.get("weight") instanceof Number num ? num.doubleValue() : 0.0;
+
+            // Chỉ giữ lại cạnh nối 2 ghi chú/tài liệu mà người dùng còn sở hữu
+            // (tránh rác nếu note/document đã bị xoá nhưng vector chưa kịp dọn).
+            boolean fromKnown = noteTitles.containsKey(from) || docTitles.containsKey(from);
+            boolean toKnown = noteTitles.containsKey(to) || docTitles.containsKey(to);
+            if (!fromKnown || !toKnown) continue;
+
+            contextIds.add(from);
+            contextIds.add(to);
+            edges.add(KnowledgeGroupResponse.GraphEdge.builder()
+                    .from(from).to(to).weight(weight).build());
+        }
+
+        List<KnowledgeGroupResponse.GraphNode> nodes = contextIds.stream()
+                .map(id -> {
+                    boolean isNote = noteTitles.containsKey(id);
+                    String title = isNote ? noteTitles.get(id) : docTitles.get(id);
+                    return KnowledgeGroupResponse.GraphNode.builder()
+                            .id(id)
+                            .type(isNote ? "note" : "document")
+                            .title(StringUtils.hasText(title) ? title : "Không có tiêu đề")
+                            .build();
+                })
+                .toList();
+
+        return KnowledgeGroupResponse.GraphResult.builder()
+                .nodes(nodes)
+                .edges(edges)
+                .build();
+    }
+
+
     public KnowledgeGroupResponse.Detail create(UUID userId, KnowledgeGroupRequest.Create req) {
         User user = getUser(userId);
 

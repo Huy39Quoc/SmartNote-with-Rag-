@@ -6,6 +6,7 @@ import {
     IconFileText,
     IconMessages,
     IconMusic,
+    IconRefresh,
     IconShare,
     IconSparkles,
     IconTrash,
@@ -55,6 +56,8 @@ export default function TaiLieu() {
 
     const [dangTai, setDangTai] = useState(true)
     const [dangTaiLen, setDangTaiLen] = useState(false)
+    const [dangXuLyLai, setDangXuLyLai] = useState(false)
+    const [dangMoFile, setDangMoFile] = useState(false)
 
     const [ketQuaAi, setKetQuaAi] = useState(null)
     const [dangXuLyAi, setDangXuLyAi] = useState(false)
@@ -72,6 +75,7 @@ export default function TaiLieu() {
     const [documentShareEmail, setDocumentShareEmail] = useState('')
     const [documentSharePermission, setDocumentSharePermission] = useState('VIEW')
     const [documentShareList, setDocumentShareList] = useState([])
+    const [shareDangCapNhat, setShareDangCapNhat] = useState(new Set())
     const [dangShareDocument, setDangShareDocument] = useState(false)
 
     const dangHoiTaiLieuRef = useRef(false)
@@ -540,6 +544,40 @@ export default function TaiLieu() {
         }
     }
 
+    const xemFileGoc = async (documentId, fallbackName) => {
+        setDangMoFile(true)
+        try {
+            const { data } = await documentApi.layFile(documentId)
+            const url = URL.createObjectURL(data)
+            window.open(url, '_blank')
+            setTimeout(() => URL.revokeObjectURL(url), 60000)
+        } catch (error) {
+            toast.error(error.response?.data?.message || `Không thể mở file${fallbackName ? ` "${fallbackName}"` : ''}`)
+        } finally {
+            setDangMoFile(false)
+        }
+    }
+
+    const xuLyLaiTaiLieu = async () => {
+        if (!chon?.id || dangXuLyLai) return
+
+        setDangXuLyLai(true)
+
+        try {
+            const { data } = await documentApi.xuLyLai(chon.id)
+
+            const nextDoc = { ...chon, ...data.data }
+            setChon(nextDoc)
+            setDanhSach(prev => prev.map(d => (d.id === chon.id ? nextDoc : d)))
+
+            toast.success('Đang xử lý lại tài liệu...')
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Không thể xử lý lại tài liệu')
+        } finally {
+            setDangXuLyLai(false)
+        }
+    }
+
     const taiDanhSachShareTaiLieu = async () => {
         if (!chon?.id) return
 
@@ -598,6 +636,38 @@ export default function TaiLieu() {
             taiDanhSachShareTaiLieu()
         } catch (error) {
             toast.error(error.response?.data?.message || 'Hủy chia sẻ thất bại')
+        }
+    }
+
+    const doiQuyenChiaSe = async (item, permission) => {
+        if (item.permission === permission) return
+
+        setShareDangCapNhat(prev => new Set(prev).add(item.id))
+
+        // Đổi quyền trực tiếp bằng cách gọi lại API chia sẻ với email cũ + quyền mới
+        // (BE tự nhận diện và cập nhật thay vì tạo bản ghi trùng), không cần
+        // hủy chia sẻ rồi thêm lại như trước.
+        setDocumentShareList(prev =>
+            prev.map(s => (s.id === item.id ? { ...s, permission } : s))
+        )
+
+        try {
+            await documentApi.chiaSe(chon.id, {
+                email: item.sharedWithEmail,
+                permission,
+            })
+            toast.success('Đã đổi quyền truy cập')
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Không thể đổi quyền truy cập')
+            setDocumentShareList(prev =>
+                prev.map(s => (s.id === item.id ? { ...s, permission: item.permission } : s))
+            )
+        } finally {
+            setShareDangCapNhat(prev => {
+                const next = new Set(prev)
+                next.delete(item.id)
+                return next
+            })
         }
     }
 
@@ -736,6 +806,17 @@ export default function TaiLieu() {
                                 </div>
                             </div>
 
+                            <button
+                                className="btn-ghost"
+                                onClick={() => xemFileGoc(chon.id, chon.originalName)}
+                                disabled={dangMoFile}
+                                style={{ gap: 4 }}
+                                title="Xem / tải file gốc"
+                            >
+                                <IconFile size={13} />
+                                {dangMoFile ? 'Đang mở...' : 'Xem file gốc'}
+                            </button>
+
                             {isDocumentReady(chon) && coAiAnalyze && (
                                 <div style={{ display: 'flex', gap: 6 }}>
                                     {chon.fileType === 'AUDIO' ? (
@@ -799,6 +880,18 @@ export default function TaiLieu() {
                                     <Spinner size={12} />
                                     Đang xử lý tài liệu...
                                 </div>
+                            )}
+
+                            {chon.status === 'FAILED' && !chon._shared && (
+                                <button
+                                    className="btn-ai"
+                                    onClick={xuLyLaiTaiLieu}
+                                    disabled={dangXuLyLai}
+                                    style={{ gap: 4 }}
+                                >
+                                    {dangXuLyLai ? <Spinner size={12} /> : <IconRefresh size={13} />}
+                                    {dangXuLyLai ? 'Đang thử lại...' : 'Thử xử lý lại'}
+                                </button>
                             )}
                         </div>
 
@@ -876,11 +969,15 @@ export default function TaiLieu() {
                                                                 {item.sharedWithEmail}
                                                             </div>
 
-                                                            <div style={styles.shareMeta}>
-                                                                {item.permission === 'EDIT'
-                                                                    ? 'Có thể chỉnh sửa'
-                                                                    : 'Chỉ xem'}
-                                                            </div>
+                                                            <select
+                                                                value={item.permission}
+                                                                disabled={shareDangCapNhat.has(item.id)}
+                                                                onChange={e => doiQuyenChiaSe(item, e.target.value)}
+                                                                style={styles.sharePermissionSelect}
+                                                            >
+                                                                <option value="VIEW">Chỉ xem</option>
+                                                                <option value="EDIT">Có thể chỉnh sửa</option>
+                                                            </select>
                                                         </div>
 
                                                         <button
@@ -1473,5 +1570,15 @@ const styles = {
         fontSize: 10,
         color: 'var(--text-muted)',
         marginTop: 2,
+    },
+    sharePermissionSelect: {
+        fontSize: 11,
+        color: 'var(--text-secondary)',
+        marginTop: 3,
+        height: 24,
+        padding: '0 6px',
+        border: '.5px solid var(--border)',
+        borderRadius: 6,
+        background: 'var(--bg-elevated)',
     },
 }

@@ -9,6 +9,7 @@ import {
     IconArrowForwardUp,
     IconList,
     IconListNumbers,
+    IconListCheck,
     IconPalette,
     IconEraser,
     IconPhoto,
@@ -35,6 +36,8 @@ import TableRow from '@tiptap/extension-table-row'
 import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
 import Collaboration from '@tiptap/extension-collaboration'
+import TaskList from '@tiptap/extension-task-list'
+import TaskItem from '@tiptap/extension-task-item'
 import * as Y from 'yjs'
 import { sanitizeRichText } from '../../utils/richText'
 
@@ -424,6 +427,10 @@ const RichTextEditor = forwardRef(function RichTextEditor({
             ResizableTableRow,
             TableHeader,
             TableCell,
+            TaskList,
+            TaskItem.configure({
+                nested: true,
+            }),
             Collaboration.configure({
                 document: ydoc,
                 field: 'content',
@@ -471,6 +478,15 @@ const RichTextEditor = forwardRef(function RichTextEditor({
                 .insertContent(html)
                 .run()
         },
+        setContentHtml: (html) => {
+            const currentEditor = editorRef.current
+            if (!currentEditor) return
+
+            // Thay toàn bộ nội dung editor (đi qua transaction của TipTap/Yjs
+            // nên sẽ đồng bộ đúng, khác với việc chỉ đổi state React của component cha).
+            currentEditor.chain().focus().setContent(html || '', true).run()
+        },
+        getContentHtml: () => editorRef.current?.getHTML() || '',
     }), [])
 
     useEffect(() => {
@@ -990,6 +1006,20 @@ const RichTextEditor = forwardRef(function RichTextEditor({
                         style={styles.toolButton}
                     >
                         <IconListNumbers size={15} />
+                    </button>
+
+                    <button
+                        type="button"
+                        className="btn-ghost"
+                        title="Checklist (công việc)"
+                        onMouseDown={keepSelection}
+                        onClick={() => runCommand(() => editor.chain().focus().toggleTaskList().run())}
+                        style={{
+                            ...styles.toolButton,
+                            ...(editor?.isActive('taskList') ? styles.activeButton : {}),
+                        }}
+                    >
+                        <IconListCheck size={15} />
                     </button>
 
                     <span style={styles.divider} />

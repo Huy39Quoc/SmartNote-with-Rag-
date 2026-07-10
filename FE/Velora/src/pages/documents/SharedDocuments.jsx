@@ -52,6 +52,7 @@ export default function SharedDocuments() {
     const [chiTietMo, setChiTietMo] = useState(null)
     const [chiTietDuLieu, setChiTietDuLieu] = useState(null)
     const [dangTaiChiTiet, setDangTaiChiTiet] = useState(false)
+    const [dangMoFile, setDangMoFile] = useState(false)
 
     const taiDuLieu = async () => {
         setDangTai(true)
@@ -94,6 +95,20 @@ export default function SharedDocuments() {
     }
 
     const dongChiTiet = () => { setChiTietMo(null); setChiTietDuLieu(null) }
+
+    const xemFileGoc = async (documentId, fallbackName) => {
+        setDangMoFile(true)
+        try {
+            const { data } = await documentApi.layFile(documentId)
+            const url = URL.createObjectURL(data)
+            window.open(url, '_blank')
+            setTimeout(() => URL.revokeObjectURL(url), 60000)
+        } catch (error) {
+            toast.error(error.response?.data?.message || `Không thể mở file${fallbackName ? ` "${fallbackName}"` : ''}`)
+        } finally {
+            setDangMoFile(false)
+        }
+    }
 
     return (
         <div style={styles.page}>
@@ -212,6 +227,17 @@ export default function SharedDocuments() {
                                     </div>
                                 </div>
 
+                                <div style={styles.section}>
+                                    <button
+                                        className="btn-primary"
+                                        onClick={() => xemFileGoc(chiTietDuLieu.id, chiTietMo.documentName)}
+                                        disabled={dangMoFile}
+                                        style={{ justifyContent: 'center', width: '100%' }}
+                                    >
+                                        {dangMoFile ? 'Đang mở file...' : 'Xem / tải file gốc'}
+                                    </button>
+                                </div>
+
                                 {chiTietDuLieu.aiSummary && (
                                     <div style={styles.section}>
                                         <div style={styles.sectionTitle}>Tóm tắt AI</div>
@@ -228,7 +254,7 @@ export default function SharedDocuments() {
 
                                 {!chiTietDuLieu.aiSummary && !chiTietDuLieu.audioTranscript && (
                                     <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-                                        Tài liệu này chưa có tóm tắt hoặc transcript AI.
+                                        Tài liệu này chưa có tóm tắt hoặc transcript AI — nhưng bạn vẫn có thể xem file gốc ở trên.
                                     </div>
                                 )}
                             </div>

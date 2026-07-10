@@ -14,6 +14,9 @@ const knowledgeApi = {
 
     layThongKeFeedback: () =>
         client.get('/knowledge/classification-feedback/stats'),
+
+    layDoThi: () =>
+        client.get('/knowledge/graph'),
 }
 
 export default knowledgeApi

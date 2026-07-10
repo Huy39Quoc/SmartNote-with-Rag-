@@ -125,6 +125,33 @@ public class ChromaDbClient {
     }
 }
 
+    /**
+     * Bản đồ tri thức: tận dụng LẠI vector embedding đã có sẵn cho RAG để tính
+     * độ liên quan ngữ nghĩa giữa toàn bộ ghi chú/tài liệu của người dùng.
+     * Trả về danh sách cạnh (từ contextId -> contextId, kèm độ tương đồng).
+     */
+    public List<Map<String, Object>> buildKnowledgeGraph(String userId) {
+        try {
+            String raw = chromaWebClient.post().uri("/graph")
+                    .bodyValue(Map.of("userId", userId, "collection", collection))
+                    .retrieve().bodyToMono(String.class)
+                    .timeout(Duration.ofSeconds(30)).block();
+
+            if (raw == null) return List.of();
+
+            Map<?, ?> resp = objectMapper.readValue(raw, Map.class);
+            List<?> edges = (List<?>) resp.get("edges");
+            if (edges == null) return List.of();
+
+            return edges.stream()
+                    .map(e -> (Map<String, Object>) e)
+                    .toList();
+        } catch (Exception e) {
+            log.error("Chroma graph error userId={}: {}", userId, e.getMessage());
+            return List.of();
+        }
+    }
+
     public boolean isHealthy() {
         try {
             chromaWebClient.get().uri("/health").retrieve()

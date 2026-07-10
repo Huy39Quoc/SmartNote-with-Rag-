@@ -11,6 +11,29 @@ public class KnowledgeGroupResponse {
 
     @Data
     @Builder
+    public static class GraphNode {
+        private String id;
+        private String type;
+        private String title;
+    }
+
+    @Data
+    @Builder
+    public static class GraphEdge {
+        private String from;
+        private String to;
+        private double weight;
+    }
+
+    @Data
+    @Builder
+    public static class GraphResult {
+        private List<GraphNode> nodes;
+        private List<GraphEdge> edges;
+    }
+
+    @Data
+    @Builder
     public static class Summary {
 
         private UUID id;

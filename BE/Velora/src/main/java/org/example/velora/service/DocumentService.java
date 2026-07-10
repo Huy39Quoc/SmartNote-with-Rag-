@@ -14,4 +14,6 @@ public interface DocumentService {
     DocumentResponse.Page getAll(UUID userId, Pageable pageable);
     DocumentResponse.Detail getById(UUID userId, UUID docId);
     void delete(UUID userId, UUID docId);
+    DocumentResponse.Summary reprocess(UUID userId, UUID docId);
+    org.springframework.core.io.Resource loadFileResource(UUID userId, UUID docId);
 }

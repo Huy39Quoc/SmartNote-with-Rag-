@@ -209,6 +209,102 @@ def search(req: SearchRequest) -> Dict[str, Any]:
     }
 
 
+class GraphRequest(BaseModel):
+    userId: str
+    collection: str = "velora_vectors"
+    minSimilarity: float = Field(default=0.55, ge=0.0, le=1.0)
+    maxEdgesPerNode: int = Field(default=5, ge=1, le=20)
+
+
+@app.post("/graph")
+def build_knowledge_graph(req: GraphRequest) -> Dict[str, Any]:
+    """
+    Xây "bản đồ tri thức": tận dụng LẠI chính các vector embedding đã có sẵn
+    (dùng cho RAG chat) để tính độ liên quan ngữ nghĩa giữa TẤT CẢ ghi chú/tài
+    liệu của người dùng, không cần gọi thêm AI text-generation nào.
+    Mỗi contextId (1 note hoặc 1 document) có thể có nhiều chunk -> gộp lại
+    thành 1 vector đại diện (centroid) rồi so sánh cosine similarity từng cặp.
+    """
+    collection = get_collection(req.collection)
+
+    try:
+        raw = collection.get(
+            where={"userId": req.userId},
+            include=["embeddings", "metadatas"],
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Chroma get error: {e}")
+
+    embeddings = raw.get("embeddings", [])
+    metadatas = raw.get("metadatas", [])
+
+    if embeddings is None or len(embeddings) == 0:
+        return {"nodes": [], "edges": []}
+
+    import numpy as np
+
+    buckets: Dict[str, Dict[str, Any]] = {}
+
+    for vector, meta in zip(embeddings, metadatas):
+        context_id = meta.get("contextId")
+        if not context_id:
+            continue
+
+        bucket = buckets.setdefault(context_id, {
+            "type": meta.get("type", "document"),
+            "vectors": [],
+        })
+        bucket["vectors"].append(vector)
+
+    if len(buckets) < 2:
+        return {
+            "nodes": [
+                {"id": cid, "type": b["type"]} for cid, b in buckets.items()
+            ],
+            "edges": [],
+        }
+
+    context_ids = list(buckets.keys())
+    centroids = np.array([
+        np.mean(buckets[cid]["vectors"], axis=0) for cid in context_ids
+    ])
+
+    # Vector đã được normalize khi embed -> cosine similarity = dot product,
+    # nhưng centroid (trung bình) có thể không còn norm = 1 nên chuẩn hoá lại.
+    norms = np.linalg.norm(centroids, axis=1, keepdims=True)
+    norms[norms == 0] = 1e-9
+    normalized = centroids / norms
+
+    similarity_matrix = normalized @ normalized.T
+
+    edges = []
+    n = len(context_ids)
+
+    for i in range(n):
+        # Với mỗi node, chỉ giữ lại vài liên kết mạnh nhất để đồ thị không bị rối
+        scored = [
+            (j, float(similarity_matrix[i][j]))
+            for j in range(n)
+            if j != i and similarity_matrix[i][j] >= req.minSimilarity
+        ]
+        scored.sort(key=lambda x: x[1], reverse=True)
+
+        for j, score in scored[: req.maxEdgesPerNode]:
+            pair = tuple(sorted((context_ids[i], context_ids[j])))
+            edges.append({"from": pair[0], "to": pair[1], "weight": round(score, 4)})
+
+    # Loại trùng (A-B và B-A đều có thể được thêm từ 2 phía)
+    unique_edges = {}
+    for e in edges:
+        key = (e["from"], e["to"])
+        if key not in unique_edges or e["weight"] > unique_edges[key]["weight"]:
+            unique_edges[key] = e
+
+    nodes = [{"id": cid, "type": buckets[cid]["type"]} for cid in context_ids]
+
+    return {"nodes": nodes, "edges": list(unique_edges.values())}
+
+
 @app.delete("/embed/{context_id}")
 def delete_embed(context_id: str, collection: str = "velora_vectors") -> Dict[str, Any]:
     col = get_collection(collection)
@@ -246,7 +342,7 @@ async def transcribe_audio(
           "Hãy nhận dạng rõ ràng, giữ đúng thuật ngữ tiếng Anh như Java, Spring Boot, React, Docker, API, database."
       )
 
-      result = model.transcribe(
+      result = get_whisper_model().transcribe(
           temp_path,
           language=language or "vi",
           fp16=False,

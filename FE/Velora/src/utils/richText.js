@@ -13,6 +13,8 @@ const ALLOWED_TAGS = new Set([
     'UL',
     'OL',
     'LI',
+    'LABEL',
+    'INPUT',
     'H1',
     'H2',
     'H3',
@@ -169,6 +171,29 @@ export function sanitizeRichText(html = '') {
             if (isSafeImageSrc(src)) {
                 clean.setAttribute('src', src.trim())
                 if (alt) clean.setAttribute('alt', alt.slice(0, 200))
+            }
+        }
+
+        if (node.tagName === 'UL' && node.getAttribute('data-type') === 'taskList') {
+            clean.setAttribute('data-type', 'taskList')
+        }
+
+        if (node.tagName === 'LI' && node.getAttribute('data-type') === 'taskItem') {
+            clean.setAttribute('data-type', 'taskItem')
+            const checked = node.getAttribute('data-checked')
+            clean.setAttribute('data-checked', checked === '' || checked === 'true' ? 'true' : 'false')
+        }
+
+        if (node.tagName === 'INPUT') {
+            // Chỉ cho phép checkbox của checklist, không cho phép loại input khác
+            // (tránh chèn form field tuỳ ý qua nội dung ghi chú).
+            if (node.getAttribute('type') !== 'checkbox') {
+                return document.createTextNode('')
+            }
+            clean.setAttribute('type', 'checkbox')
+            clean.setAttribute('disabled', 'disabled')
+            if (node.hasAttribute('checked')) {
+                clean.setAttribute('checked', 'checked')
             }
         }
 

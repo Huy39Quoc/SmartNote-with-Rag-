@@ -77,6 +77,12 @@ const PAGE_META = [
         icon: IconBrain,
     },
     {
+        test: pathname => pathname === '/knowledge/graph',
+        title: 'Bản đồ tri thức',
+        desc: 'AI kết nối các ghi chú và tài liệu liên quan bằng ngữ nghĩa (RAG)',
+        icon: IconBrain,
+    },
+    {
         test: pathname => pathname === '/account',
         title: 'Tài khoản',
         desc: 'Quản lý thông tin cá nhân và gói sử dụng',

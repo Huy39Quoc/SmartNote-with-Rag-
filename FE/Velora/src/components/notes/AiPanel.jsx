@@ -28,7 +28,7 @@ const HANH_DONG = [
     },
 ]
 
-export default function AiPanel({ noteId, content, title, onApply, onDong }) {
+export default function AiPanel({ noteId, content, title, onApply, onInsertChecklist, onDong }) {
     const { nguoiDung } = useAuthStore()
 
     const hanhDongKhaDung = useMemo(() => {
@@ -102,6 +102,30 @@ export default function AiPanel({ noteId, content, title, onApply, onDong }) {
 
     const boQua = () => {
         setKetQua(null)
+    }
+
+    const chenChecklistVaoGhiChu = () => {
+        const items = (ketQua?.checklist || []).map(text => String(text).trim()).filter(Boolean)
+        if (items.length === 0) return
+
+        const escape = (s) => s
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+
+        const itemsHtml = items
+            .map(text => `<li data-type="taskItem" data-checked="false"><label><input type="checkbox"></label><div><p>${escape(text)}</p></div></li>`)
+            .join('')
+
+        const html = `<ul data-type="taskList">${itemsHtml}</ul>`
+
+        try {
+            onInsertChecklist?.(html)
+            onDong?.()
+            toast.success('Đã chèn checklist vào ghi chú')
+        } catch (error) {
+            toast.error(error?.message || 'Không thể chèn checklist')
+        }
     }
 
     return (
@@ -199,7 +223,26 @@ export default function AiPanel({ noteId, content, title, onApply, onDong }) {
                             </div>
                         )}
 
-                        {ketQua.improvedContent ? (
+                        {ketQua.checklist?.length > 0 ? (
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                <button
+                                    className="btn-primary"
+                                    onClick={chenChecklistVaoGhiChu}
+                                    style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}
+                                >
+                                    <IconCheck size={12} /> Chèn vào ghi chú
+                                </button>
+
+                                <button
+                                    className="btn-ghost"
+                                    onClick={apDung}
+                                    style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}
+                                    title="Tạo các task có deadline trong Lịch, dựa theo checklist này"
+                                >
+                                    Tạo task có deadline
+                                </button>
+                            </div>
+                        ) : ketQua.improvedContent ? (
                             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                                 <button
                                     className="btn-primary"

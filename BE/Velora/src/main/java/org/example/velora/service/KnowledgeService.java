@@ -28,4 +28,6 @@ public interface KnowledgeService {
     );
 
     KnowledgeGroupResponse.FeedbackStats getClassificationFeedbackStats(UUID userId);
+
+    KnowledgeGroupResponse.GraphResult getKnowledgeGraph(UUID userId);
 }

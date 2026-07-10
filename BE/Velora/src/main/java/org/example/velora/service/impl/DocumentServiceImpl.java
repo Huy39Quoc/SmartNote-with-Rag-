@@ -319,6 +319,25 @@ public class DocumentServiceImpl implements DocumentService {
         documentRepository.delete(doc);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public org.springframework.core.io.Resource loadFileResource(UUID userId, UUID docId) {
+        Document doc = accessibleDocument(userId, docId);
+
+        try {
+            java.nio.file.Path path = Paths.get(doc.getStoragePath());
+            org.springframework.core.io.Resource resource = new org.springframework.core.io.UrlResource(path.toUri());
+
+            if (!resource.exists() || !resource.isReadable()) {
+                throw new ResourceNotFoundException("File tài liệu không còn tồn tại trên máy chủ");
+            }
+
+            return resource;
+        } catch (java.net.MalformedURLException e) {
+            throw new ResourceNotFoundException("Không thể đọc file tài liệu");
+        }
+    }
+
     private Document accessibleDocument(UUID userId, UUID docId) {
         Document doc = documentRepository.findById(docId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tài liệu không tồn tại"));
@@ -334,6 +353,34 @@ public class DocumentServiceImpl implements DocumentService {
         }
 
         return doc;
+    }
+
+    @Override
+    public DocumentResponse.Summary reprocess(UUID userId, UUID docId) {
+        Document doc = ownerOnly(userId, docId);
+
+        if (doc.getStatus() == Document.Status.PROCESSING) {
+            throw new BadRequestException("Tài liệu đang được xử lý, vui lòng đợi");
+        }
+
+        doc.setStatus(Document.Status.PENDING);
+        doc.setIsEmbedded(false);
+        documentRepository.save(doc);
+
+        log.info("Document reprocess requested: id={}", docId);
+
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    applicationContext.getBean(DocumentServiceImpl.class).processAsync(docId);
+                }
+            });
+        } else {
+            applicationContext.getBean(DocumentServiceImpl.class).processAsync(docId);
+        }
+
+        return toSummary(doc);
     }
 
     private Document ownerOnly(UUID userId, UUID docId) {

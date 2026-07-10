@@ -18,6 +18,7 @@ import Chat from './pages/chat/Chat'
 import Documents from './pages/documents/Documents'
 import Schedule from './pages/schedule/Schedule'
 import Knowledge from './pages/knowledge/Knowledge'
+import KnowledgeGraph from './pages/knowledge/KnowledgeGraph'
 import Account from './pages/profile/Account'
 import Notifications from './pages/notifications/Notifications'
 import ServicePackages from './pages/packages/ServicePackages'
@@ -76,6 +77,7 @@ export default function App() {
                 <Route path="/shared-documents" element={<SharedDocuments />} />
                 <Route path="/schedule" element={<Schedule />} />
                 <Route path="/knowledge" element={<Knowledge />} />
+                <Route path="/knowledge/graph" element={<KnowledgeGraph />} />
                 <Route path="/account" element={<Account />} />
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/service-packages" element={<ServicePackages />} />

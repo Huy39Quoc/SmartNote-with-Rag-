@@ -88,6 +88,43 @@ public class DocumentController {
         return ResponseEntity.ok(ApiResponse.ok(documentService.getById(u.getUserId(), id)));
     }
 
+    /**
+     * Xem/tải file gốc đã upload (PDF, DOCX, TXT, audio...) - không phụ thuộc
+     * vào việc AI đã phân tích/tóm tắt xong hay chưa. Cho phép cả chủ sở hữu
+     * lẫn người được chia sẻ (VIEW hoặc EDIT).
+     */
+    @GetMapping("/{id}/file")
+    public ResponseEntity<org.springframework.core.io.Resource> getFile(
+            @AuthenticationPrincipal UserDetailsImpl.UserDetailsWithId u,
+            @PathVariable UUID id) {
+        DocumentResponse.Detail meta = documentService.getById(u.getUserId(), id);
+        org.springframework.core.io.Resource resource = documentService.loadFileResource(u.getUserId(), id);
+
+        String contentType = switch (meta.getFileType()) {
+            case PDF -> "application/pdf";
+            case DOCX -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+            case TXT -> "text/plain; charset=UTF-8";
+            case AUDIO -> "audio/mpeg";
+        };
+
+        String safeName = meta.getOriginalName() == null ? "file" : meta.getOriginalName();
+        String encodedName = java.net.URLEncoder.encode(safeName, java.nio.charset.StandardCharsets.UTF_8)
+                .replace("+", "%20");
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .header("Content-Disposition", "inline; filename*=UTF-8''" + encodedName)
+                .body(resource);
+    }
+
+    @PostMapping("/{id}/reprocess")
+    public ResponseEntity<ApiResponse<DocumentResponse.Summary>> reprocess(
+            @AuthenticationPrincipal UserDetailsImpl.UserDetailsWithId u,
+            @PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.ok("Đang xử lý lại tài liệu...",
+            documentService.reprocess(u.getUserId(), id)));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> delete(
             @AuthenticationPrincipal UserDetailsImpl.UserDetailsWithId u,

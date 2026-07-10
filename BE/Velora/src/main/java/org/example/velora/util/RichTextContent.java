@@ -8,7 +8,7 @@ public final class RichTextContent {
 
     private static final Set<String> ALLOWED_TAGS = Set.of(
             "b", "i", "u", "s", "strong", "em", "span", "p", "div", "br",
-            "ul", "ol", "li", "h1", "h2", "h3", "blockquote",
+            "ul", "ol", "li", "label", "input", "h1", "h2", "h3", "blockquote",
             "a", "img", "table", "thead", "tbody", "tr", "th", "td"
     );
 
@@ -51,6 +51,10 @@ public final class RichTextContent {
     private static final Pattern HREF_ATTR_PATTERN = Pattern.compile("(?i)\\bhref\\s*=\\s*([\"'])(.*?)\\1");
     private static final Pattern SRC_ATTR_PATTERN = Pattern.compile("(?i)\\bsrc\\s*=\\s*([\"'])(.*?)\\1");
     private static final Pattern ALT_ATTR_PATTERN = Pattern.compile("(?i)\\balt\\s*=\\s*([\"'])(.*?)\\1");
+    private static final Pattern DATA_TYPE_ATTR_PATTERN = Pattern.compile("(?i)\\bdata-type\\s*=\\s*([\"'])(.*?)\\1");
+    private static final Pattern DATA_CHECKED_ATTR_PATTERN = Pattern.compile("(?i)\\bdata-checked\\s*=\\s*([\"'])(.*?)\\1");
+    private static final Pattern INPUT_TYPE_ATTR_PATTERN = Pattern.compile("(?i)\\btype\\s*=\\s*([\"'])(.*?)\\1");
+    private static final Pattern CHECKED_ATTR_PATTERN = Pattern.compile("(?i)(?:^|\\s)checked\\b");
 
     private RichTextContent() {
     }
@@ -76,7 +80,7 @@ public final class RichTextContent {
 
             if (ALLOWED_TAGS.contains(tag)) {
                 if ("/".equals(slash)) {
-                    if ("img".equals(tag)) {
+                    if ("img".equals(tag) || "input".equals(tag)) {
                         replacement = "";
                     } else {
                         replacement = "</" + tag + ">";
@@ -85,6 +89,20 @@ public final class RichTextContent {
                     replacement = "<br>";
                 } else if ("span".equals(tag)) {
                     replacement = buildSpanReplacement(attrs);
+                } else if ("ul".equals(tag)) {
+                    replacement = "taskList".equals(extractDataType(attrs)) ? "<ul data-type=\"taskList\">" : "<ul>";
+                } else if ("li".equals(tag)) {
+                    if ("taskItem".equals(extractDataType(attrs))) {
+                        boolean checked = "true".equals(extractDataChecked(attrs));
+                        replacement = "<li data-type=\"taskItem\" data-checked=\"" + checked + "\">";
+                    } else {
+                        replacement = "<li>";
+                    }
+                } else if ("input".equals(tag)) {
+                    if ("checkbox".equals(extractInputType(attrs))) {
+                        boolean checked = attrs != null && CHECKED_ATTR_PATTERN.matcher(attrs).find();
+                        replacement = "<input type=\"checkbox\" disabled" + (checked ? " checked" : "") + ">";
+                    }
                 } else if (allowsTextAlign(tag)) {
                     String textAlign = extractAllowedTextAlign(attrs);
                     replacement = textAlign == null ? "<" + tag + ">" : "<" + tag + " style=\"text-align: " + textAlign + "\">";
@@ -268,6 +286,27 @@ public final class RichTextContent {
 
         String alt = decodeBasicEntities(matcher.group(2)).trim();
         return alt.isBlank() ? null : alt.substring(0, Math.min(alt.length(), 200));
+    }
+
+    private static String extractDataType(String attrs) {
+        if (attrs == null || attrs.isBlank()) return null;
+
+        Matcher matcher = DATA_TYPE_ATTR_PATTERN.matcher(attrs);
+        return matcher.find() ? matcher.group(2) : null;
+    }
+
+    private static String extractDataChecked(String attrs) {
+        if (attrs == null || attrs.isBlank()) return null;
+
+        Matcher matcher = DATA_CHECKED_ATTR_PATTERN.matcher(attrs);
+        return matcher.find() ? matcher.group(2) : null;
+    }
+
+    private static String extractInputType(String attrs) {
+        if (attrs == null || attrs.isBlank()) return null;
+
+        Matcher matcher = INPUT_TYPE_ATTR_PATTERN.matcher(attrs);
+        return matcher.find() ? matcher.group(2).toLowerCase() : null;
     }
 
     private static String escapeAttribute(String value) {

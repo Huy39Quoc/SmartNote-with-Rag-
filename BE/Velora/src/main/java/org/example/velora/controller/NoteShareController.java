@@ -59,7 +59,7 @@ public class NoteShareController {
             @Valid @RequestBody NoteShareRequest.UpdatePermission request
     ) {
         return ResponseEntity.ok(ApiResponse.ok(
-                "ÄÃ£ cáº­p nháº­t quyá»n chia sáº»",
+                "Đã cập nhật quyền chia sẻ",
                 noteShareService.updatePermission(user.getUserId(), shareId, request)
         ));
     }

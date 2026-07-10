@@ -107,4 +107,13 @@ public class KnowledgeController {
                 knowledgeService.getClassificationFeedbackStats(user.getUserId())
         ));
     }
+
+    @GetMapping("/graph")
+    public ResponseEntity<ApiResponse<KnowledgeGroupResponse.GraphResult>> getKnowledgeGraph(
+            @AuthenticationPrincipal UserDetailsImpl.UserDetailsWithId user
+    ) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                knowledgeService.getKnowledgeGraph(user.getUserId())
+        ));
+    }
 }

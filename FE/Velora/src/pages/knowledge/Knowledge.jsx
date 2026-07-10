@@ -1,6 +1,7 @@
 import {useEffect, useState} from 'react'
 import {useNavigate} from 'react-router-dom'
 import {
+    IconBrain,
     IconCheck,
     IconFileText,
     IconPlus,
@@ -269,9 +270,16 @@ export default function Knowledge() {
                 )}
 
                 <button className="btn-ai" onClick={phanLoaiLai} disabled={dangPhanLoai}
-                        style={{margin: '8px 10px', justifyContent: 'center', padding: '6px'}}>
+                        style={{margin: '8px 10px 4px', justifyContent: 'center', padding: '6px'}}>
                     {dangPhanLoai ? <Spinner size={12}/> : <IconSparkles size={12}/>}
                     AI phân loại lại tất cả
+                </button>
+
+                <button className="btn-ghost" onClick={() => navigate('/knowledge/graph')}
+                        style={{margin: '0 10px 8px', justifyContent: 'center', padding: '6px', fontSize: 11.5}}
+                        title="Xem sơ đồ liên kết ngữ nghĩa giữa các ghi chú/tài liệu">
+                    <IconBrain size={12}/>
+                    Xem bản đồ tri thức
                 </button>
                 {feedbackStats && (
                     <div style={styles.feedbackStats}>

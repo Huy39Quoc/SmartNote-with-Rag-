@@ -94,8 +94,10 @@ public class AiServiceImpl implements AiService {
                     .build();
         } catch (Exception e) {
             log.error("analyzeDocument error: {}", e.getMessage());
-            return DocumentResponse.AnalysisResult.builder()
-                    .summary("Không thể phân tích tài liệu lúc này").build();
+            // Trước đây lỗi bị "nuốt" và trả về như 1 kết quả phân tích thành công
+            // (chỉ có dòng summary báo lỗi) -> người dùng không thấy thông báo lỗi rõ ràng.
+            // Giờ ném lỗi thật để FE hiển thị toast lỗi đúng như đã thiết kế.
+            throw new BadRequestException("AI hiện không thể phân tích tài liệu này. Vui lòng thử lại sau.");
         }
     }
 
@@ -1286,13 +1288,13 @@ public class AiServiceImpl implements AiService {
 
         StringBuilder sb = new StringBuilder();
         sb.append("flowchart LR\n");
-        sb.append("  A[").append(escapeMermaid(title)).append("]\n");
+        sb.append("  A[\"").append(escapeMermaid(title)).append("\"]\n");
 
         for (int i = 0; i < lines.size(); i++) {
             char node = (char) ('B' + i);
-            sb.append("  ").append(node).append("[")
+            sb.append("  ").append(node).append("[\"")
                     .append(escapeMermaid(lines.get(i)))
-                    .append("]\n");
+                    .append("\"]\n");
             sb.append("  A --> ").append(node).append("\n");
         }
 
@@ -1422,13 +1424,7 @@ public class AiServiceImpl implements AiService {
     }
 
     private String sanitizeFlowchartLine(String line) {
-        String sanitized = line;
-
-        // Xử lý riêng từng loại ngoặc (tròn / vuông / nhọn) để tránh bắt nhầm
-        // ngoặc đóng của loại khác nhau -> sinh ký tự thừa gây lỗi cú pháp Mermaid.
-        sanitized = replaceNodeShape(sanitized, '{', '}');
-        sanitized = replaceNodeShape(sanitized, '(', ')');
-        sanitized = replaceNodeShape(sanitized, '[', ']');
+        String sanitized = replaceAllNodeShapes(line);
 
         // Lưới an toàn cuối cùng: sau khi chuẩn hoá, không được còn dấu ngoặc nhọn nào.
         sanitized = sanitized.replace("{", "").replace("}", "");
@@ -1436,20 +1432,24 @@ public class AiServiceImpl implements AiService {
         return "  " + sanitized.trim();
     }
 
-    private String replaceNodeShape(String line, char open, char close) {
-        String openEsc = "\\" + open;
-        String closeEsc = "\\" + close;
+    // Xử lý cả 3 dạng ngoặc node ({...}, (...), [...]) trong CÙNG một lượt quét,
+    // tránh việc lượt sau quét lại kết quả đã được lượt trước chuyển đổi
+    // (từng gây lặp dấu nháy khi dòng gốc dùng {} hoặc () ).
+    private static final Pattern NODE_SHAPE_PATTERN = Pattern.compile(
+            "([^\\s\\[\\]\\(\\)\\{\\}]+)\\s*(?:\\{([^\\}]*)\\}|\\(([^\\)]*)\\)|\\[([^\\]]*)\\])"
+    );
 
-        Pattern nodePattern = Pattern.compile(
-                "([A-Za-z][A-Za-z0-9_]*)\\s*" + openEsc + "([^" + closeEsc + "]*)" + closeEsc
-        );
-
-        Matcher matcher = nodePattern.matcher(line);
+    private String replaceAllNodeShapes(String line) {
+        Matcher matcher = NODE_SHAPE_PATTERN.matcher(line);
         StringBuffer sb = new StringBuffer();
 
         while (matcher.find()) {
             String nodeId = matcher.group(1);
-            String label = sanitizeMermaidLabel(matcher.group(2));
+            String rawLabel = matcher.group(2) != null ? matcher.group(2)
+                    : matcher.group(3) != null ? matcher.group(3)
+                    : matcher.group(4);
+
+            String label = sanitizeMermaidLabel(rawLabel);
 
             matcher.appendReplacement(
                     sb,

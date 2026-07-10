@@ -90,6 +90,7 @@ export default function Notes() {
     const idParamRef = useRef(idParam)
     const ghiChuHienTaiRef = useRef(ghiChuHienTai)
     const richTextEditorRef = useRef(null)
+    const autoTitleXuLyRef = useRef(new Set())
     const editorSessionIdRef = useRef(
         window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`
     )
@@ -354,7 +355,7 @@ export default function Notes() {
     const taoMoi = async () => {
         try {
             const { data } = await noteApi.taoMoi({
-                title: 'Ghi chú mới',
+                title: DEFAULT_TITLE,
                 content: '',
             })
 
@@ -367,6 +368,44 @@ export default function Notes() {
             toast.success('Đã tạo ghi chú mới')
         } catch {
             toast.error('Không thể tạo ghi chú')
+        }
+    }
+
+    const DEFAULT_TITLE = 'Ghi chú mới'
+
+    const tuDongDeXuatTieuDe = async (noteId, currentTitle, contentHtml) => {
+        const plainText = richTextToPlainText(contentHtml || '').trim()
+        if (plainText.length < 20) return
+
+        try {
+            const { data } = await noteApi.caiThienAi(noteId, {
+                content: plainText,
+                title: currentTitle,
+                action: 'SUGGEST_TITLE',
+            })
+
+            const suggestedTitle = data?.data?.suggestedTitle?.trim()
+            if (!suggestedTitle) return
+
+            // Nếu người dùng đã chuyển sang ghi chú khác trong lúc chờ AI, bỏ qua
+            // để tránh ghi đè nhầm tiêu đề của ghi chú không còn đang mở.
+            if (ghiChuHienTaiRef.current?.id !== noteId) return
+            if (ghiChuHienTaiRef.current?.title?.trim() !== DEFAULT_TITLE) return
+
+            const { data: updated } = await noteApi.capNhat(noteId, {
+                title: suggestedTitle,
+                content: ghiChuHienTaiRef.current.content,
+                tagIds: ghiChuHienTaiRef.current.tags?.map(t => t.id),
+                editorSessionId: editorSessionIdRef.current,
+            })
+
+            setGhiChuHienTai(updated.data)
+            setDanhSach(p => p.map(n => (n.id === updated.data.id ? { ...n, ...updated.data } : n)))
+            banDaLuuRef.current = taoDauMocGhiChu(updated.data)
+
+            toast.success(`Đã tự động đặt tiêu đề: "${suggestedTitle}"`)
+        } catch {
+            // Tính năng nền, không làm phiền người dùng nếu AI không phản hồi được.
         }
     }
 
@@ -394,6 +433,16 @@ export default function Notes() {
             )
 
             banDaLuuRef.current = taoDauMocGhiChu(data.data)
+
+            // Ghi chú mới, chưa từng đặt tên, vừa có nội dung thật sự lần đầu
+            // -> tự động đề xuất và áp dụng tiêu đề (không cần bấm nút thủ công).
+            if (
+                data.data.title?.trim() === DEFAULT_TITLE &&
+                !autoTitleXuLyRef.current.has(data.data.id)
+            ) {
+                autoTitleXuLyRef.current.add(data.data.id)
+                tuDongDeXuatTieuDe(data.data.id, data.data.title, data.data.content)
+            }
         } catch {
             toast.error('Lưu thất bại')
         } finally {
@@ -477,10 +526,11 @@ export default function Notes() {
             return
         }
 
+        let noiDungMoiApDung = null
+
         setGhiChuHienTai(p => {
             if (!p) return p
 
-            let noiDungMoi = p.content || ''
             let tieuDeMoi = p.title
 
             if (ketQua.suggestedTitle) {
@@ -488,17 +538,24 @@ export default function Notes() {
             }
 
             if (ketQua.improvedContent) {
-                noiDungMoi = ketQua.improvedContent
+                noiDungMoiApDung = ketQua.improvedContent
             } else if (ketQua.summary) {
-                noiDungMoi = `${noiDungMoi.trim()}\n\n---\n\n## AI Summary\n${ketQua.summary}`
+                noiDungMoiApDung = `${(p.content || '').trim()}\n\n---\n\n## AI Summary\n${ketQua.summary}`
             }
 
             return {
                 ...p,
                 title: tieuDeMoi,
-                content: noiDungMoi,
+                content: noiDungMoiApDung !== null ? noiDungMoiApDung : p.content,
             }
         })
+
+        // Nội dung ghi chú đang được soạn thảo real-time qua Yjs, nên phải đẩy
+        // thẳng vào editor đang chạy (qua ref) thì mới thực sự đổi trên màn hình
+        // và được lưu lại — chỉ đổi state React của component cha là không đủ.
+        if (noiDungMoiApDung !== null) {
+            richTextEditorRef.current?.setContentHtml(noiDungMoiApDung)
+        }
     }
 
     const xacNhanTaoTaskTuChecklist = async () => {
@@ -1672,6 +1729,13 @@ export default function Notes() {
                                     content={richTextToPlainText(ghiChuHienTai.content)}
                                     title={ghiChuHienTai.title}
                                     onApply={apDungAi}
+                                    onInsertChecklist={(html) => {
+                                        if (!coTheChinhSua) {
+                                            toast.error('Bạn không có quyền chỉnh sửa ghi chú này')
+                                            return
+                                        }
+                                        richTextEditorRef.current?.insertHtmlAtEnd(html)
+                                    }}
                                     onDong={() => setHienAi(false)}
                                 />
                             )}

@@ -7,6 +7,9 @@ const documentApi = {
     layTheoId: (id) =>
         client.get(`/documents/${id}`),
 
+    layFile: (id) =>
+        client.get(`/documents/${id}/file`, { responseType: 'blob' }),
+
     taiLen: (file, onProgress) => {
         const form = new FormData()
         form.append('file', file)
@@ -33,6 +36,9 @@ const documentApi = {
 
     xoa: (id) =>
         client.delete(`/documents/${id}`),
+
+    xuLyLai: (id) =>
+        client.post(`/documents/${id}/reprocess`),
 
     chiaSe: (documentId, data) =>
         client.post(`/document-shares/documents/${documentId}`, data),
