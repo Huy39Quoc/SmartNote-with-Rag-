@@ -88,6 +88,19 @@ const ALLOWED_FONT_FAMILIES = new Map([
     ['courier new, monospace', '"Courier New", monospace'],
 ])
 
+const ALLOWED_IMAGE_WIDTHS = new Set([
+    '240px',
+    '320px',
+    '420px',
+    '560px',
+    '100%',
+])
+
+function normalizeImageWidth(value = '') {
+    const width = value.trim().toLowerCase()
+    return ALLOWED_IMAGE_WIDTHS.has(width) ? width : ''
+}
+
 function normalizeFontSize(value = '') {
     const size = value.trim().toLowerCase()
     return ALLOWED_FONT_SIZES.has(size) ? size : ''
@@ -187,7 +200,21 @@ export function sanitizeRichText(html = '') {
 
             if (isSafeImageSrc(src)) {
                 clean.setAttribute('src', src.trim())
-                if (alt) clean.setAttribute('alt', alt.slice(0, 200))
+
+                if (alt) {
+                    clean.setAttribute('alt', alt.slice(0, 200))
+                }
+
+                const width = normalizeImageWidth(
+                    node.style.width || node.getAttribute('width') || ''
+                )
+
+                if (width) {
+                    clean.style.width = width
+                }
+
+                clean.style.maxWidth = '100%'
+                clean.style.height = 'auto'
             }
         }
 

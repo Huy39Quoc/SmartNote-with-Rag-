@@ -86,7 +86,13 @@ const FONT_SIZES = [
     { label: '24', value: '24px' },
     { label: '32', value: '32px' },
 ]
-
+const IMAGE_WIDTHS = [
+    { label: 'Ảnh S', value: '240px' },
+    { label: 'Ảnh M', value: '320px' },
+    { label: 'Ảnh L', value: '420px' },
+    { label: 'Ảnh XL', value: '560px' },
+    { label: 'Full', value: '100%' },
+]
 const CustomTextStyle = TextStyle.extend({
     addAttributes() {
         return {
@@ -111,6 +117,35 @@ const CustomTextStyle = TextStyle.extend({
                     return {
                         style: `font-family: ${attributes.fontFamily}`,
                     }
+                },
+            },
+        }
+    },
+})
+const ResizableImage = Image.extend({
+    addAttributes() {
+        return {
+            ...this.parent?.(),
+
+            width: {
+                default: '420px',
+                parseHTML: element => element.style.width || element.getAttribute('width') || '420px',
+                renderHTML: attributes => {
+                    const width = attributes.width || '420px'
+
+                    return {
+                        width,
+                        style: `width: ${width}; max-width: 100%; height: auto;`,
+                    }
+                },
+            },
+
+            alt: {
+                default: null,
+                parseHTML: element => element.getAttribute('alt'),
+                renderHTML: attributes => {
+                    if (!attributes.alt) return {}
+                    return { alt: attributes.alt }
                 },
             },
         }
@@ -431,7 +466,7 @@ const RichTextEditor = forwardRef(function RichTextEditor({
                     target: '_blank',
                 },
             }),
-            Image.configure({
+            ResizableImage.configure({
                 inline: false,
                 allowBase64: true,
             }),
@@ -730,9 +765,12 @@ const RichTextEditor = forwardRef(function RichTextEditor({
         const reader = new FileReader()
 
         reader.onload = () => {
-            editor.chain().focus().setImage({ src: reader.result }).run()
+            editor.chain().focus().setImage({
+                src: reader.result,
+                alt: file.name,
+                width: '420px',
+            }).run()
         }
-
         reader.readAsDataURL(file)
     }
     const setFontFamily = (fontFamily) => {
@@ -756,7 +794,25 @@ const RichTextEditor = forwardRef(function RichTextEditor({
 
         editor.chain().focus().setMark('textStyle', { fontSize }).run()
     }
+    const setImageWidth = (width) => {
+        if (!editor || readOnly || !editor.isActive('image')) return
 
+        editor
+            .chain()
+            .focus()
+            .updateAttributes('image', { width })
+            .run()
+    }
+
+    const xoaAnhDangChon = () => {
+        if (!editor || readOnly || !editor.isActive('image')) return
+
+        editor
+            .chain()
+            .focus()
+            .deleteSelection()
+            .run()
+    }
     const setHeading = (value) => {
         if (!editor || readOnly) return
 
@@ -1062,7 +1118,36 @@ const RichTextEditor = forwardRef(function RichTextEditor({
                     >
                         <IconPhoto size={15} />
                     </button>
+                    {editor?.isActive('image') && (
+                        <>
+                            <select
+                                title="Kích thước ảnh"
+                                value={editor?.getAttributes('image')?.width || '420px'}
+                                onChange={e => setImageWidth(e.target.value)}
+                                style={{
+                                    ...styles.toolSelect,
+                                    ...styles.imageSizeSelect,
+                                }}
+                            >
+                                {IMAGE_WIDTHS.map(size => (
+                                    <option key={size.value} value={size.value}>
+                                        {size.label}
+                                    </option>
+                                ))}
+                            </select>
 
+                            <button
+                                type="button"
+                                className="btn-ghost btn-danger"
+                                title="Xóa ảnh đang chọn"
+                                onMouseDown={keepSelection}
+                                onClick={xoaAnhDangChon}
+                                style={styles.toolButton}
+                            >
+                                <IconTrash size={15} />
+                            </button>
+                        </>
+                    )}
                     <div style={styles.tablePickerWrap}>
                     <button
                         type="button"
@@ -1352,6 +1437,9 @@ const styles = {
 
     sizeSelect: {
         width: 72,
+    },
+    imageSizeSelect: {
+        width: 86,
     },
     activeButton: {
         background: 'var(--bg-ai)',

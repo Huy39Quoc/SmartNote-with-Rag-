@@ -234,6 +234,14 @@ body.resize-cursor {
   background: transparent;
   pointer-events: none;
 }
+.rich-text-editor img.ProseMirror-selectednode {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 3px;
+}
 
+.rich-text-editor figure,
+.rich-text-editor img {
+    max-width: 100%;
+}
 @keyframes fadeIn { from { opacity:0; transform: translateY(4px); } to { opacity:1; transform: translateY(0); } }
 .fade-in { animation: fadeIn .2s ease; }
