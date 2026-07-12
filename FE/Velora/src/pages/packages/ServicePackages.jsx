@@ -4,10 +4,10 @@ import packageApi from '../../lib/api/packageApi'
 import Spinner from '../../components/ui/Spinner'
 import useAuthStore from '../../service/authStore'
 
-const PACKAGE_RANK = {
-    FREE: 0,
-    PRO: 1,
-    PLUS: 2,
+const SYSTEM_PACKAGE_ORDER = {
+    FREE: 1,
+    PRO: 2,
+    PLUS: 3,
 }
 
 const FEATURE_CODES = [
@@ -152,8 +152,53 @@ export default function ServicePackages() {
         return currentPackageName?.toUpperCase() || 'FREE'
     }
 
+    const getComparablePrice = (goi) => {
+        const monthly = Number(goi?.priceMonthly || 0)
+        const yearly = Number(goi?.priceYearly || 0)
+
+        if (monthly > 0) return monthly
+        if (yearly > 0) return yearly / 12
+
+        return 0
+    }
+
+    const sapXepGoi = (packages) => {
+        return [...packages].sort((a, b) => {
+            const aName = getPackageName(a)
+            const bName = getPackageName(b)
+
+            const aKnown = SYSTEM_PACKAGE_ORDER[aName]
+            const bKnown = SYSTEM_PACKAGE_ORDER[bName]
+
+            if (aKnown && bKnown) {
+                return aKnown - bKnown
+            }
+
+            if (aKnown && !bKnown) return -1
+            if (!aKnown && bKnown) return 1
+
+            const priceDiff = getComparablePrice(a) - getComparablePrice(b)
+
+            if (priceDiff !== 0) {
+                return priceDiff
+            }
+
+            return aName.localeCompare(bName)
+        })
+    }
+
     const getPackageRank = (packageName) => {
-        return PACKAGE_RANK[packageName?.toUpperCase()] ?? 0
+        const target = packageName?.toUpperCase() || 'FREE'
+        const orderedNames = sapXepGoi(danhSachGoi).map(getPackageName)
+        const index = orderedNames.findIndex(name => name === target)
+
+        if (index >= 0) return index
+
+        if (SYSTEM_PACKAGE_ORDER[target]) {
+            return SYSTEM_PACKAGE_ORDER[target] - 1
+        }
+
+        return orderedNames.length
     }
 
     const laGoiHienTai = (goi) => {
@@ -175,7 +220,12 @@ export default function ServicePackages() {
     }
 
     const getPackageActionLabel = (goi) => {
-        return `Nâng cấp lên ${getPackageName(goi)}`
+        const currentRank = getPackageRank(getCurrentPackageName())
+        const targetRank = getPackageRank(getPackageName(goi))
+
+        return targetRank > currentRank
+            ? `Nâng cấp lên ${getPackageName(goi)}`
+            : `Chọn gói ${getPackageName(goi)}`
     }
 
     const getUnavailablePackageText = (goi) => {
@@ -188,31 +238,6 @@ export default function ServicePackages() {
         }
 
         return 'Không khả dụng'
-    }
-
-    const formatGia = (price) => {
-        const value = Number(price || 0)
-
-        if (value === 0) return '0₫'
-
-        return value.toLocaleString('vi-VN', {
-            style: 'currency',
-            currency: 'VND',
-        })
-    }
-
-    const sapXepGoi = (packages) => {
-        const order = {
-            FREE: 1,
-            PRO: 2,
-            PLUS: 3,
-        }
-
-        return [...packages].sort((a, b) => {
-            const aOrder = order[a.name?.toUpperCase()] || 99
-            const bOrder = order[b.name?.toUpperCase()] || 99
-            return aOrder - bOrder
-        })
     }
 
     const formatBytes = (bytes) => {
@@ -256,7 +281,7 @@ export default function ServicePackages() {
 
     const getPackageByName = (name) => {
         return danhSachGoi.find(
-            goi => goi.name?.toUpperCase() === name.toUpperCase()
+            goi => getPackageName(goi) === name.toUpperCase()
         )
     }
 

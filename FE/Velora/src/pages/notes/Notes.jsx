@@ -128,9 +128,21 @@ export default function Notes() {
     }
 
     const layPreview = (note) => {
+        const previewFromApi = String(note?.contentPreview || '').trim()
+
+        if (previewFromApi) {
+            return previewFromApi.length > 110
+                ? `${previewFromApi.slice(0, 110)}...`
+                : previewFromApi
+        }
+
         const text = layPlainText(note?.content || '').trim()
-        if (!text) return 'Chưa có nội dung'
-        return text.length > 110 ? `${text.slice(0, 110)}...` : text
+
+        if (text) {
+            return text.length > 110 ? `${text.slice(0, 110)}...` : text
+        }
+
+        return 'Chưa có nội dung'
     }
 
     const parseNgayTuApi = (raw) => {
@@ -1055,37 +1067,39 @@ export default function Notes() {
                         </button>
                     </div>
 
-                    <div style={styles.tagFilter}>
-                        <button
-                            className={locTag ? 'btn-ghost' : 'btn-ai'}
-                            onClick={() => setLocTag(null)}
-                            style={styles.tagFilterButton}
-                        >
-                            Tất cả
-                        </button>
-
-                        {tags.slice(0, 8).map(t => (
+                    {(hienTag || locTag) && (
+                        <div style={styles.tagFilter}>
                             <button
-                                key={t.id}
-                                style={{
-                                    ...styles.tagFilterButton,
-                                    background: locTag === t.id
-                                        ? 'var(--bg-ai)'
-                                        : 'transparent',
-                                }}
-                                className={locTag === t.id ? 'btn-ai' : 'btn-ghost'}
-                                onClick={() => setLocTag(locTag === t.id ? null : t.id)}
+                                className={locTag ? 'btn-ghost' : 'btn-ai'}
+                                onClick={() => setLocTag(null)}
+                                style={styles.tagFilterButton}
                             >
-                                <span
-                                    style={{
-                                        ...styles.tagDot,
-                                        background: t.color || '#3B82F6',
-                                    }}
-                                />
-                                {t.name}
+                                Tất cả tag
                             </button>
-                        ))}
-                    </div>
+
+                            {tags.slice(0, 8).map(t => (
+                                <button
+                                    key={t.id}
+                                    style={{
+                                        ...styles.tagFilterButton,
+                                        background: locTag === t.id
+                                            ? 'var(--bg-ai)'
+                                            : 'transparent',
+                                    }}
+                                    className={locTag === t.id ? 'btn-ai' : 'btn-ghost'}
+                                    onClick={() => setLocTag(locTag === t.id ? null : t.id)}
+                                >
+                <span
+                    style={{
+                        ...styles.tagDot,
+                        background: t.color || '#3B82F6',
+                    }}
+                />
+                                    {t.name}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 <div style={styles.listBody}>

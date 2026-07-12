@@ -1,0 +1,24 @@
+# Node / React
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+
+# Python
+.venv/
+**/.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+
+# Java / Maven
+target/
+**/target/
+
+# Environment
+.env
+*.env
+
+# IDE
+.idea/
+.vscode/

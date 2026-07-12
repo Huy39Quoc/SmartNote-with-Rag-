@@ -18,7 +18,7 @@ import useAuthStore from '../service/authStore'
 import noteApi from '../lib/api/noteApi'
 import scheduleApi from '../lib/api/scheduleApi'
 import Spinner from '../components/ui/Spinner'
-
+import documentApi from '../lib/api/documentApi'
 export default function Overview() {
     const { nguoiDung } = useAuthStore()
     const navigate = useNavigate()
@@ -27,18 +27,20 @@ export default function Overview() {
     const [deadlineGanDay, setDeadlineGanDay] = useState([])
     const [dangTai, setDangTai] = useState(true)
     const [tuKhoa, setTuKhoa] = useState('')
-
+    const [taiLieuGanDay, setTaiLieuGanDay] = useState([])
     useEffect(() => {
         const tai = async () => {
             setDangTai(true)
 
             try {
-                const [rc, sc] = await Promise.all([
+                const [rc, sc, dc] = await Promise.all([
                     noteApi.layTatCa({ page: 0, size: 8 }),
                     scheduleApi.layUuTien(),
+                    documentApi.layTatCa({ page: 0, size: 4 }),
                 ])
 
                 setGhiChuGanDay(rc.data.data?.content || [])
+                setTaiLieuGanDay(dc.data.data?.content || [])
 
                 const ds = sc.data.data
                 const tatCa = [
@@ -93,32 +95,37 @@ export default function Overview() {
 
     const ghiChuGhim = ghiChuGanDay.slice(0, 3)
 
-    const taiLieuGanDay = [
-        {
-            ten: 'SWD392_PE.pdf',
-            thoiGian: 'Upload lúc 10:20 hôm qua',
-            trangThai: 'Đã phân tích',
-            type: 'success',
-        },
-        {
-            ten: 'Database_System_Design.pdf',
-            thoiGian: 'Upload lúc 09:15 30/06',
-            trangThai: 'Đã phân tích',
-            type: 'success',
-        },
-        {
-            ten: 'React_Handbook.pdf',
-            thoiGian: 'Upload lúc 16:45 29/06',
-            trangThai: 'Đang xử lý',
-            type: 'processing',
-        },
-        {
-            ten: 'System_Architecture.pptx',
-            thoiGian: 'Upload lúc 14:20 28/06',
-            trangThai: 'Chưa phân tích',
-            type: 'muted',
-        },
-    ]
+    const hienThiThoiGianTaiLieu = (raw) => {
+        const date = parseNgayTuApi(raw)
+
+        if (!date) return 'Vừa upload'
+
+        const diff = Math.max(0, Date.now() - date.getTime())
+        const minutes = Math.floor(diff / 60000)
+        const hours = Math.floor(minutes / 60)
+        const days = Math.floor(hours / 24)
+
+        if (minutes < 1) return 'Vừa upload'
+        if (minutes < 60) return `Upload ${minutes} phút trước`
+        if (hours < 24) return `Upload ${hours} giờ trước`
+        if (days < 7) return `Upload ${days} ngày trước`
+
+        return `Upload ${date.toLocaleDateString('vi-VN')}`
+    }
+
+    const trangThaiTaiLieu = (status) => {
+        switch (status) {
+            case 'DONE':
+                return { label: 'Đã phân tích', type: 'success' }
+            case 'PROCESSING':
+            case 'PENDING':
+                return { label: 'Đang xử lý', type: 'processing' }
+            case 'FAILED':
+                return { label: 'Lỗi xử lý', type: 'muted' }
+            default:
+                return { label: 'Chưa phân tích', type: 'muted' }
+        }
+    }
 
     const quickActions = [
         {
@@ -383,24 +390,41 @@ export default function Overview() {
                         </button>
                     </div>
 
-                    <div style={styles.documentGrid}>
-                        {taiLieuGanDay.map(d => (
-                            <div key={d.ten} style={styles.documentRow}>
-                                <div style={styles.documentIcon}>
-                                    <IconFileText size={15} />
-                                </div>
+                    {taiLieuGanDay.length === 0 ? (
+                        <p style={styles.emptyText}>Chưa có tài liệu nào</p>
+                    ) : (
+                        <div style={styles.documentGrid}>
+                            {taiLieuGanDay.map(d => {
+                                const status = trangThaiTaiLieu(d.status)
 
-                                <div style={styles.rowContent}>
-                                    <div style={styles.rowTitle}>{d.ten}</div>
-                                    <div style={styles.rowSub}>{d.thoiGian}</div>
-                                </div>
+                                return (
+                                    <div
+                                        key={d.id}
+                                        style={styles.documentRow}
+                                        onClick={() => navigate('/documents')}
+                                    >
+                                        <div style={styles.documentIcon}>
+                                            <IconFileText size={15} />
+                                        </div>
 
-                                <span style={{ ...styles.statusBadge, ...styles[`statusBadge_${d.type}`] }}>
-                                    {d.trangThai}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
+                                        <div style={styles.rowContent}>
+                                            <div style={styles.rowTitle}>
+                                                {d.originalName || 'Tài liệu không tên'}
+                                            </div>
+
+                                            <div style={styles.rowSub}>
+                                                {hienThiThoiGianTaiLieu(d.uploadedAt)}
+                                            </div>
+                                        </div>
+
+                                        <span style={{ ...styles.statusBadge, ...styles[`statusBadge_${status.type}`] }}>
+                        {status.label}
+                    </span>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )}
                 </div>
 
                 <div style={styles.panel}>

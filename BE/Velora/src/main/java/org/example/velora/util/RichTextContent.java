@@ -13,8 +13,10 @@ public final class RichTextContent {
     );
 
     private static final Set<String> ALLOWED_COLORS = Set.of(
-            "#e8e6de", "#ffffff", "#f87171", "#fb923c", "#facc15",
-            "#4ade80", "#38bdf8", "#a78bfa", "#f472b6"
+            "#000000", "#111827", "#374151", "#6b7280", "#e8e6de", "#ffffff",
+            "#ef4444", "#f97316", "#f59e0b", "#eab308", "#22c55e",
+            "#10b981", "#06b6d4", "#3b82f6", "#6366f1", "#8b5cf6", "#ec4899",
+            "#f87171", "#fb923c", "#facc15", "#4ade80", "#38bdf8", "#a78bfa", "#f472b6"
     );
 
     private static final Set<String> ALLOWED_FONT_FAMILIES = Set.of(
