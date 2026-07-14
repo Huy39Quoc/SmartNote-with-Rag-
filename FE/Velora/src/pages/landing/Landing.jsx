@@ -52,7 +52,7 @@ export default function Landing({ previewContent = null, editor = null }) {
       setContent({ ...LANDING_DEFAULTS, ...previewContent })
       return
     }
-    landingApi.layNoiDungDaXuatBan()
+    landingApi.getPublishedContent()
       .then(({ data }) => setContent({ ...LANDING_DEFAULTS, ...(data.data || {}) }))
       .catch(() => setContent(LANDING_DEFAULTS))
   }, [previewContent])

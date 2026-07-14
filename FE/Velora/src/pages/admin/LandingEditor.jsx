@@ -18,7 +18,7 @@ export default function LandingEditor() {
   const richTextRef = useRef({})
 
   useEffect(() => {
-    adminApi.layLandingDraft()
+    adminApi.getLandingDraft()
       .then(({ data }) => setContent({ ...LANDING_DEFAULTS, ...(data.data || {}) }))
       .catch(() => toast.error('Không thể tải nội dung Landing Page'))
       .finally(() => setLoading(false))
@@ -91,7 +91,7 @@ export default function LandingEditor() {
   const saveDraft = async (notify = true) => {
     setSaving(true)
     try {
-      const { data } = await adminApi.luuLandingDraft(requestBody())
+      const { data } = await adminApi.saveLandingDraft(requestBody())
       richTextRef.current = {}
       setContent({ ...LANDING_DEFAULTS, ...(data.data || {}) })
       if (notify) toast.success('Đã lưu bản nháp')
@@ -104,7 +104,7 @@ export default function LandingEditor() {
   const publish = async () => {
     if (!await saveDraft(false)) return
     setSaving(true)
-    try { await adminApi.xuatBanLanding(); setConfirmPublish(false); toast.success('Đã xuất bản Landing Page') }
+    try { await adminApi.publishLanding(); setConfirmPublish(false); toast.success('Đã xuất bản Landing Page') }
     catch (error) { toast.error(error.response?.data?.message || 'Xuất bản thất bại') }
     finally { setSaving(false) }
   }
