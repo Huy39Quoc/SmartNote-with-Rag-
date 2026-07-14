@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react'
-import { IconUsers, IconBrain, IconChartBar, IconBell, IconEdit, IconCheck, IconX, IconTrash, IconShield } from '@tabler/icons-react'
+import { IconUsers, IconBrain, IconChartBar, IconBell, IconEdit, IconCheck, IconX, IconTrash, IconShield, IconHomeEdit } from '@tabler/icons-react'
 import adminApi from '../../lib/api/adminApi'
 import Spinner from '../../components/ui/Spinner'
 import toast from 'react-hot-toast'
+import LandingEditor from './LandingEditor'
 
 const TAB = [
   { key: 'thongke',    nhan: 'Thống kê',     icon: IconChartBar },
   { key: 'nguoidung',  nhan: 'Người dùng',   icon: IconUsers },
   { key: 'prompt',     nhan: 'System Prompt', icon: IconBrain },
   { key: 'thongbao',   nhan: 'Thông báo',    icon: IconBell },
+  { key: 'landing',     nhan: 'Trang chủ',     icon: IconHomeEdit },
 ]
 
 export default function AdminPanel() {
@@ -235,6 +237,8 @@ export default function AdminPanel() {
             </div>
           </div>
         )}
+
+        {tab === 'landing' && <LandingEditor />}
 
       </div>
     </div>

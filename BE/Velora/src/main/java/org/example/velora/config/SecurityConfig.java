@@ -41,6 +41,7 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/api/packages/vnpay-callback").permitAll()
                         .requestMatchers("/api/packages/active").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/landing").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/notes/*/events").permitAll()
                         .requestMatchers("/api/notes/*/collab").permitAll()
 
