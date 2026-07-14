@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { IconUsers, IconBrain, IconChartBar, IconBell, IconEdit, IconCheck, IconX, IconTrash, IconShield, IconHomeEdit } from '@tabler/icons-react'
+import { IconUsers, IconBrain, IconChartBar, IconBell, IconEdit, IconCheck, IconX, IconTrash, IconShield, IconHomeEdit, IconReceipt } from '@tabler/icons-react'
 import adminApi from '../../lib/api/adminApi'
 import Spinner from '../../components/ui/Spinner'
 import toast from 'react-hot-toast'
 import LandingEditor from './LandingEditor'
+import TransactionManagement from './TransactionManagement'
 
 const TAB = [
   { key: 'stats',       label: 'Thống kê',     icon: IconChartBar },
@@ -11,6 +12,7 @@ const TAB = [
   { key: 'prompt',     label: 'System Prompt', icon: IconBrain },
   { key: 'notifications', label: 'Thông báo',  icon: IconBell },
   { key: 'landing',     label: 'Trang chủ',     icon: IconHomeEdit },
+  { key: 'transactions', label: 'Giao dịch',     icon: IconReceipt },
 ]
 
 export default function AdminPanel() {
@@ -239,6 +241,7 @@ export default function AdminPanel() {
         )}
 
         {tab === 'landing' && <LandingEditor />}
+        {tab === 'transactions' && <TransactionManagement />}
 
       </div>
     </div>

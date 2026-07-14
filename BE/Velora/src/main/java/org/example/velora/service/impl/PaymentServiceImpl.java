@@ -78,6 +78,7 @@ public class PaymentServiceImpl implements PaymentService {
                         .packageService(pkg)
                         .amount(price)
                         .status("PENDING")
+                        .billingType(normalizedType)
                         .build()
         );
 
@@ -120,11 +121,14 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         PackageTransaction tx = txOpt.get();
+        tx.setResponseCode(responseCode);
+        tx.setBankCode(params.get("vnp_BankCode"));
 
         if ("PENDING".equals(tx.getStatus())) {
             if ("00".equals(responseCode)) {
                 tx.setStatus("SUCCESS");
                 tx.setVnpayTranNo(params.get("vnp_TransactionNo"));
+                tx.setPayDate(parseVnpDate(params.get("vnp_PayDate")));
                 activatePaidPackage(tx);
             } else {
                 tx.setStatus("FAILED");
@@ -171,10 +175,17 @@ return returnUrl + "?status=" + tx.getStatus().toLowerCase();
                 ? null
                 : BigDecimal.valueOf(pkg.getPriceYearly());
 
-        boolean isYearly = yearlyPrice != null && tx.getAmount().compareTo(yearlyPrice) == 0;
+        boolean isYearly = "yearly".equalsIgnoreCase(tx.getBillingType())
+                || (tx.getBillingType() == null && yearlyPrice != null && tx.getAmount().compareTo(yearlyPrice) == 0);
         user.setPackageExpiryDate(isYearly ? base.plusYears(1) : base.plusMonths(1));
 
         userRepository.save(user);
+    }
+
+    private LocalDateTime parseVnpDate(String value) {
+        if (value == null || value.isBlank()) return null;
+        try { return LocalDateTime.parse(value, DateTimeFormatter.ofPattern("yyyyMMddHHmmss")); }
+        catch (Exception ignored) { return null; }
     }
 
     private BigDecimal resolvePrice(PackageService pkg, String billingType) {
