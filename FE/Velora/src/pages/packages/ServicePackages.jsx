@@ -33,6 +33,16 @@ const FEATURE_CODES = [
     'PRIORITY_SUPPORT',
 ]
 
+const formatGia = (value) => {
+    const price = Number(value || 0)
+
+    return price.toLocaleString('vi-VN', {
+        style: 'currency',
+        currency: 'VND',
+        maximumFractionDigits: 0,
+    })
+}
+
 export default function ServicePackages() {
     const { nguoiDung, layThongTin } = useAuthStore()
     const navigate = useNavigate()
