@@ -14,5 +14,5 @@ public class PackageServiceRequest {
     private Integer storageGb;
     private Integer maxDevices;
     private Boolean isActive;
-    private List<String> features; // Danh sách các mã quyền hạn ví dụ: ["AI_FLASHCARD", "DEADLINE_MANAGEMENT"]
+    private List<String> features;
 }

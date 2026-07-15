@@ -1,9 +1,3 @@
--- ============================================================
--- Velora - Seed data (SQL Server)
--- Admin mặc định: admin@velora.com / Admin@123
--- ============================================================
-
--- Admin account (BCrypt của "Admin@123")
 INSERT INTO users (id, email, password_hash, full_name, role, is_active, created_at)
 VALUES (
     NEWID(),
@@ -15,7 +9,6 @@ VALUES (
     SYSDATETIME()
 );
 
--- System prompts tiếng Việt
 INSERT INTO system_prompts (id, prompt_key, prompt_text, description, is_active, created_at) VALUES
 (NEWID(), 'note.summarize',
  N'Bạn là trợ lý AI thông minh hỗ trợ học tập. Hãy tóm tắt nội dung sau thành các điểm chính ngắn gọn, rõ ràng bằng tiếng Việt. Trả về dạng danh sách bullet points.',
@@ -53,7 +46,6 @@ INSERT INTO system_prompts (id, prompt_key, prompt_text, description, is_active,
  N'Bạn nhận được transcript âm thanh bằng tiếng Việt. Hãy: 1) Làm sạch văn bản, 2) Tổ chức thành ghi chú có cấu trúc với tiêu đề và bullet points, 3) Giữ nguyên nghĩa gốc. Trả về markdown.',
  N'Xử lý transcript âm thanh', 1, SYSDATETIME());
 
--- Service packages
 IF NOT EXISTS (SELECT 1 FROM package_service WHERE name = 'FREE')
 BEGIN
     INSERT INTO package_service (
@@ -117,7 +109,6 @@ BEGIN
     );
 END;
 
--- Default Plus user: thanh@gmail.com / thanh123
 DECLARE @plusPackageId UNIQUEIDENTIFIER;
 DECLARE @thanhUserId UNIQUEIDENTIFIER;
 

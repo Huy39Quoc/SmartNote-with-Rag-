@@ -22,20 +22,7 @@ import useAuthStore from '../../service/authStore'
 import logo from '../../assets/logo.svg'
 import notificationApi from '../../lib/api/notificationApi'
 import useThemeStore from '../../service/themeStore'
-
-const menu = [
-    { to: '/overview', label: 'Tổng quan', icon: IconLayoutDashboard },
-    { to: '/service-packages', label: 'Gói Premium', icon: IconSparkles },
-    { to: '/notes', label: 'Ghi chú', icon: IconNotes },
-    { to: '/shared-notes', label: 'Ghi chú được chia sẻ', icon: IconShare },
-    { to: '/chat', label: 'Hỏi đáp AI', icon: IconMessages },
-    { to: '/documents', label: 'Tài liệu', icon: IconFileText },
-    { to: '/shared-documents', label: 'Tài liệu được chia sẻ', icon: IconFolderShare },
-    { to: '/schedule', label: 'Lịch & Deadline', icon: IconCalendar },
-    { to: '/knowledge', label: 'Kiến thức', icon: IconBrain },
-    { to: '/account', label: 'Tài khoản', icon: IconUser },
-    { to: '/notifications', label: 'Thông báo', icon: IconBell },
-]
+import { SIDEBAR_MENU } from '../../constants/layoutConstants'
 
 export default function Sidebar() {
     const { user, logout, isAdmin } = useAuthStore()
@@ -96,7 +83,7 @@ export default function Sidebar() {
                 borderRight: '1px solid var(--border)',
             }}
         >
-            {/* Logo */}
+
             <div
                 className="flex items-center gap-2 px-5 py-4 shrink-0"
                 style={{ borderBottom: '1px solid var(--border)' }}
@@ -104,7 +91,6 @@ export default function Sidebar() {
                 <img src={logo} alt="Velora" style={{ height: 24 }} />
             </div>
 
-            {/* Quick create */}
             <div className="px-4 pt-4 pb-2">
                 <button
                     onClick={() => navigate('/notes')}
@@ -116,9 +102,8 @@ export default function Sidebar() {
                 </button>
             </div>
 
-            {/* Nav */}
             <nav className="flex-1 px-3 py-2 flex flex-col gap-0.5 overflow-y-auto">
-                {menu.map(({ to, icon: Icon, label }) => {
+                {SIDEBAR_MENU.map(({ to, icon: Icon, label }) => {
                     const isNotification = to === '/notifications'
 
                     return (
@@ -190,7 +175,6 @@ export default function Sidebar() {
                 )}
             </nav>
 
-            {/* Bottom: user + plan card + actions */}
             <div className="px-3 pb-3 pt-2 shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
                 <div className="flex items-center gap-2.5 px-2 py-2 mb-1">
                     <div

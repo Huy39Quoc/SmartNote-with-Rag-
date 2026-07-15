@@ -50,7 +50,6 @@ public class Note {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // Relationships
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "note_tags",

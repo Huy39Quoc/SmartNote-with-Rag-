@@ -31,7 +31,7 @@ const documentApi = {
     analyze: (id, data) =>
         client.post(`/documents/${id}/analyze`, data || {}),
 
-    hoiDap: (id, data) =>
+    ask: (id, data) =>
         client.post(`/documents/${id}/ask`, data),
 
     getChatHistory: (id) =>

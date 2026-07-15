@@ -6,7 +6,8 @@ import {
 import toast from 'react-hot-toast'
 import adminApi from '../../lib/api/adminApi'
 import Spinner from '../../components/ui/Spinner'
-import Landing, { LANDING_DEFAULTS } from '../landing/Landing'
+import Landing from '../landing/Landing'
+import { LANDING_DEFAULTS } from '../../constants/landingConstants'
 
 export default function LandingEditor() {
   const [content, setContent] = useState(LANDING_DEFAULTS)

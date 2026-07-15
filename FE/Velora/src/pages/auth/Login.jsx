@@ -39,7 +39,7 @@ export default function Login() {
 
   return (
     <div className="flex" style={{ height: '100vh', overflow: 'hidden', background: 'var(--bg-base)' }}>
-      {/* Cột trái - branding */}
+
       <div
         className="hidden md:flex flex-1 items-center justify-center p-12"
         style={{ background: 'var(--bg-surface)', borderRight: '1px solid var(--border)' }}
@@ -76,7 +76,6 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Cột phải - form */}
       <div className="flex items-center justify-center p-10" style={{ width: 440 }}>
         <div className="w-full">
           <h2 style={{ marginBottom: 6, fontSize: 22, fontWeight: 700, color: 'var(--text-primary)' }}>Đăng nhập</h2>
@@ -129,7 +128,7 @@ export default function Login() {
           <p style={{ textAlign: 'center', marginTop: 22, fontSize: 12.5, color: 'var(--text-muted)' }}>
             Chưa có tài khoản?{' '}
             <Link to="/register" style={{ color: 'var(--accent-blue)', textDecoration: 'none', fontWeight: 600 }}>
-              Đăng ký date
+              Đăng ký ngay
             </Link>
           </p>
         </div>

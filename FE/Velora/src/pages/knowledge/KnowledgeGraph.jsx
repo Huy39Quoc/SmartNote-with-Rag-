@@ -5,12 +5,7 @@ import toast from 'react-hot-toast'
 import knowledgeApi from '../../lib/api/knowledgeApi'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
-
-const WIDTH = 900
-const HEIGHT = 620
-const CENTER_X = WIDTH / 2
-const CENTER_Y = HEIGHT / 2
-const RADIUS = 260
+import { KNOWLEDGE_GRAPH_LAYOUT } from '../../constants/knowledgeConstants'
 
 export default function KnowledgeGraph() {
     const navigate = useNavigate()
@@ -32,7 +27,6 @@ export default function KnowledgeGraph() {
 
     useEffect(() => { loadGraph() }, [])
 
-    // Bố trí node theo vòng tròn, cụm gần nhau hơn nếu liên kết với nhiều node khác
     const layout = useMemo(() => {
         const { nodes } = data
         if (nodes.length === 0) return []
@@ -41,8 +35,8 @@ export default function KnowledgeGraph() {
             const angle = (i / nodes.length) * Math.PI * 2 - Math.PI / 2
             return {
                 ...node,
-                x: CENTER_X + RADIUS * Math.cos(angle),
-                y: CENTER_Y + RADIUS * Math.sin(angle),
+                x: KNOWLEDGE_GRAPH_LAYOUT.centerX + KNOWLEDGE_GRAPH_LAYOUT.radius * Math.cos(angle),
+                y: KNOWLEDGE_GRAPH_LAYOUT.centerY + KNOWLEDGE_GRAPH_LAYOUT.radius * Math.sin(angle),
             }
         })
     }, [data])
@@ -113,7 +107,7 @@ export default function KnowledgeGraph() {
                         />
                     </div>
                 ) : (
-                    <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} style={styles.svg}>
+                    <svg viewBox={`0 0 ${KNOWLEDGE_GRAPH_LAYOUT.width} ${KNOWLEDGE_GRAPH_LAYOUT.height}`} style={styles.svg}>
                         {data.edges.map((edge, i) => {
                             const a = nodeById[edge.from]
                             const b = nodeById[edge.to]

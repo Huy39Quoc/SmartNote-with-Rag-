@@ -64,12 +64,6 @@ public class UserMapper {
                 .build();
     }
 
-    /**
-     * Quy ước:
-     * - Nếu user chưa có package thì dùng defaultValue.
-     * - Nếu package có field null thì hiểu là vô hạn, trả về -1.
-     * - Nếu package có số âm thì cũng hiểu là vô hạn, trả về -1.
-     */
     private Integer normalizeLimit(Integer value, Integer defaultValue) {
         if (value == null) return -1;
         if (value < 0) return -1;

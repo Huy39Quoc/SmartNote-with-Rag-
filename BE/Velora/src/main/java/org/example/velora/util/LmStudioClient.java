@@ -22,7 +22,6 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class LmStudioClient {
 
-    // ĐÃ ĐỔI TÊN: Thành lmStudioWebClient để tự động khớp với @Bean trong WebClientConfig (Bỏ @Qualifier)
     private final WebClient lmStudioWebClient;
 
     @Value("${ai.lm-studio.model}")          private String model;
@@ -48,7 +47,7 @@ public class LmStudioClient {
                 ))
                 .maxTokens(maxTokens).temperature(temperature).stream(false).build();
         try {
-            // Thay đổi sang lmStudioWebClient
+
             LmStudioResponse resp = lmStudioWebClient.post()
                     .uri("/v1/chat/completions")
                     .bodyValue(req)
@@ -68,19 +67,14 @@ public class LmStudioClient {
         return "AI chưa trả về nội dung. Hãy kiểm tra LM Studio: model có thể đang bật Reasoning hoặc phản hồi quá lâu.";
     }
 
-    /**
-     * Transcribe audio file → text (dùng endpoint /v1/audio/transcriptions nếu LM Studio hỗ trợ)
-     * Nếu không hỗ trợ, cần cài Whisper riêng trong Python AI service
-     */
     public String transcribeAudio(String filePath) {
         try {
             MultipartBodyBuilder builder = new MultipartBodyBuilder();
             builder.part("file", new FileSystemResource(filePath));
             builder.part("model", "whisper-1");
-            builder.part("language", "vi");  // tiếng Việt
+            builder.part("language", "vi");
             builder.part("response_format", "text");
 
-            // Thay đổi sang lmStudioWebClient
             String result = lmStudioWebClient.post()
                     .uri("/v1/audio/transcriptions")
                     .contentType(MediaType.MULTIPART_FORM_DATA)
@@ -98,7 +92,7 @@ public class LmStudioClient {
 
     public List<String> getLoadedModels() {
         try {
-            // Thay đổi sang lmStudioWebClient
+
             Map<?, ?> resp = lmStudioWebClient.get().uri("/v1/models")
                     .retrieve().bodyToMono(Map.class)
                     .timeout(Duration.ofSeconds(5)).block();

@@ -1,12 +1,7 @@
-import { IconEdit, IconEye } from '@tabler/icons-react'
-
-const PERMISSIONS = {
-    EDIT: { label: 'Có thể chỉnh sửa', icon: IconEdit, className: 'tag-blue' },
-    VIEW: { label: 'Chỉ xem', icon: IconEye, className: 'tag-dim' },
-}
+import { PERMISSION_BADGE_CONFIG } from '../../constants/uiConstants'
 
 export default function PermissionBadge({ permission }) {
-    const info = PERMISSIONS[permission] || PERMISSIONS.VIEW
+    const info = PERMISSION_BADGE_CONFIG[permission] || PERMISSION_BADGE_CONFIG.VIEW
     const Icon = info.icon
 
     return (

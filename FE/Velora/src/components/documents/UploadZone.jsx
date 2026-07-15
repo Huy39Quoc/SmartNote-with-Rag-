@@ -1,17 +1,7 @@
 import { useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { IconUpload, IconFileText, IconMusic } from '@tabler/icons-react'
-
-const CHAP_NHAN = {
-  'application/pdf': ['.pdf'],
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-  'text/plain': ['.txt'],
-  'audio/mpeg': ['.mp3'],
-  'audio/wav': ['.wav'],
-  'audio/mp4': ['.m4a'],
-  'audio/webm': ['.webm'],
-  'audio/ogg': ['.ogg'],
-}
+import { DOCUMENT_UPLOAD_ACCEPT, DOCUMENT_UPLOAD_MAX_FILES } from '../../constants/documentConstants'
 
 export default function UploadZone({ onUpload, isUploading }) {
   const onDrop = useCallback(files => {
@@ -19,7 +9,7 @@ export default function UploadZone({ onUpload, isUploading }) {
   }, [onUpload])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop, accept: CHAP_NHAN, disabled: isUploading, maxFiles: 5,
+    onDrop, accept: DOCUMENT_UPLOAD_ACCEPT, disabled: isUploading, maxFiles: DOCUMENT_UPLOAD_MAX_FILES,
   })
 
   return (

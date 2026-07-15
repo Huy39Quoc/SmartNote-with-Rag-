@@ -13,6 +13,7 @@ import {
     IconArrowBackUp,
 } from '@tabler/icons-react'
 import noteApi from '../../lib/api/noteApi'
+import { NOTE_DIAGRAM_TYPES } from '../../constants/diagramConstants'
 
 mermaid.initialize({
     startOnLoad: false,
@@ -20,15 +21,6 @@ mermaid.initialize({
     theme: 'default',
 })
 
-const DIAGRAM_TYPES = [
-    { value: 'MINDMAP', label: 'Mindmap - Sơ đồ tư duy' },
-    { value: 'FLOWCHART', label: 'Flowchart - Quy trình' },
-    { value: 'ARCHITECTURE', label: 'Architecture - Kiến trúc' },
-    { value: 'SKETCHNOTE', label: 'Sketchnote - Ghi chú trực quan' },
-]
-
-// Loại bỏ mọi phần tử mermaid vô tình chèn thẳng vào <body> khi render lỗi
-// (mermaid tự vẽ 1 icon lỗi và không luôn dọn dẹp phần tử tạm của nó).
 function withBodyLeakCleanup(fn) {
     const before = new Set(Array.from(document.body.children))
 
@@ -298,7 +290,7 @@ export default function NoteDiagramGenerator({ noteId, onClose, onInsertIntoNote
     }
 
     const restoreOriginalCode = () => {
-        // Trường hợp người dùng chỉnh code lỗi, khôi phục lại bản gốc AI đã sinh ra.
+
         createDiagram()
     }
 
@@ -399,7 +391,7 @@ export default function NoteDiagramGenerator({ noteId, onClose, onInsertIntoNote
                     onChange={e => setDiagramType(e.target.value)}
                     style={styles.select}
                 >
-                    {DIAGRAM_TYPES.map(type => (
+                    {NOTE_DIAGRAM_TYPES.map(type => (
                         <option key={type.value} value={type.value}>
                             {type.label}
                         </option>

@@ -22,29 +22,7 @@ import toast from 'react-hot-toast'
 import useAuthStore from '../../service/authStore'
 import { getUpgradeMessage, hasFeature } from '../../utils/packageFeatures'
 import flashcardApi from '../../lib/api/flashcardApi'
-
-const TRANG_THAI = {
-    PENDING: {
-        label: 'Chờ xử lý',
-        color: 'var(--text-muted)',
-    },
-    PROCESSING: {
-        label: 'Đang xử lý',
-        color: 'var(--accent-amber)',
-    },
-    DONE: {
-        label: 'Hoàn tất',
-        color: 'var(--accent-green)',
-    },
-    SUCCESS: {
-        label: 'Hoàn tất',
-        color: 'var(--accent-green)',
-    },
-    FAILED: {
-        label: 'Lỗi',
-        color: 'var(--accent-red)',
-    },
-}
+import { DOCUMENT_STATUS_CONFIG } from '../../constants/documentConstants'
 
 export default function Documents() {
     const { user, getProfile } = useAuthStore()
@@ -128,8 +106,6 @@ export default function Documents() {
             const { data } = await documentApi.getChatHistory(documentId)
             const messages = data.data?.messages || []
 
-            // BE lưu từng dòng USER/ASSISTANT riêng theo thứ tự thời gian ->
-            // ghép lại thành từng cặp hỏi/đáp để hiển thị giống giao diện cũ.
             const cap = []
             for (let i = 0; i < messages.length; i++) {
                 const msg = messages[i]
@@ -248,9 +224,6 @@ export default function Documents() {
         loadChatHistory(select?.id)
     }, [select?.id])
 
-    // Danh sách tài liệu (Summary) không có aiSummary/audioTranscript/myPermission
-    // -> luôn lấy lại chi tiết đầy đủ khi chọn 1 tài liệu, để hiển thị đúng kết
-    // quả phân tích AI đã lưu trước đó và đúng quyền hạn của người xem hiện tại.
     useEffect(() => {
         if (!select?.id) return
 
@@ -295,7 +268,7 @@ export default function Documents() {
                         setSelected(nextDoc)
                     }
                 } catch {
-                    // Bỏ qua lỗi polling tạm thời
+
                 }
             }
         }, 3000)
@@ -455,7 +428,7 @@ export default function Documents() {
         }
     }
 
-    const hoiDap = async () => {
+    const askDocument = async () => {
         if (!canUseAiChat) {
             toast.error(getUpgradeMessage('AI_CHAT'))
             return
@@ -470,12 +443,12 @@ export default function Documents() {
 
         isAskingDocumentRef.current = true
 
-        const question = question.trim()
+        const trimmedQuestion = question.trim()
         const tempId = `${Date.now()}-${Math.random()}`
 
         const pendingMessage = {
             id: tempId,
-            question,
+            question: trimmedQuestion,
             answer: '',
             loading: true,
             error: false,
@@ -488,8 +461,8 @@ export default function Documents() {
         setProcessingAi(true)
 
         try {
-            const { data } = await documentApi.hoiDap(select.id, {
-                question,
+            const { data } = await documentApi.ask(select.id, {
+                question: trimmedQuestion,
             })
 
             const result = data.data || data
@@ -686,9 +659,6 @@ export default function Documents() {
 
         setShareBeingUpdated(prev => new Set(prev).add(item.id))
 
-        // Đổi quyền trực tiếp bằng cách gọi lại API chia sẻ với email cũ + quyền mới
-        // (BE tự nhận diện và cập nhật thay vì tạo bản ghi trùng), không cần
-        // hủy chia sẻ rồi thêm lại như trước.
         setDocumentShareList(prev =>
             prev.map(s => (s.id === item.id ? { ...s, permission } : s))
         )
@@ -748,7 +718,7 @@ export default function Documents() {
                     ) : (
                         items.map(d => {
                             const DocIcon = d.fileType === 'AUDIO' ? IconMusic : IconFileText
-                            const tt = TRANG_THAI[d.status] || TRANG_THAI.PENDING
+                            const tt = DOCUMENT_STATUS_CONFIG[d.status] || DOCUMENT_STATUS_CONFIG.PENDING
 
                             return (
                                 <div
@@ -841,7 +811,7 @@ export default function Documents() {
                                 </div>
 
                                 <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                                    {TRANG_THAI[select.status]?.label || select.status}
+                                    {DOCUMENT_STATUS_CONFIG[select.status]?.label || select.status}
                                     {' · '}
                                     {dungLuong(select.fileSize)}
                                     {select._shared ? ' · Được chia sẻ với bạn' : ''}
@@ -1255,7 +1225,7 @@ export default function Documents() {
                                                 return
                                             }
 
-                                            hoiDap()
+                                            askDocument()
                                         }
                                     }}
                                     placeholder={
@@ -1270,7 +1240,7 @@ export default function Documents() {
 
                                 <button
                                     className="btn-primary"
-                                    onClick={hoiDap}
+                                    onClick={askDocument}
                                     disabled={!question.trim() || isAnsweringDocument}
                                     style={{
                                         padding: '8px 14px',

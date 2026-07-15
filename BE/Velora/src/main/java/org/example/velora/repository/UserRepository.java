@@ -14,7 +14,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     boolean existsByEmail(String email);
 
-    /** Dùng countByIsActive thay vì @Query để tránh lỗi boolean literal với SQL Server */
     long countByIsActive(Boolean isActive);
 
     Page<User> findByEmailContainingIgnoreCaseOrFullNameContainingIgnoreCase(

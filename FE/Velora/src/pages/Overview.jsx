@@ -19,6 +19,7 @@ import noteApi from '../lib/api/noteApi'
 import scheduleApi from '../lib/api/scheduleApi'
 import Spinner from '../components/ui/Spinner'
 import documentApi from '../lib/api/documentApi'
+import { parseLocalDate } from '../utils/formatters'
 export default function Overview() {
     const { user } = useAuthStore()
     const navigate = useNavigate()
@@ -33,25 +34,32 @@ export default function Overview() {
             setLoading(true)
 
             try {
-                const [rc, sc, dc] = await Promise.all([
+                const [notesResult, schedulesResult, documentsResult] = await Promise.allSettled([
                     noteApi.getAll({ page: 0, size: 8 }),
                     scheduleApi.getPriority(),
                     documentApi.getAll({ page: 0, size: 4 }),
                 ])
 
-                setRecentNotes(rc.data.data?.content || [])
-                setRecentDocuments(dc.data.data?.content || [])
+                if (notesResult.status === 'fulfilled') {
+                    setRecentNotes(notesResult.value.data.data?.content || [])
+                }
 
-                const ds = sc.data.data
-                const all = [
-                    ...(ds?.urgent || []),
-                    ...(ds?.high || []),
-                    ...(ds?.medium || []),
-                ]
+                if (documentsResult.status === 'fulfilled') {
+                    setRecentDocuments(documentsResult.value.data.data?.content || [])
+                }
 
-                setUpcomingDeadlines(all.slice(0, 5))
+                if (schedulesResult.status === 'fulfilled') {
+                    const schedules = schedulesResult.value.data.data
+                    const all = [
+                        ...(schedules?.urgent || []),
+                        ...(schedules?.high || []),
+                        ...(schedules?.medium || []),
+                    ]
+
+                    setUpcomingDeadlines(all.slice(0, 5))
+                }
             } catch {
-                // Không chặn màn tổng quan nếu một API lỗi
+
             } finally {
                 setLoading(false)
             }
@@ -96,7 +104,7 @@ export default function Overview() {
     const pinnedNotes = recentNotes.slice(0, 3)
 
     const formatDocumentTime = (raw) => {
-        const date = parseApiDate(raw)
+        const date = parseLocalDate(raw)
 
         if (!date) return 'Vừa upload'
 

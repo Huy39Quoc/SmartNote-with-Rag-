@@ -43,10 +43,6 @@ public class PaymentServiceImpl implements PaymentService {
     @Value("${vnpay.return-url:http://localhost:5173/service-packages}") private String returnUrl;
     @Value("${vnpay.callback-url:http://localhost:8080/api/packages/vnpay-callback}") private String callbackUrl;
 
-    // =========================================================
-    // PUBLIC API
-    // =========================================================
-
     @Override
     @Transactional
     public ApiResponse<?> checkout(UUID packageId, String billingType, HttpServletRequest request) {
@@ -58,7 +54,6 @@ public class PaymentServiceImpl implements PaymentService {
         String normalizedType = normalizeBillingType(billingType);
         BigDecimal price = resolvePrice(pkg, normalizedType);
 
-        // Gói Free / giá 0 → kích hoạt luôn, không qua VNPay
         if (price.compareTo(BigDecimal.ZERO) <= 0) {
             activateFreePackage(user, pkg);
             Map<String, Object> data = Map.of(
@@ -69,7 +64,6 @@ public class PaymentServiceImpl implements PaymentService {
             return ApiResponse.ok(data);
         }
 
-        // Tạo transaction pending
         String txnRef = "VELORA" + System.currentTimeMillis();
         packageTransactionRepository.save(
                 PackageTransaction.builder()
@@ -82,7 +76,6 @@ public class PaymentServiceImpl implements PaymentService {
                         .build()
         );
 
-        // Build VNPay payment URL
         String paymentUrl = buildPaymentUrl(txnRef, price, request);
 
         Map<String, Object> data = Map.of(
@@ -143,10 +136,6 @@ public class PaymentServiceImpl implements PaymentService {
 
 return returnUrl + "?status=" + tx.getStatus().toLowerCase();
     }
-
-    // =========================================================
-    // PRIVATE HELPERS
-    // =========================================================
 
     private User currentUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();

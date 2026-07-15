@@ -1,7 +1,3 @@
-/**
- * SidebarFooter — User info + Logout section at the bottom of the sidebar
- * Tách riêng để dễ thay đổi profile, settings, logout độc lập
- */
 import { IconLogout } from '@tabler/icons-react'
 import useAuthStore from '../../service/authStore'
 import { useNavigate } from 'react-router-dom'

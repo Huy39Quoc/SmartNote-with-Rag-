@@ -18,9 +18,9 @@ public class DocumentRequest {
 
     @Data
     public static class TranscribeAudio {
-        /** Tuỳ chọn: gợi ý chủ đề để AI nhận dạng tốt hơn */
+
         private String topic;
-        /** Có tạo ghi chú từ transcript không? */
+
         private Boolean createNote = false;
         private String noteTitle;
     }

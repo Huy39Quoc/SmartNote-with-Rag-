@@ -263,8 +263,6 @@ public class DocumentServiceImpl implements DocumentService {
         DocumentResponse.AnalysisResult result = aiService.analyzeDocument(content, req.getInstruction());
         userPackageService.increaseAiUsage(user);
 
-        // Lưu lại kết quả phân tích vào tài liệu -> mọi người có quyền xem
-        // (kể cả người được chia sẻ) đều thấy lại được, không cần phân tích lại mỗi lần mở.
         StringBuilder combined = new StringBuilder(result.getSummary() == null ? "" : result.getSummary());
         if (result.getKeyPoints() != null && !result.getKeyPoints().isEmpty()) {
             combined.append("\n\nÝ chính:\n");
@@ -289,9 +287,6 @@ public class DocumentServiceImpl implements DocumentService {
 
         Document doc = accessibleDocument(userId, docId);
 
-        // Khung chat hỏi đáp AI của tài liệu giờ được CHIA SẺ thật sự: người
-        // được chia sẻ quyền EDIT có thể cùng đặt câu hỏi (không chỉ chủ sở
-        // hữu như trước đây); quyền VIEW chỉ được đọc lại lịch sử, không hỏi mới.
         requireCanOperate(userId, doc);
 
         if (doc.getStatus() != Document.Status.DONE || !Boolean.TRUE.equals(doc.getIsEmbedded())) {
@@ -344,8 +339,7 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Override
     public void clearChatHistory(UUID userId, UUID docId) {
-        // Chỉ chủ sở hữu được xoá lịch sử chat chung, tránh 1 người được chia
-        // sẻ vô tình xoá mất hội thoại của cả nhóm.
+
         ownerOnly(userId, docId);
         documentChatMessageRepository.deleteByDocumentId(docId);
     }
@@ -367,9 +361,7 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     @Transactional(readOnly = true)
     public DocumentResponse.Detail getById(UUID userId, UUID docId) {
-        // Cho phép cả owner lẫn người được chia sẻ (VIEW/EDIT) xem chi tiết.
-        // Thao tác phá hủy (delete) vẫn giữ nguyên ownerOnly(); ask()/chat giờ
-        // cho phép người được chia sẻ quyền EDIT cùng hỏi đáp AI với tài liệu.
+
         Document doc = accessibleDocument(userId, docId);
         DocumentResponse.Detail detail = toDetail(doc);
         detail.setMyPermission(resolvePermission(userId, doc));

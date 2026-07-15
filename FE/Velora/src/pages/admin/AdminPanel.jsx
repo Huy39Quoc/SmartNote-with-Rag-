@@ -1,19 +1,11 @@
 import { useEffect, useState } from 'react'
-import { IconUsers, IconBrain, IconChartBar, IconBell, IconEdit, IconCheck, IconX, IconTrash, IconShield, IconHomeEdit, IconReceipt } from '@tabler/icons-react'
+import { IconBell, IconEdit, IconCheck, IconX, IconTrash, IconShield } from '@tabler/icons-react'
 import adminApi from '../../lib/api/adminApi'
 import Spinner from '../../components/ui/Spinner'
 import toast from 'react-hot-toast'
 import LandingEditor from './LandingEditor'
 import TransactionManagement from './TransactionManagement'
-
-const TAB = [
-  { key: 'stats',       label: 'Thống kê',     icon: IconChartBar },
-  { key: 'users',       label: 'Người dùng',   icon: IconUsers },
-  { key: 'prompt',     label: 'System Prompt', icon: IconBrain },
-  { key: 'notifications', label: 'Thông báo',  icon: IconBell },
-  { key: 'landing',     label: 'Trang chủ',     icon: IconHomeEdit },
-  { key: 'transactions', label: 'Giao dịch',     icon: IconReceipt },
-]
+import { ADMIN_TABS } from '../../constants/adminConstants'
 
 export default function AdminPanel() {
   const [tab, setTab]             = useState('stats')
@@ -74,13 +66,13 @@ export default function AdminPanel() {
 
   return (
     <div style={styles.wrap}>
-      {/* Sidebar tab */}
+
       <div style={styles.sidebar}>
         <div style={{ padding: '12px 10px', borderBottom: '.5px solid var(--border)', display: 'flex', alignItems: 'center', gap: 6 }}>
           <IconShield size={14} style={{ color: 'var(--accent-purple)' }} />
           <span style={{ fontSize: 12, fontWeight: 600 }}>Quản trị hệ thống</span>
         </div>
-        {TAB.map(({ key, label, icon: Icon }) => (
+        {ADMIN_TABS.map(({ key, label, icon: Icon }) => (
           <div key={key} onClick={() => setTab(key)}
             style={{ ...styles.tabItem, background: tab === key ? 'var(--bg-selected)' : 'transparent', color: tab === key ? 'var(--text-primary)' : 'var(--text-muted)' }}>
             <Icon size={14} />
@@ -89,10 +81,8 @@ export default function AdminPanel() {
         ))}
       </div>
 
-      {/* Nội dung */}
       <div style={styles.content}>
 
-        {/* Thống kê */}
         {tab === 'stats' && (
           <div style={{ padding: 20 }}>
             <h2 style={{ marginBottom: 16 }}>Thống kê hệ thống</h2>
@@ -117,7 +107,6 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* Người dùng */}
         {tab === 'users' && (
           <div style={{ padding: 20, overflow: 'auto', flex: 1 }}>
             <h2 style={{ marginBottom: 14 }}>Quản lý người dùng ({users.length})</h2>
@@ -170,7 +159,6 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* System Prompt */}
         {tab === 'prompt' && (
           <div style={{ padding: 20, overflow: 'auto' }}>
             <h2 style={{ marginBottom: 6 }}>System Prompt</h2>
@@ -215,7 +203,6 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* Thông báo */}
         {tab === 'notifications' && (
           <div style={{ padding: 20 }}>
             <h2 style={{ marginBottom: 6 }}>Gửi thông báo toàn hệ thống</h2>

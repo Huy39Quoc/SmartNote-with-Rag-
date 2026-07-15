@@ -66,9 +66,6 @@ public class FlashcardServiceImpl implements FlashcardService {
         Document document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tài liệu không tồn tại"));
 
-        // Cho phép chủ sở hữu, hoặc người được chia sẻ quyền EDIT (nhất quán với
-        // quyền hỏi đáp AI / phân tích AI của tài liệu). Người chỉ có quyền VIEW
-        // hoặc không liên quan gì tới tài liệu đều bị chặn (404 để không lộ tồn tại).
         boolean isOwner = document.getUser() != null && document.getUser().getId().equals(userId);
         boolean canEdit = !isOwner && documentShareRepository
                 .findByDocumentIdAndSharedWithId(documentId, userId)
@@ -117,8 +114,6 @@ public class FlashcardServiceImpl implements FlashcardService {
         return flashcardRepository.findByNoteId(note.getId())
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
-
-    // ── Private helpers ───────────────────────────────────────────────────
 
     private User getUser(UUID userId) {
         return userRepository.findById(userId)

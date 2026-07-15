@@ -18,7 +18,7 @@ public class SystemPrompt {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    // Cập nhật trường ID sang UNIQUEIDENTIFIER
+
     @Column(name = "id", columnDefinition = "UNIQUEIDENTIFIER", updatable = false, nullable = false)
     private UUID id;
 
@@ -35,7 +35,6 @@ public class SystemPrompt {
     @Builder.Default
     private Boolean isActive = true;
 
-    // Cập nhật trường updatedBy sang UNIQUEIDENTIFIER để đồng bộ dữ liệu với User Id
     @Column(name = "updated_by", columnDefinition = "UNIQUEIDENTIFIER")
     private UUID updatedBy;
 

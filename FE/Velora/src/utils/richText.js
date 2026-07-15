@@ -229,8 +229,7 @@ export function sanitizeRichText(html = '') {
         }
 
         if (node.tagName === 'INPUT') {
-            // Chỉ cho phép checkbox của checklist, không cho phép loại input khác
-            // (tránh chèn form field tuỳ ý qua nội dung ghi chú).
+
             if (node.getAttribute('type') !== 'checkbox') {
                 return document.createTextNode('')
             }
