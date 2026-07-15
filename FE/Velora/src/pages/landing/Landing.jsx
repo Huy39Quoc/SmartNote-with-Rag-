@@ -32,7 +32,7 @@ export const LANDING_DEFAULTS = {
     { number: '03', title: 'Để AI làm phần còn lại', description: 'Tóm tắt, phân tích và hỏi đáp với nội dung của bạn.' },
   ],
   ctaTitle: 'Sẵn sàng bắt đầu?',
-  ctaDescription: 'Đăng ký ngay — hoàn toàn miễn phí, không yêu cầu thẻ tín dụng',
+  ctaDescription: 'Đăng ký date — hoàn toàn miễn phí, không yêu cầu thẻ tín dụng',
   ctaButtonText: 'Tạo tài khoản miễn phí',
   footerText: '© 2026 Velora · SmartNote with AI',
   textStyles: {},

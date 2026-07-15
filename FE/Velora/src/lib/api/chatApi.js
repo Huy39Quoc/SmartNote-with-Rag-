@@ -1,12 +1,12 @@
 import client from './client'
 const chatApi = {
-  layDanhSachSession: ()          => client.get('/chat/sessions'),
-  laySession:         (id)        => client.get(`/chat/sessions/${id}`),
-  taoSession:         (data)      => client.post('/chat/sessions', data || {}),
-  capNhatSession:     (id, data)  => client.patch(`/chat/sessions/${id}`, data),
-  xoaSession:         (id)        => client.delete(`/chat/sessions/${id}`),
+  getSessions: ()          => client.get('/chat/sessions'),
+  getSession:         (id)        => client.get(`/chat/sessions/${id}`),
+  createSession:         (data)      => client.post('/chat/sessions', data || {}),
+  updateSession:     (id, data)  => client.patch(`/chat/sessions/${id}`, data),
+  deleteSession:         (id)        => client.delete(`/chat/sessions/${id}`),
   hoiDap:             (id, data)  => client.post(`/chat/sessions/${id}/ask`, data),
-  nhanDangGiongNoi:   (formData)  => client.post('/chat/transcribe', formData, {
+  recognizeSpeech:   (formData)  => client.post('/chat/transcribe', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
 }

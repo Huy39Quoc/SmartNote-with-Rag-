@@ -85,7 +85,7 @@ const PAGE_META = [
     {
         test: pathname => pathname === '/account',
         title: 'Tài khoản',
-        desc: 'Quản lý thông tin cá nhân và gói sử dụng',
+        desc: 'Quản lý thông message cá nhân và gói sử dụng',
         icon: IconUser,
     },
     {

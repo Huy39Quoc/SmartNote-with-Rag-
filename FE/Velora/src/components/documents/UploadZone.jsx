@@ -13,13 +13,13 @@ const CHAP_NHAN = {
   'audio/ogg': ['.ogg'],
 }
 
-export default function UploadZone({ onUpload, dangTaiLen }) {
+export default function UploadZone({ onUpload, isUploading }) {
   const onDrop = useCallback(files => {
     files.forEach(f => onUpload(f))
   }, [onUpload])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop, accept: CHAP_NHAN, disabled: dangTaiLen, maxFiles: 5,
+    onDrop, accept: CHAP_NHAN, disabled: isUploading, maxFiles: 5,
   })
 
   return (
@@ -29,7 +29,7 @@ export default function UploadZone({ onUpload, dangTaiLen }) {
       borderColor: isDragActive ? 'var(--accent-blue)' : 'var(--border)',
     }}>
       <input {...getInputProps()} />
-      {dangTaiLen
+      {isUploading
         ? <><div className="spinner" /><span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Đang tải lên...</span></>
         : (
           <>

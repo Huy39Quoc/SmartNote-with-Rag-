@@ -17,33 +17,33 @@ import toast from 'react-hot-toast'
 export default function SharedNotes() {
     const navigate = useNavigate()
 
-    const [danhSach, setDanhSach] = useState([])
-    const [dangTai, setDangTai] = useState(true)
-    const [tuKhoa, setTuKhoa] = useState('')
+    const [items, setItems] = useState([])
+    const [isLoading, setLoading] = useState(true)
+    const [keyword, setKeyword] = useState('')
 
-    const taiDuLieu = async () => {
-        setDangTai(true)
+    const loadData = async () => {
+        setLoading(true)
 
         try {
-            const { data } = await noteApi.layGhiChuDuocChiaSe()
-            setDanhSach(data.data || [])
+            const { data } = await noteApi.getSharedNotes()
+            setItems(data.data || [])
         } catch (error) {
             toast.error(error.response?.data?.message || 'Không thể tải danh sách ghi chú được chia sẻ')
         } finally {
-            setDangTai(false)
+            setLoading(false)
         }
     }
 
     useEffect(() => {
-        taiDuLieu()
+        loadData()
     }, [])
 
-    const danhSachLoc = useMemo(() => {
-        const keyword = tuKhoa.trim().toLowerCase()
+    const filteredItems = useMemo(() => {
+        const keyword = keyword.trim().toLowerCase()
 
-        if (!keyword) return danhSach
+        if (!keyword) return items
 
-        return danhSach.filter(item => {
+        return items.filter(item => {
             const title = item.noteTitle?.toLowerCase() || ''
             const ownerEmail = item.ownerEmail?.toLowerCase() || ''
             const ownerName = item.ownerFullName?.toLowerCase() || ''
@@ -52,9 +52,9 @@ export default function SharedNotes() {
                 || ownerEmail.includes(keyword)
                 || ownerName.includes(keyword)
         })
-    }, [danhSach, tuKhoa])
+    }, [items, keyword])
 
-    const moGhiChu = (noteId) => {
+    const openNote = (noteId) => {
         if (!noteId) {
             toast.error('Không tìm thấy ghi chú')
             return
@@ -63,7 +63,7 @@ export default function SharedNotes() {
         navigate(`/notes/${noteId}`)
     }
 
-    const formatNgay = (value) => {
+    const formatDate = (value) => {
         if (!value) return ''
 
         try {
@@ -112,7 +112,7 @@ export default function SharedNotes() {
 
                     <button
                         className="btn-ghost"
-                        onClick={taiDuLieu}
+                        onClick={loadData}
                         style={{ fontSize: 12 }}
                     >
                         Làm mới
@@ -132,18 +132,18 @@ export default function SharedNotes() {
                     />
 
                     <input
-                        value={tuKhoa}
-                        onChange={e => setTuKhoa(e.target.value)}
+                        value={keyword}
+                        onChange={e => setKeyword(e.target.value)}
                         placeholder="Tìm theo tiêu đề, email hoặc tên người chia sẻ..."
                         style={styles.searchInput}
                     />
                 </div>
 
-                {dangTai ? (
+                {isLoading ? (
                     <div style={styles.loadingBox}>
                         <Spinner size={24} />
                     </div>
-                ) : danhSachLoc.length === 0 ? (
+                ) : filteredItems.length === 0 ? (
                     <div style={styles.emptyBox}>
                         <EmptyState
                             icon={IconShare}
@@ -153,7 +153,7 @@ export default function SharedNotes() {
                     </div>
                 ) : (
                     <div style={styles.grid}>
-                        {danhSachLoc.map(item => {
+                        {filteredItems.map(item => {
                             const info = permissionInfo(item.permission)
                             const PermissionIcon = info.icon
 
@@ -161,7 +161,7 @@ export default function SharedNotes() {
                                 <div
                                     key={item.id}
                                     style={styles.card}
-                                    onClick={() => moGhiChu(item.noteId)}
+                                    onClick={() => openNote(item.noteId)}
                                 >
                                     <div style={styles.cardTop}>
                                         <div style={styles.noteIcon}>
@@ -204,7 +204,7 @@ export default function SharedNotes() {
 
                                         <span style={styles.metaItem}>
                                             <IconClock size={12} />
-                                            {formatNgay(item.createdAt)}
+                                            {formatDate(item.createdAt)}
                                         </span>
                                     </div>
 
@@ -213,7 +213,7 @@ export default function SharedNotes() {
                                         style={styles.openBtn}
                                         onClick={e => {
                                             e.stopPropagation()
-                                            moGhiChu(item.noteId)
+                                            openNote(item.noteId)
                                         }}
                                     >
                                         Mở ghi chú

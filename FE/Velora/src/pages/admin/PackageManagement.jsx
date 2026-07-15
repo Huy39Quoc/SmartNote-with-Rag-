@@ -234,7 +234,7 @@ export default function PackageManagement() {
         })
     }
 
-    const hienThiGioiHan = (value, suffix = '') => {
+    const formatLimit = (value, suffix = '') => {
         if (value === null || value === undefined || Number(value) < 0) {
             return 'Vô hạn'
         }
@@ -536,28 +536,28 @@ export default function PackageManagement() {
                                             <div style={styles.specItem}>
                                                 📄 Ghi chú:{' '}
                                                 <span style={styles.specValue}>
-                                                    {hienThiGioiHan(pkg.maxNotes, ' ghi chú')}
+                                                    {formatLimit(pkg.maxNotes, ' ghi chú')}
                                                 </span>
                                             </div>
 
                                             <div style={styles.specItem}>
                                                 🤖 AI Format:{' '}
                                                 <span style={styles.specValue}>
-                                                    {hienThiGioiHan(pkg.maxAiFormatsPerMonth, ' lần')}
+                                                    {formatLimit(pkg.maxAiFormatsPerMonth, ' lần')}
                                                 </span>
                                             </div>
 
                                             <div style={styles.specItem}>
                                                 💾 Lưu trữ:{' '}
                                                 <span style={styles.specValue}>
-                                                    {hienThiGioiHan(pkg.storageGb, ' GB')}
+                                                    {formatLimit(pkg.storageGb, ' GB')}
                                                 </span>
                                             </div>
 
                                             <div style={styles.specItem}>
                                                 📱 Thiết bị:{' '}
                                                 <span style={styles.specValue}>
-                                                    {hienThiGioiHan(pkg.maxDevices, ' máy')}
+                                                    {formatLimit(pkg.maxDevices, ' máy')}
                                                 </span>
                                             </div>
                                         </td>

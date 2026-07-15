@@ -804,7 +804,7 @@ const RichTextEditor = forwardRef(function RichTextEditor({
             .run()
     }
 
-    const xoaAnhDangChon = () => {
+    const removeSelectedImage = () => {
         if (!editor || readOnly || !editor.isActive('image')) return
 
         editor
@@ -1141,7 +1141,7 @@ const RichTextEditor = forwardRef(function RichTextEditor({
                                 className="btn-ghost btn-danger"
                                 title="Xóa ảnh đang chọn"
                                 onMouseDown={keepSelection}
-                                onClick={xoaAnhDangChon}
+                                onClick={removeSelectedImage}
                                 style={styles.toolButton}
                             >
                                 <IconTrash size={15} />

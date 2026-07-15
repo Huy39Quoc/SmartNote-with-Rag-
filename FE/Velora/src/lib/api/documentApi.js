@@ -1,16 +1,16 @@
 import client from './client'
 
 const documentApi = {
-    layTatCa: (params) =>
+    getAll: (params) =>
         client.get('/documents', { params }),
 
-    layTheoId: (id) =>
+    getById: (id) =>
         client.get(`/documents/${id}`),
 
-    layFile: (id) =>
+    getFile: (id) =>
         client.get(`/documents/${id}/file`, { responseType: 'blob' }),
 
-    taiLen: (file, onProgress) => {
+    upload: (file, onProgress) => {
         const form = new FormData()
         form.append('file', file)
 
@@ -25,37 +25,37 @@ const documentApi = {
         })
     },
 
-    phanTichAmThanh: (id, data) =>
+    analyzeAudio: (id, data) =>
         client.post(`/documents/${id}/transcribe`, data || {}),
 
-    phanTich: (id, data) =>
+    analyze: (id, data) =>
         client.post(`/documents/${id}/analyze`, data || {}),
 
     hoiDap: (id, data) =>
         client.post(`/documents/${id}/ask`, data),
 
-    layLichSuChat: (id) =>
+    getChatHistory: (id) =>
         client.get(`/documents/${id}/chat`),
 
-    xoaLichSuChat: (id) =>
+    clearChatHistory: (id) =>
         client.delete(`/documents/${id}/chat`),
 
-    xoa: (id) =>
+    remove: (id) =>
         client.delete(`/documents/${id}`),
 
-    xuLyLai: (id) =>
+    reprocess: (id) =>
         client.post(`/documents/${id}/reprocess`),
 
-    chiaSe: (documentId, data) =>
+    share: (documentId, data) =>
         client.post(`/document-shares/documents/${documentId}`, data),
 
-    layDanhSachChiaSe: (documentId) =>
+    getShares: (documentId) =>
         client.get(`/document-shares/documents/${documentId}`),
 
-    huyChiaSe: (shareId) =>
+    revokeShare: (shareId) =>
         client.delete(`/document-shares/${shareId}`),
 
-    layTaiLieuDuocChiaSe: () =>
+    getSharedDocuments: () =>
         client.get('/document-shares/shared-with-me'),
 }
 

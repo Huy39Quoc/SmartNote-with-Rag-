@@ -29,13 +29,13 @@ import AdminPanel from './pages/admin/AdminPanel'
 import PackageManagement from './pages/admin/PackageManagement'
 
 export default function App() {
-    const { daXacThuc, layThongTin } = useAuthStore()
+    const { isAuthenticated, getProfile } = useAuthStore()
 
     useEffect(() => {
-        if (daXacThuc) {
-            layThongTin()
+        if (isAuthenticated) {
+            getProfile()
         }
-    }, [daXacThuc, layThongTin])
+    }, [isAuthenticated, getProfile])
 
     return (
         <Routes>
@@ -105,7 +105,7 @@ export default function App() {
             {/* Fallback */}
             <Route
                 path="*"
-                element={<Navigate to={daXacThuc ? '/notes' : '/'} replace />}
+                element={<Navigate to={isAuthenticated ? '/notes' : '/'} replace />}
             />
         </Routes>
     )

@@ -8,28 +8,28 @@ import useAuthStore from '../../service/authStore'
 import { hasFeature } from '../../utils/packageFeatures'
 
 export default function FlashcardsAI() {
-    const { nguoiDung } = useAuthStore()
+    const { user } = useAuthStore()
 
-    const duocDungFlashcard = hasFeature(nguoiDung, 'AI_FLASHCARD')
+    const duocDungFlashcard = hasFeature(user, 'AI_FLASHCARD')
     const { id } = useParams(); // Lấy UUID của ghi chú từ URL
     const navigate = useNavigate();
 
     const [flashcards, setFlashcards] = useState([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
-    const [dangTai, setDangTai] = useState(true);
+    const [isLoading, setLoading] = useState(true);
 
     // Tự động tải dữ liệu flashcard đã có sẵn của ghi chú khi vào trang
     useEffect(() => {
         if (!id) return;
-        setDangTai(true);
+        setLoading(true);
         flashcardApi.getByNote(id)
             .then(res => {
                 const list = res.data?.data || res.data;
                 setFlashcards(list || []);
             })
             .catch(() => toast.error("Không thể tải bộ Flashcard."))
-            .finally(() => setDangTai(false));
+            .finally(() => setLoading(false));
     }, [id]);
 
     // Hiện thực hóa tính năng điều khiển bằng phím tắt (SPACE, Mũi tên Trái/Phải)
@@ -80,7 +80,7 @@ export default function FlashcardsAI() {
         )
     }
 
-    if (dangTai) {
+    if (isLoading) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
                 <Spinner />

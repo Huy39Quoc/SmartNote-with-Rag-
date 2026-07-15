@@ -31,13 +31,13 @@ const menu = [
   { to: '/notifications',    label: 'Thông báo',           icon: IconBell },
 ]
 
-export default function SidebarNav({ soThongBaoChuaDoc = 0 }) {
-  const { laAdmin } = useAuthStore()
+export default function SidebarNav({ unreadNotificationCount = 0 }) {
+  const { isAdmin } = useAuthStore()
 
   return (
     <nav style={styles.nav}>
       {menu.map(({ to, icon: Icon, label }) => {
-        const laThongBao = to === '/notifications'
+        const isNotification = to === '/notifications'
 
         return (
           <NavLink
@@ -49,16 +49,16 @@ export default function SidebarNav({ soThongBaoChuaDoc = 0 }) {
             <Icon size={17} />
             <span style={styles.label}>{label}</span>
 
-            {laThongBao && soThongBaoChuaDoc > 0 && (
+            {isNotification && unreadNotificationCount > 0 && (
               <span style={styles.badge}>
-                {soThongBaoChuaDoc > 99 ? '99+' : soThongBaoChuaDoc}
+                {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
               </span>
             )}
           </NavLink>
         )
       })}
 
-      {laAdmin() && (
+      {isAdmin() && (
         <>
           <div style={styles.divider} />
           <NavLink to="/admin" style={navStyle} className={({ isActive }) => isActive ? 'active' : ''}>

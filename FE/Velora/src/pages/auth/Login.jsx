@@ -9,31 +9,31 @@ export default function Login() {
 
     const [form, setForm] = useState({
         email: location.state?.email || '',
-        matKhau: '',
+        password: '',
     })
-  const [hienMatKhau, setHienMatKhau] = useState(false)
-  const [loi, setLoi] = useState({})
-  const { dangNhap, dangTai } = useAuthStore()
+  const [showPassword, setShowPassword] = useState(false)
+  const [errors, setErrors] = useState({})
+  const { login, isLoading } = useAuthStore()
   const navigate = useNavigate()
 
   const validate = () => {
     const e = {}
     if (!form.email)        e.email = 'Vui lòng nhập email'
     else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Email không hợp lệ'
-    if (!form.matKhau)      e.matKhau = 'Vui lòng nhập mật khẩu'
+    if (!form.password)      e.password = 'Vui lòng nhập mật khẩu'
     return e
   }
 
-    const xuLyDangNhap = async e => {
+    const handleLogin = async e => {
         e.preventDefault()
 
         const err = validate()
         if (Object.keys(err).length) {
-            setLoi(err)
+            setErrors(err)
             return
         }
 
-        const ok = await dangNhap(form.email.trim().toLowerCase(), form.matKhau)
+        const ok = await login(form.email.trim().toLowerCase(), form.password)
         if (ok) navigate('/notes')
     }
 
@@ -86,7 +86,7 @@ export default function Login() {
                     : 'Chào mừng bạn quay lại Velora'}
             </p>
 
-          <form onSubmit={xuLyDangNhap} noValidate>
+          <form onSubmit={handleLogin} noValidate>
             <div className="mb-4">
               <label className="block mb-1.5" style={{ fontSize: 12.5, color: 'var(--text-secondary)', fontWeight: 500 }}>Email</label>
               <input
@@ -94,42 +94,42 @@ export default function Login() {
                 value={form.email}
                 onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
                 className="rounded-xl"
-                style={loi.email ? { borderColor: 'var(--accent-red)' } : {}}
+                style={errors.email ? { borderColor: 'var(--accent-red)' } : {}}
                 autoFocus
               />
-              {loi.email && <span className="block mt-1" style={{ fontSize: 11.5, color: 'var(--accent-red)' }}>{loi.email}</span>}
+              {errors.email && <span className="block mt-1" style={{ fontSize: 11.5, color: 'var(--accent-red)' }}>{errors.email}</span>}
             </div>
 
             <div className="mb-5">
               <label className="block mb-1.5" style={{ fontSize: 12.5, color: 'var(--text-secondary)', fontWeight: 500 }}>Mật khẩu</label>
               <div style={{ position: 'relative' }}>
                 <input
-                  type={hienMatKhau ? 'text' : 'password'}
+                  type={showPassword ? 'text' : 'password'}
                   placeholder="Nhập mật khẩu"
-                  value={form.matKhau}
-                  onChange={e => setForm(p => ({ ...p, matKhau: e.target.value }))}
+                  value={form.password}
+                  onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
                   className="rounded-xl"
-                  style={{ ...(loi.matKhau ? { borderColor: 'var(--accent-red)' } : {}), paddingRight: 36 }}
+                  style={{ ...(errors.password ? { borderColor: 'var(--accent-red)' } : {}), paddingRight: 36 }}
                 />
-                <button type="button" onClick={() => setHienMatKhau(p => !p)}
+                <button type="button" onClick={() => setShowPassword(p => !p)}
                   style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', border: 'none', padding: 4 }} className="btn-ghost">
-                  {hienMatKhau ? <IconEyeOff size={14} /> : <IconEye size={14} />}
+                  {showPassword ? <IconEyeOff size={14} /> : <IconEye size={14} />}
                 </button>
               </div>
-              {loi.matKhau && <span className="block mt-1" style={{ fontSize: 11.5, color: 'var(--accent-red)' }}>{loi.matKhau}</span>}
+              {errors.password && <span className="block mt-1" style={{ fontSize: 11.5, color: 'var(--accent-red)' }}>{errors.password}</span>}
             </div>
 
             <button type="submit" className="btn-primary rounded-xl"
               style={{ width: '100%', justifyContent: 'center', padding: '11px', marginTop: 4 }}
-              disabled={dangTai}>
-              {dangTai ? <><div className="spinner" style={{ width: 14, height: 14 }} />Đang đăng nhập...</> : 'Đăng nhập'}
+              disabled={isLoading}>
+              {isLoading ? <><div className="spinner" style={{ width: 14, height: 14 }} />Đang đăng nhập...</> : 'Đăng nhập'}
             </button>
           </form>
 
           <p style={{ textAlign: 'center', marginTop: 22, fontSize: 12.5, color: 'var(--text-muted)' }}>
             Chưa có tài khoản?{' '}
             <Link to="/register" style={{ color: 'var(--accent-blue)', textDecoration: 'none', fontWeight: 600 }}>
-              Đăng ký ngay
+              Đăng ký date
             </Link>
           </p>
         </div>

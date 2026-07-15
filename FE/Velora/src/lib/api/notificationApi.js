@@ -1,10 +1,10 @@
 import client from './client'
 
 const notificationApi = {
-    layTatCa: (params) => client.get('/notifications', { params }),
-    demChuaDoc: () => client.get('/notifications/unread-count'),
-    danhDauDaDoc: (id) => client.patch(`/notifications/${id}/read`),
-    danhDauTatCaDaDoc: () => client.patch('/notifications/read-all'),
+    getAll: (params) => client.get('/notifications', { params }),
+    unreadCount: () => client.get('/notifications/unread-count'),
+    markAsRead: (id) => client.patch(`/notifications/${id}/read`),
+    markAllAsRead: () => client.patch('/notifications/read-all'),
 }
 
 export default notificationApi

@@ -14,27 +14,27 @@ const RADIUS = 260
 
 export default function KnowledgeGraph() {
     const navigate = useNavigate()
-    const [dangTai, setDangTai] = useState(true)
-    const [duLieu, setDuLieu] = useState({ nodes: [], edges: [] })
+    const [isLoading, setLoading] = useState(true)
+    const [data, setData] = useState({ nodes: [], edges: [] })
     const [nodeHover, setNodeHover] = useState(null)
 
-    const taiDoThi = async () => {
-        setDangTai(true)
+    const loadGraph = async () => {
+        setLoading(true)
         try {
-            const { data } = await knowledgeApi.layDoThi()
-            setDuLieu(data.data || { nodes: [], edges: [] })
+            const { data } = await knowledgeApi.getGraph()
+            setData(data.data || { nodes: [], edges: [] })
         } catch (error) {
             toast.error(error.response?.data?.message || 'Không thể tải bản đồ tri thức')
         } finally {
-            setDangTai(false)
+            setLoading(false)
         }
     }
 
-    useEffect(() => { taiDoThi() }, [])
+    useEffect(() => { loadGraph() }, [])
 
     // Bố trí node theo vòng tròn, cụm gần nhau hơn nếu liên kết với nhiều node khác
     const layout = useMemo(() => {
-        const { nodes } = duLieu
+        const { nodes } = data
         if (nodes.length === 0) return []
 
         return nodes.map((node, i) => {
@@ -45,7 +45,7 @@ export default function KnowledgeGraph() {
                 y: CENTER_Y + RADIUS * Math.sin(angle),
             }
         })
-    }, [duLieu])
+    }, [data])
 
     const nodeById = useMemo(() => {
         const map = {}
@@ -61,12 +61,12 @@ export default function KnowledgeGraph() {
 
     const degreeById = useMemo(() => {
         const map = {}
-        duLieu.edges.forEach(e => {
+        data.edges.forEach(e => {
             map[e.from] = (map[e.from] || 0) + 1
             map[e.to] = (map[e.to] || 0) + 1
         })
         return map
-    }, [duLieu.edges])
+    }, [data.edges])
 
     return (
         <div style={styles.wrap}>
@@ -83,7 +83,7 @@ export default function KnowledgeGraph() {
                     </p>
                 </div>
 
-                <button className="btn-ghost" onClick={taiDoThi} disabled={dangTai}>
+                <button className="btn-ghost" onClick={loadGraph} disabled={isLoading}>
                     <IconRefresh size={14} />
                     Làm mới
                 </button>
@@ -102,7 +102,7 @@ export default function KnowledgeGraph() {
             </div>
 
             <div style={styles.canvasBox}>
-                {dangTai ? (
+                {isLoading ? (
                     <div style={styles.centerBox}><Spinner size={22} /></div>
                 ) : layout.length === 0 ? (
                     <div style={styles.centerBox}>
@@ -114,7 +114,7 @@ export default function KnowledgeGraph() {
                     </div>
                 ) : (
                     <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} style={styles.svg}>
-                        {duLieu.edges.map((edge, i) => {
+                        {data.edges.map((edge, i) => {
                             const a = nodeById[edge.from]
                             const b = nodeById[edge.to]
                             if (!a || !b) return null

@@ -3,72 +3,72 @@ import authApi from '../lib/api/authApi'
 import toast from 'react-hot-toast'
 
 const useAuthStore = create((set, get) => ({
-  nguoiDung: null,
-  dangTai: false,
-  daXacThuc: !!localStorage.getItem('velora_token'),
+  user: null,
+  isLoading: false,
+  isAuthenticated: !!localStorage.getItem('velora_token'),
 
-  dangNhap: async (email, matKhau) => {
-    set({ dangTai: true })
+  login: async (email, password) => {
+    set({ isLoading: true })
     try {
-      const { data } = await authApi.dangNhap({ email, password: matKhau })
+      const { data } = await authApi.login({ email, password: password })
       const { accessToken, refreshToken, user } = data.data
       localStorage.setItem('velora_token', accessToken)
       localStorage.setItem('velora_refresh', refreshToken)
-      set({ nguoiDung: user, daXacThuc: true, dangTai: false })
+      set({ user: user, isAuthenticated: true, isLoading: false })
       return true
     } catch (err) {
       toast.error(err.response?.data?.message || 'Đăng nhập thất bại')
-      set({ dangTai: false })
+      set({ isLoading: false })
       return false
     }
   },
 
-    dangKy: async (email, matKhau, hoTen) => {
-        set({ dangTai: true })
+    register: async (email, password, fullName) => {
+        set({ isLoading: true })
 
         try {
-            await authApi.dangKy({
+            await authApi.register({
                 email,
-                password: matKhau,
-                fullName: hoTen,
+                password: password,
+                fullName: fullName,
             })
 
             localStorage.removeItem('velora_token')
             localStorage.removeItem('velora_refresh')
 
             set({
-                nguoiDung: null,
-                daXacThuc: false,
-                dangTai: false,
+                user: null,
+                isAuthenticated: false,
+                isLoading: false,
             })
 
             toast.success('Đăng ký thành công. Vui lòng đăng nhập để tiếp tục.')
             return true
         } catch (err) {
             toast.error(err.response?.data?.message || 'Đăng ký thất bại')
-            set({ dangTai: false })
+            set({ isLoading: false })
             return false
         }
     },
 
-  dangXuat: async () => {
+  logout: async () => {
     try {
       const refreshToken = localStorage.getItem('velora_refresh')
-      if (refreshToken) await authApi.dangXuat({ refreshToken })
+      if (refreshToken) await authApi.logout({ refreshToken })
     } catch {}
     localStorage.removeItem('velora_token')
     localStorage.removeItem('velora_refresh')
-    set({ nguoiDung: null, daXacThuc: false })
+    set({ user: null, isAuthenticated: false })
   },
 
-  layThongTin: async () => {
+  getProfile: async () => {
     try {
-      const { data } = await authApi.layThongTinToi()
-      set({ nguoiDung: data.data })
-    } catch { get().dangXuat() }
+      const { data } = await authApi.getMyProfile()
+      set({ user: data.data })
+    } catch { get().logout() }
   },
 
-  laAdmin: () => get().nguoiDung?.role === 'ADMIN',
+  isAdmin: () => get().user?.role === 'ADMIN',
 }))
 
 export default useAuthStore

@@ -1,19 +1,19 @@
 import { useEffect } from 'react'
 import { IconX } from '@tabler/icons-react'
 
-export default function Modal({ tieu_de, onDong, children, width = 480 }) {
+export default function Modal({ title, onClose, children, width = 480 }) {
   useEffect(() => {
-    const fn = e => e.key === 'Escape' && onDong()
+    const fn = e => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', fn)
     return () => window.removeEventListener('keydown', fn)
-  }, [onDong])
+  }, [onClose])
 
   return (
-    <div style={styles.overlay} onClick={onDong}>
+    <div style={styles.overlay} onClick={onClose}>
       <div style={{ ...styles.box, width }} onClick={e => e.stopPropagation()} className="fade-in">
         <div style={styles.header}>
-          <span style={{ fontWeight: 500 }}>{tieu_de}</span>
-          <button className="btn-ghost" onClick={onDong} style={{ padding: 4 }}>
+          <span style={{ fontWeight: 500 }}>{title}</span>
+          <button className="btn-ghost" onClick={onClose} style={{ padding: 4 }}>
             <IconX size={15} />
           </button>
         </div>

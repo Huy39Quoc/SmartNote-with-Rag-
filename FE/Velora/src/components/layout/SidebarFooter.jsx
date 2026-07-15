@@ -6,13 +6,13 @@ import { IconLogout } from '@tabler/icons-react'
 import useAuthStore from '../../service/authStore'
 import { useNavigate } from 'react-router-dom'
 
-export default function SidebarFooter({ setSoThongBaoChuaDoc }) {
-  const { nguoiDung, dangXuat } = useAuthStore()
+export default function SidebarFooter({ setUnreadNotificationCount }) {
+  const { user, logout } = useAuthStore()
   const navigate = useNavigate()
 
-  const handleDangXuat = async () => {
-    await dangXuat()
-    if (setSoThongBaoChuaDoc) setSoThongBaoChuaDoc(0)
+  const handleLogout = async () => {
+    await logout()
+    if (setUnreadNotificationCount) setUnreadNotificationCount(0)
     navigate('/login')
   }
 
@@ -20,22 +20,22 @@ export default function SidebarFooter({ setSoThongBaoChuaDoc }) {
     <div style={styles.footer}>
       <div style={styles.userRow}>
         <div style={styles.avatar}>
-          {nguoiDung?.fullName?.[0]?.toUpperCase() || 'U'}
+          {user?.fullName?.[0]?.toUpperCase() || 'U'}
         </div>
 
         <div style={styles.userInfo}>
           <div style={styles.userName}>
-            {nguoiDung?.fullName || 'Người dùng'}
+            {user?.fullName || 'Người dùng'}
           </div>
           <div style={styles.userEmail}>
-            {nguoiDung?.email}
+            {user?.email}
           </div>
         </div>
       </div>
 
       <button
         className="btn-ghost"
-        onClick={handleDangXuat}
+        onClick={handleLogout}
         style={styles.logoutBtn}
       >
         <IconLogout size={15} />

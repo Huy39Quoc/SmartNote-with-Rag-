@@ -19,8 +19,8 @@ export const FEATURE_LABELS = {
     PRIORITY_SUPPORT: 'Ưu tiên hỗ trợ khách hàng',
 }
 
-export const parsePackageFeatures = (nguoiDung) => {
-    const raw = nguoiDung?.packageFeatures || ''
+export const parsePackageFeatures = (user) => {
+    const raw = user?.packageFeatures || ''
 
     return raw
         .split(',')
@@ -28,16 +28,16 @@ export const parsePackageFeatures = (nguoiDung) => {
         .filter(Boolean)
 }
 
-export const hasFeature = (nguoiDung, featureCode) => {
-    if (!nguoiDung || !featureCode) {
+export const hasFeature = (user, featureCode) => {
+    if (!user || !featureCode) {
         return false
     }
 
     const packageName =
-        nguoiDung.packageName ||
-        nguoiDung.currentPackageName ||
-        nguoiDung.package?.name ||
-        nguoiDung.currentPackage?.name ||
+        user.packageName ||
+        user.currentPackageName ||
+        user.package?.name ||
+        user.currentPackage?.name ||
         'FREE'
 
     if (packageName.toUpperCase() === 'PLUS') {
@@ -45,10 +45,10 @@ export const hasFeature = (nguoiDung, featureCode) => {
     }
 
     const rawFeatures =
-        nguoiDung.features ||
-        nguoiDung.packageFeatures ||
-        nguoiDung.currentPackage?.features ||
-        nguoiDung.package?.features ||
+        user.features ||
+        user.packageFeatures ||
+        user.currentPackage?.features ||
+        user.package?.features ||
         ''
 
     if (Array.isArray(rawFeatures)) {
@@ -67,8 +67,8 @@ export const hasFeature = (nguoiDung, featureCode) => {
     return false
 }
 
-export const hasAllFeatures = (nguoiDung, featureCodes = []) => {
-    return featureCodes.every(code => hasFeature(nguoiDung, code))
+export const hasAllFeatures = (user, featureCodes = []) => {
+    return featureCodes.every(code => hasFeature(user, code))
 }
 
 export const getFeatureLabel = (featureCode) => {

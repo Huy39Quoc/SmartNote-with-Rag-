@@ -5,33 +5,33 @@ import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
 import toast from 'react-hot-toast'
 
-const NHOM = [
-  { key: 'overdue', nhan: 'Quá hạn',    mau: 'var(--accent-red)' },
-  { key: 'urgent',  nhan: 'Khẩn',       mau: 'var(--accent-amber)' },
-  { key: 'high',    nhan: 'Ưu tiên cao', mau: 'var(--accent-amber)' },
-  { key: 'medium',  nhan: 'Trung bình',  mau: 'var(--accent-blue-dim)' },
-  { key: 'low',     nhan: 'Thấp',        mau: 'var(--text-muted)' },
+const GROUPS = [
+  { key: 'overdue', label: 'Quá hạn',    color: 'var(--accent-red)' },
+  { key: 'urgent',  label: 'Khẩn',       color: 'var(--accent-amber)' },
+  { key: 'high',    label: 'Ưu tiên cao', color: 'var(--accent-amber)' },
+  { key: 'medium',  label: 'Trung bình',  color: 'var(--accent-blue-dim)' },
+  { key: 'low',     label: 'Thấp',        color: 'var(--text-muted)' },
 ]
 
 export default function Schedule() {
-  const [nhomTask, setNhomTask] = useState({})
-  const [dangTai, setDangTai]   = useState(true)
-  const [hienForm, setHienForm] = useState(false)
+  const [taskGroups, setTaskGroups] = useState({})
+  const [isLoading, setLoading]   = useState(true)
+  const [showForm, setShowForm] = useState(false)
   const [form, setForm]         = useState({ taskName: '', deadline: '', priority: 'MEDIUM' })
-  const [dangTrichXuat, setDangTrichXuat] = useState(false)
-  const [noiDungGhiChu, setNoiDungGhiChu] = useState('')
+  const [isExtracting, setExtracting] = useState(false)
+  const [noteContent, setNoteContent] = useState('')
 
-  const tai = async () => {
-    setDangTai(true)
+  const download = async () => {
+    setLoading(true)
     try {
-      const { data } = await scheduleApi.layUuTien()
-      setNhomTask(data.data || {})
+      const { data } = await scheduleApi.getPriority()
+      setTaskGroups(data.data || {})
     } catch {}
-    setDangTai(false)
+    setLoading(false)
   }
-  useEffect(() => { tai() }, [])
+  useEffect(() => { download() }, [])
 
-    const taoMoi = async () => {
+    const create = async () => {
         const taskName = form.taskName.trim()
 
         if (!taskName) {
@@ -39,13 +39,13 @@ export default function Schedule() {
             return
         }
 
-        if (form.deadline && form.deadline < homNay) {
+        if (form.deadline && form.deadline < today) {
             toast.error('Không được đặt deadline trong quá khứ')
             return
         }
 
         try {
-            await scheduleApi.taoMoi({
+            await scheduleApi.create({
                 taskName,
                 deadline: form.deadline || null,
                 priority: form.priority,
@@ -53,45 +53,45 @@ export default function Schedule() {
 
             toast.success('Đã thêm công việc')
             setForm({ taskName: '', deadline: '', priority: 'MEDIUM' })
-            setHienForm(false)
-            tai()
+            setShowForm(false)
+            download()
         } catch (error) {
             toast.error(error.response?.data?.message || 'Thêm thất bại')
         }
     }
 
-  const hoanThanh = async (id) => {
+  const complete = async (id) => {
     try {
-      await scheduleApi.capNhat(id, { isDone: true })
-      tai()
+      await scheduleApi.update(id, { isDone: true })
+      download()
     } catch {}
   }
 
-  const xoa = async (id) => {
-    await scheduleApi.xoa(id)
-    tai()
+  const remove = async (id) => {
+    await scheduleApi.remove(id)
+    download()
   }
 
-  const trichXuat = async () => {
-    if (!noiDungGhiChu.trim()) { toast.error('Nhập nội dung ghi chú'); return }
-    setDangTrichXuat(true)
+  const extract = async () => {
+    if (!noteContent.trim()) { toast.error('Nhập nội dung ghi chú'); return }
+    setExtracting(true)
     try {
-      const { data } = await scheduleApi.trichXuatTuGhiChu({ content: noiDungGhiChu })
+      const { data } = await scheduleApi.extractFromNote({ content: noteContent })
       toast.success(`AI tìm được ${data.data.totalFound} công việc!`)
-      setNoiDungGhiChu('')
-      tai()
+      setNoteContent('')
+      download()
     } catch { toast.error('AI không phản hồi') }
-    setDangTrichXuat(false)
+    setExtracting(false)
   }
 
-  const formatNgay = (ngay) => {
-    if (!ngay) return null
-    return new Date(ngay).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const formatDate = (date) => {
+    if (!date) return null
+    return new Date(date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
   }
 
-    const homNay = new Date().toISOString().slice(0, 10)
+    const today = new Date().toISOString().slice(0, 10)
 
-  const tatCaTask = Object.values(nhomTask).flat()
+  const allTasks = Object.values(taskGroups).flat()
 
   return (
     <div style={styles.wrap}>
@@ -102,22 +102,22 @@ export default function Schedule() {
             <IconSparkles size={13} style={{ color: 'var(--accent-blue-dim)' }} />
             Trích xuất deadline từ ghi chú
           </p>
-          <textarea value={noiDungGhiChu} onChange={e => setNoiDungGhiChu(e.target.value)}
+          <textarea value={noteContent} onChange={e => setNoteContent(e.target.value)}
             placeholder="Dán nội dung ghi chú vào đây, AI sẽ tìm ra các deadline và công việc..."
             style={{ fontSize: 12, resize: 'none', minHeight: 100, marginBottom: 8 }} rows={5} />
-          <button className="btn-ai" onClick={trichXuat} disabled={dangTrichXuat || !noiDungGhiChu.trim()}
+          <button className="btn-ai" onClick={extract} disabled={isExtracting || !noteContent.trim()}
             style={{ width: '100%', justifyContent: 'center', padding: '7px' }}>
-            {dangTrichXuat ? <><Spinner size={12} />Đang phân tích...</> : <><IconSparkles size={12} />Phân tích AI</>}
+            {isExtracting ? <><Spinner size={12} />Đang phân tích...</> : <><IconSparkles size={12} />Phân tích AI</>}
           </button>
         </div>
 
         {/* Thêm task thủ công */}
         <div style={{ padding: '10px 12px', borderBottom: '.5px solid var(--border)' }}>
-          <button className="btn-ghost" onClick={() => setHienForm(p => !p)}
+          <button className="btn-ghost" onClick={() => setShowForm(p => !p)}
             style={{ width: '100%', justifyContent: 'center', fontSize: 12 }}>
             <IconPlus size={13} /> Thêm thủ công
           </button>
-          {hienForm && (
+          {showForm && (
             <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
               <input placeholder="Tên công việc *" value={form.taskName}
                 onChange={e => setForm(p => ({ ...p, taskName: e.target.value }))}
@@ -125,7 +125,7 @@ export default function Schedule() {
                 <input
                     type="date"
                     value={form.deadline}
-                    min={homNay}
+                    min={today}
                     onChange={e => setForm(p => ({ ...p, deadline: e.target.value }))}
                     style={{ fontSize: 12 }}
                 />
@@ -137,8 +137,8 @@ export default function Schedule() {
                 <option value="URGENT">Khẩn cấp</option>
               </select>
               <div style={{ display: 'flex', gap: 5 }}>
-                <button className="btn-primary" onClick={taoMoi} style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}>Thêm</button>
-                <button onClick={() => setHienForm(false)} style={{ fontSize: 12 }}>Huỷ</button>
+                <button className="btn-primary" onClick={create} style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}>Thêm</button>
+                <button onClick={() => setShowForm(false)} style={{ fontSize: 12 }}>Huỷ</button>
               </div>
             </div>
           )}
@@ -147,17 +147,17 @@ export default function Schedule() {
         {/* Thống kê */}
         <div style={{ padding: '10px 12px' }}>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>Tổng quan</div>
-          {NHOM.map(({ key, nhan, mau }) => {
-            const dem = nhomTask[key]?.length || 0
-            if (dem === 0) return null
+          {GROUPS.map(({ key, label, color }) => {
+            const count = taskGroups[key]?.length || 0
+            if (count === 0) return null
             return (
               <div key={key} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 12 }}>
-                <span style={{ color: mau }}>{nhan}</span>
-                <span style={{ color: 'var(--text-muted)' }}>{dem} việc</span>
+                <span style={{ color: color }}>{label}</span>
+                <span style={{ color: 'var(--text-muted)' }}>{count} việc</span>
               </div>
             )
           })}
-          {tatCaTask.length === 0 && (
+          {allTasks.length === 0 && (
             <p style={{ fontSize: 11, color: 'var(--text-faint)', textAlign: 'center', padding: '8px 0' }}>Không có công việc nào</p>
           )}
         </div>
@@ -165,21 +165,21 @@ export default function Schedule() {
 
       {/* Phải: Bảng công việc */}
       <div style={styles.right}>
-        {dangTai
+        {isLoading
           ? <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}><Spinner size={24} /></div>
-          : tatCaTask.length === 0
+          : allTasks.length === 0
             ? <EmptyState icon={IconCalendar} title="Không có công việc nào" desc="Thêm thủ công hoặc dùng AI trích xuất từ ghi chú" />
             : (
               <div style={{ padding: '12px 16px', overflowY: 'auto', flex: 1 }}>
-                {NHOM.map(({ key, nhan, mau }) => {
-                  const tasks = nhomTask[key] || []
+                {GROUPS.map(({ key, label, color }) => {
+                  const tasks = taskGroups[key] || []
                   if (tasks.length === 0) return null
                   return (
                     <div key={key} style={{ marginBottom: 20 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
-                        {key === 'overdue' && <IconAlertTriangle size={13} style={{ color: mau }} />}
-                        <span style={{ fontSize: 11, fontWeight: 600, color: mau, textTransform: 'uppercase', letterSpacing: '.06em' }}>
-                          {nhan} ({tasks.length})
+                        {key === 'overdue' && <IconAlertTriangle size={13} style={{ color: color }} />}
+                        <span style={{ fontSize: 11, fontWeight: 600, color: color, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                          {label} ({tasks.length})
                         </span>
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -188,8 +188,8 @@ export default function Schedule() {
                             <div style={{ flex: 1 }}>
                               <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 3 }}>{t.taskName}</div>
                               {t.deadline && (
-                                <div style={{ fontSize: 11, color: key === 'overdue' ? mau : 'var(--text-muted)' }}>
-                                  📅 {formatNgay(t.deadline)}
+                                <div style={{ fontSize: 11, color: key === 'overdue' ? color : 'var(--text-muted)' }}>
+                                  📅 {formatDate(t.deadline)}
                                   {t.daysUntilDeadline !== undefined && t.daysUntilDeadline >= 0 && (
                                     <span style={{ marginLeft: 5 }}>— còn {t.daysUntilDeadline} ngày</span>
                                   )}
@@ -200,11 +200,11 @@ export default function Schedule() {
                               )}
                             </div>
                             <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                              <button className="btn-ghost" onClick={() => hoanThanh(t.id)} title="Đánh dấu hoàn thành"
+                              <button className="btn-ghost" onClick={() => complete(t.id)} title="Đánh dấu hoàn thành"
                                 style={{ padding: 4, color: 'var(--accent-green)' }}>
                                 <IconCheck size={13} />
                               </button>
-                              <button className="btn-ghost btn-danger" onClick={() => xoa(t.id)} style={{ padding: 4 }}>
+                              <button className="btn-ghost btn-danger" onClick={() => remove(t.id)} style={{ padding: 4 }}>
                                 <IconTrash size={12} />
                               </button>
                             </div>

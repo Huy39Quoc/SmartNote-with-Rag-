@@ -16,94 +16,94 @@ import toast from 'react-hot-toast'
 
 export default function Chat() {
   const [sessions, setSessions] = useState([])
-  const [sessionHienTai, setSessionHienTai] = useState(null)
-  const [tinNhan, setTinNhan] = useState([])
-  const [cauHoi, setCauHoi] = useState('')
-  const [dangGui, setDangGui] = useState(false)
-  const [dangTai, setDangTai] = useState(false)
-  const [dangGhiAm, setDangGhiAm] = useState(false)
-  const [dangNhanDang, setDangNhanDang] = useState(false)
+  const [currentSession, setCurrentSession] = useState(null)
+  const [messages, setMessages] = useState([])
+  const [question, setQuestion] = useState('')
+  const [isSending, setSending] = useState(false)
+  const [isLoading, setLoading] = useState(false)
+  const [isRecording, setRecording] = useState(false)
+  const [isRecognizing, setRecognizing] = useState(false)
 
-  const cuoiChat = useRef(null)
+  const chatEndRef = useRef(null)
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
   const streamRef = useRef(null)
 
   useEffect(() => {
-    chatApi.layDanhSachSession()
+    chatApi.getSessions()
       .then(r => setSessions(r.data.data || []))
       .catch(() => toast.error('Không tải được danh sách trò chuyện'))
   }, [])
 
   useEffect(() => {
-    cuoiChat.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [tinNhan])
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
 
   useEffect(() => () => {
     streamRef.current?.getTracks().forEach(track => track.stop())
   }, [])
 
-  const chonSession = async (s) => {
-    setDangTai(true)
+  const selectSession = async (s) => {
+    setLoading(true)
 
     try {
-      const { data } = await chatApi.laySession(s.id)
-      setSessionHienTai(data.data)
-      setTinNhan(data.data.messages || [])
+      const { data } = await chatApi.getSession(s.id)
+      setCurrentSession(data.data)
+      setMessages(data.data.messages || [])
     } catch {
       toast.error('Không tải được cuộc trò chuyện')
     } finally {
-      setDangTai(false)
+      setLoading(false)
     }
   }
 
-  const taoSession = async () => {
+  const createSession = async () => {
     try {
-      const { data } = await chatApi.taoSession()
+      const { data } = await chatApi.createSession()
       setSessions(p => [data.data, ...p])
-      setSessionHienTai(data.data)
-      setTinNhan([])
+      setCurrentSession(data.data)
+      setMessages([])
     } catch {
       toast.error('Không thể tạo cuộc trò chuyện')
     }
   }
 
-  const xoaSession = async (id) => {
+  const deleteSession = async (id) => {
     if (!window.confirm('Xoá cuộc trò chuyện này?')) return
 
-    await chatApi.xoaSession(id)
+    await chatApi.deleteSession(id)
     setSessions(p => p.filter(s => s.id !== id))
 
-    if (sessionHienTai?.id === id) {
-      setSessionHienTai(null)
-      setTinNhan([])
+    if (currentSession?.id === id) {
+      setCurrentSession(null)
+      setMessages([])
     }
   }
 
-  const guiNoiDung = async (noiDung) => {
-    const cau = noiDung.trim()
-    if (!cau || !sessionHienTai || dangGui) return
+  const sendContent = async (content) => {
+    const cau = content.trim()
+    if (!cau || !currentSession || isSending) return
 
-    setCauHoi('')
-    setDangGui(true)
+    setQuestion('')
+    setSending(true)
 
-    const tinUser = {
+    const userMessage = {
       id: Date.now(),
       role: 'USER',
       content: cau,
       createdAt: new Date(),
     }
 
-    setTinNhan(p => [...p, tinUser])
+    setMessages(p => [...p, userMessage])
 
     try {
-      const { data } = await chatApi.hoiDap(sessionHienTai.id, { message: cau })
+      const { data } = await chatApi.hoiDap(currentSession.id, { message: cau })
       const { assistantMessage } = data.data
 
-      setTinNhan(p => [...p, assistantMessage])
+      setMessages(p => [...p, assistantMessage])
 
-      if (tinNhan.length === 0) {
-        setSessions(p => p.map(s => s.id === sessionHienTai.id
+      if (messages.length === 0) {
+        setSessions(p => p.map(s => s.id === currentSession.id
           ? { ...s, title: cau.slice(0, 40) }
           : s
         ))
@@ -111,14 +111,14 @@ export default function Chat() {
     } catch {
       toast.error('AI không phản hồi, kiểm tra LM Studio')
     } finally {
-      setDangGui(false)
+      setSending(false)
     }
   }
 
-  const gui = () => guiNoiDung(cauHoi)
+  const send = () => sendContent(question)
 
-  const batDauGhiAm = async () => {
-    if (dangGhiAm || dangNhanDang) return
+  const startRecording = async () => {
+    if (isRecording || isRecognizing) return
 
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
       toast.error('Trình duyệt không hỗ trợ ghi âm')
@@ -145,7 +145,7 @@ export default function Chat() {
       recorder.onstop = async () => {
         stream.getTracks().forEach(track => track.stop())
         streamRef.current = null
-        setDangGhiAm(false)
+        setRecording(false)
 
         const blob = new Blob(audioChunksRef.current, {
           type: recorder.mimeType || 'audio/webm',
@@ -158,11 +158,11 @@ export default function Chat() {
           return
         }
 
-        await nhanDangVaDienVaoChat(blob)
+        await recognizeAndFillChat(blob)
       }
 
       recorder.start()
-      setDangGhiAm(true)
+      setRecording(true)
       toast.success('Đang ghi âm...')
     } catch {
       toast.error('Không thể truy cập micro. Hãy cho phép quyền microphone.')
@@ -177,14 +177,14 @@ export default function Chat() {
     }
   }
 
-  const nhanDangVaDienVaoChat = async (blob) => {
-    setDangNhanDang(true)
+  const recognizeAndFillChat = async (blob) => {
+    setRecognizing(true)
 
     try {
       const formData = new FormData()
       formData.append('file', blob, `chat-voice-${Date.now()}.webm`)
 
-      const { data } = await chatApi.nhanDangGiongNoi(formData)
+      const { data } = await chatApi.recognizeSpeech(formData)
       const transcript = data.data?.transcript?.trim()
 
       if (!transcript) {
@@ -192,19 +192,19 @@ export default function Chat() {
         return
       }
 
-      setCauHoi(transcript)
+      setQuestion(transcript)
       toast.success('Đã chuyển giọng nói thành văn bản')
     } catch (error) {
       toast.error(error.response?.data?.message || 'Không thể nhận dạng giọng nói')
     } finally {
-      setDangNhanDang(false)
+      setRecognizing(false)
     }
   }
 
   const nhimEnter = e => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      gui()
+      send()
     }
   }
 
@@ -215,7 +215,7 @@ export default function Chat() {
           <span style={{ fontSize: 12, fontWeight: 500 }}>Hỏi đáp AI</span>
           <button
             className="btn-ghost"
-            onClick={taoSession}
+            onClick={createSession}
             style={{ padding: 4 }}
             title="Cuộc trò chuyện mới"
           >
@@ -233,11 +233,11 @@ export default function Chat() {
               key={s.id}
               style={{
                 ...styles.sessionRow,
-                background: sessionHienTai?.id === s.id
+                background: currentSession?.id === s.id
                   ? 'var(--bg-selected)'
                   : 'transparent',
               }}
-              onClick={() => chonSession(s)}
+              onClick={() => selectSession(s)}
             >
               <div style={{ flex: 1, overflow: 'hidden' }}>
                 <div style={styles.sessionTitle}>
@@ -255,7 +255,7 @@ export default function Chat() {
                 className="btn-ghost btn-danger"
                 onClick={e => {
                   e.stopPropagation()
-                  xoaSession(s.id)
+                  deleteSession(s.id)
                 }}
                 style={styles.deleteSessionButton}
               >
@@ -267,13 +267,13 @@ export default function Chat() {
       </div>
 
       <div style={styles.chatArea}>
-        {!sessionHienTai ? (
+        {!currentSession ? (
           <EmptyState
             icon={IconMessages}
             title="Chọn hoặc tạo cuộc trò chuyện"
             desc="AI sẽ trả lời dựa trên ghi chú và tài liệu của bạn"
             action={
-              <button className="btn-primary" onClick={taoSession}>
+              <button className="btn-primary" onClick={createSession}>
                 <IconPlus size={13} />
                 Bắt đầu hỏi đáp
               </button>
@@ -282,11 +282,11 @@ export default function Chat() {
         ) : (
           <>
             <div style={styles.messages}>
-              {dangTai ? (
+              {isLoading ? (
                 <div style={{ display: 'flex', justifyContent: 'center', padding: 20 }}>
                   <Spinner />
                 </div>
-              ) : tinNhan.length === 0 ? (
+              ) : messages.length === 0 ? (
                 <div style={styles.emptyChat}>
                   <IconRobot size={32} style={{ color: 'var(--text-faint)', marginBottom: 10 }} />
                   <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
@@ -302,7 +302,7 @@ export default function Chat() {
                       <button
                         key={q}
                         className="btn-ghost"
-                        onClick={() => setCauHoi(q)}
+                        onClick={() => setQuestion(q)}
                         style={{ fontSize: 11 }}
                       >
                         {q}
@@ -311,10 +311,10 @@ export default function Chat() {
                   </div>
                 </div>
               ) : (
-                tinNhan.map(t => <MessageBubble key={t.id} tin={t} />)
+                messages.map(t => <MessageBubble key={t.id} message={t} />)
               )}
 
-              {dangGui && (
+              {isSending && (
                 <div style={styles.typingRow}>
                   <div style={styles.aiAvatar}>
                     <Spinner size={12} />
@@ -325,43 +325,43 @@ export default function Chat() {
                 </div>
               )}
 
-              <div ref={cuoiChat} />
+              <div ref={chatEndRef} />
             </div>
 
             <div style={styles.inputArea}>
               <textarea
-                value={cauHoi}
-                onChange={e => setCauHoi(e.target.value)}
+                value={question}
+                onChange={e => setQuestion(e.target.value)}
                 onKeyDown={nhimEnter}
                 placeholder={
-                  dangGhiAm
+                  isRecording
                     ? 'Đang ghi âm... bấm nút dừng để nhận dạng'
-                    : dangNhanDang
+                    : isRecognizing
                       ? 'Đang chuyển giọng nói thành văn bản...'
                       : 'Nhập câu hỏi hoặc bấm micro để nói...'
                 }
                 style={styles.input}
                 rows={2}
-                disabled={dangNhanDang}
+                disabled={isRecognizing}
               />
 
               <button
-                className={dangGhiAm ? 'btn-danger' : 'btn-ghost'}
-                onClick={dangGhiAm ? dungGhiAm : batDauGhiAm}
-                disabled={dangGui || dangNhanDang}
+                className={isRecording ? 'btn-danger' : 'btn-ghost'}
+                onClick={isRecording ? dungGhiAm : startRecording}
+                disabled={isSending || isRecognizing}
                 style={styles.voiceButton}
-                title={dangGhiAm ? 'Dừng ghi âm' : 'Ghi âm câu hỏi'}
+                title={isRecording ? 'Dừng ghi âm' : 'Ghi âm câu hỏi'}
               >
-                {dangGhiAm ? <IconPlayerStop size={15} /> : <IconMicrophone size={15} />}
+                {isRecording ? <IconPlayerStop size={15} /> : <IconMicrophone size={15} />}
                 <span style={{ fontSize: 12 }}>
-                  {dangGhiAm ? 'Dừng' : dangNhanDang ? 'Đang nghe...' : 'Nói'}
+                  {isRecording ? 'Dừng' : isRecognizing ? 'Đang nghe...' : 'Nói'}
                 </span>
               </button>
 
               <button
                 className="btn-primary"
-                onClick={gui}
-                disabled={!cauHoi.trim() || dangGui || dangNhanDang}
+                onClick={send}
+                disabled={!question.trim() || isSending || isRecognizing}
                 style={styles.sendButton}
               >
                 <IconSend size={14} />
