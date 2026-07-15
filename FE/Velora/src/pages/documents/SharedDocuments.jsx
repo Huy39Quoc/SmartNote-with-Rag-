@@ -2,9 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
     IconFolderShare,
-    IconSearch,
-    IconEye,
-    IconEdit,
     IconUser,
     IconClock,
     IconFile,
@@ -14,36 +11,18 @@ import {
 } from '@tabler/icons-react'
 import documentApi from '../../lib/api/documentApi'
 import Spinner from '../../components/ui/Spinner'
-import EmptyState from '../../components/ui/EmptyState'
+import PageHeader from '../../components/ui/PageHeader'
+import SearchField from '../../components/ui/SearchField'
+import AsyncContent from '../../components/ui/AsyncContent'
+import PermissionBadge from '../../components/ui/PermissionBadge'
+import OwnerSummary from '../../components/ui/OwnerSummary'
+import { formatFileSize, formatLocalDate } from '../../utils/formatters'
 import toast from 'react-hot-toast'
-
-const formatBytes = (bytes) => {
-    if (!bytes && bytes !== 0) return ''
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
-const formatDate = (value) => {
-    if (!value) return ''
-    try {
-        return new Date(value).toLocaleDateString('vi-VN', {
-            day: '2-digit', month: '2-digit', year: 'numeric',
-            hour: '2-digit', minute: '2-digit',
-        })
-    } catch { return '' }
-}
 
 const fileIconOf = (type) => {
     if (type === 'AUDIO') return IconFileMusic
     if (type === 'TXT') return IconFileText
     return IconFile
-}
-
-const permissionInfo = (permission) => {
-    if (permission === 'EDIT')
-        return { label: 'Có thể chỉnh sửa', icon: IconEdit, className: 'tag-blue' }
-    return { label: 'Chỉ xem', icon: IconEye, className: 'tag-dim' }
 }
 
 export default function SharedDocuments() {
@@ -71,13 +50,13 @@ export default function SharedDocuments() {
     useEffect(() => { loadData() }, [])
 
     const filteredItems = useMemo(() => {
-        const keyword = keyword.trim().toLowerCase()
-        if (!keyword) return items
+        const normalizedKeyword = keyword.trim().toLowerCase()
+        if (!normalizedKeyword) return items
         return items.filter(item => {
             const name = item.documentName?.toLowerCase() || ''
             const ownerEmail = item.ownerEmail?.toLowerCase() || ''
             const ownerName = item.ownerFullName?.toLowerCase() || ''
-            return name.includes(keyword) || ownerEmail.includes(keyword) || ownerName.includes(keyword)
+            return name.includes(normalizedKeyword) || ownerEmail.includes(normalizedKeyword) || ownerName.includes(normalizedKeyword)
         })
     }, [items, keyword])
 
@@ -115,73 +94,47 @@ export default function SharedDocuments() {
     return (
         <div style={styles.page}>
             <div style={styles.inner}>
-                <div style={styles.header}>
-                    <div>
-                        <h2 style={styles.title}>
-                            <IconFolderShare size={20} />
-                            Tài liệu được chia sẻ với tôi
-                        </h2>
-                        <p style={styles.subtitle}>
-                            Những tài liệu người khác đã chia sẻ cho bạn. Nhấn vào để xem tóm tắt và nội dung.
-                        </p>
-                    </div>
-                    <button className="btn-ghost" onClick={loadData} style={{ fontSize: 12 }}>
-                        Làm mới
-                    </button>
-                </div>
+                <PageHeader
+                    icon={IconFolderShare}
+                    title="Tài liệu được chia sẻ với tôi"
+                    description="Những tài liệu người khác đã chia sẻ cho bạn. Nhấn vào để xem tóm tắt và nội dung."
+                    action={<button className="btn-ghost" onClick={loadData} style={{ fontSize: 12 }}>Làm mới</button>}
+                />
 
-                <div style={styles.searchBox}>
-                    <IconSearch size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                    <input
-                        value={keyword}
-                        onChange={e => setKeyword(e.target.value)}
-                        placeholder="Tìm theo tên tài liệu, email hoặc tên người chia sẻ..."
-                        style={styles.searchInput}
-                    />
-                </div>
+                <SearchField
+                    value={keyword}
+                    onChange={setKeyword}
+                    placeholder="Tìm theo tên tài liệu, email hoặc tên người chia sẻ..."
+                />
 
-                {isLoading ? (
-                    <div style={styles.loadingBox}><Spinner size={24} /></div>
-                ) : filteredItems.length === 0 ? (
-                    <div style={styles.emptyBox}>
-                        <EmptyState
-                            icon={IconFolderShare}
-                            title="Chưa có tài liệu được chia sẻ"
-                            desc="Khi người khác chia sẻ tài liệu cho bạn, danh sách sẽ hiển thị ở đây."
-                        />
-                    </div>
-                ) : (
+                <AsyncContent
+                    loading={isLoading}
+                    empty={filteredItems.length === 0}
+                    emptyState={{
+                        icon: IconFolderShare,
+                        title: 'Chưa có tài liệu được chia sẻ',
+                        desc: 'Khi người khác chia sẻ tài liệu cho bạn, danh sách sẽ hiển thị ở đây.',
+                    }}
+                >
                     <div style={styles.grid}>
                         {filteredItems.map(item => {
-                            const info = permissionInfo(item.permission)
-                            const PermissionIcon = info.icon
                             const FileIcon = fileIconOf(item.documentFileType)
                             return (
                                 <div key={item.id} style={styles.card} onClick={() => openDetails(item)}>
                                     <div style={styles.cardTop}>
                                         <div style={styles.docIcon}><FileIcon size={17} /></div>
-                                        <span className={`tag ${info.className}`} style={styles.permissionTag}>
-                                            <PermissionIcon size={11} />{info.label}
-                                        </span>
+                                        <PermissionBadge permission={item.permission} />
                                     </div>
 
                                     <div style={styles.docTitle}>
                                         {item.documentName || 'Tài liệu không có tên'}
                                     </div>
 
-                                    <div style={styles.ownerBox}>
-                                        <div style={styles.ownerAvatar}>
-                                            {item.ownerFullName?.[0]?.toUpperCase() || item.ownerEmail?.[0]?.toUpperCase() || 'U'}
-                                        </div>
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={styles.ownerName}>{item.ownerFullName || 'Người dùng'}</div>
-                                            <div style={styles.ownerEmail}>{item.ownerEmail}</div>
-                                        </div>
-                                    </div>
+                                    <OwnerSummary name={item.ownerFullName} email={item.ownerEmail} />
 
                                     <div style={styles.metaRow}>
-                                        <span style={styles.metaItem}><IconUser size={12} />{formatBytes(item.fileSize)}</span>
-                                        <span style={styles.metaItem}><IconClock size={12} />{formatDate(item.createdAt)}</span>
+                                        <span style={styles.metaItem}><IconUser size={12} />{formatFileSize(item.fileSize)}</span>
+                                        <span style={styles.metaItem}><IconClock size={12} />{formatLocalDate(item.createdAt)}</span>
                                     </div>
 
                                     <button
@@ -195,7 +148,7 @@ export default function SharedDocuments() {
                             )
                         })}
                     </div>
-                )}
+                </AsyncContent>
             </div>
 
             {isDetailOpen && (
@@ -217,7 +170,7 @@ export default function SharedDocuments() {
                                     </div>
                                     <div>
                                         <div style={styles.metaLabel}>Kích thước</div>
-                                        <div style={styles.metaValue}>{formatBytes(detailData.fileSize)}</div>
+                                        <div style={styles.metaValue}>{formatFileSize(detailData.fileSize)}</div>
                                     </div>
                                     <div>
                                         <div style={styles.metaLabel}>Trạng thái</div>
@@ -225,7 +178,7 @@ export default function SharedDocuments() {
                                     </div>
                                     <div>
                                         <div style={styles.metaLabel}>Ngày tải lên</div>
-                                        <div style={styles.metaValue}>{formatDate(detailData.uploadedAt)}</div>
+                                        <div style={styles.metaValue}>{formatLocalDate(detailData.uploadedAt)}</div>
                                     </div>
                                 </div>
 
