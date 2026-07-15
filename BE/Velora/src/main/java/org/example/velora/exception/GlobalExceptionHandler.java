@@ -77,7 +77,6 @@ public class GlobalExceptionHandler {
             .body(ApiResponse.fail("File quá lớn. Giới hạn tối đa là 100MB", "FILE_TOO_LARGE"));
     }
 
-    /** Catch-all: log đầy đủ ra IntelliJ console để debug */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGeneral(Exception ex) {
         log.error("[500] {} - {}", ex.getClass().getSimpleName(), ex.getMessage(), ex);

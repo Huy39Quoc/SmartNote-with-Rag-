@@ -11,7 +11,6 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 from sentence_transformers import SentenceTransformer
 
-
 CHROMA_DIR = os.getenv("CHROMA_DIR", "./chroma_data")
 EMBEDDING_MODEL_NAME = os.getenv(
     "EMBEDDING_MODEL_NAME",
@@ -19,13 +18,11 @@ EMBEDDING_MODEL_NAME = os.getenv(
 )
 WHISPER_MODEL_NAME = os.getenv("WHISPER_MODEL_NAME", "base")
 
-
 app = FastAPI(title="Velora AI Service", version="1.0.0")
 
 client = chromadb.PersistentClient(path=CHROMA_DIR)
 embedding_model: Optional[SentenceTransformer] = None
 whisper_model = None
-
 
 class EmbedRequest(BaseModel):
     id: str
@@ -34,7 +31,6 @@ class EmbedRequest(BaseModel):
     type: str = "document"
     collection: str = "velora_vectors"
 
-
 class SearchRequest(BaseModel):
     query: str
     userId: str
@@ -42,13 +38,11 @@ class SearchRequest(BaseModel):
     k: int = Field(default=5, ge=1, le=20)
     collection: str = "velora_vectors"
 
-
 def get_embedding_model() -> SentenceTransformer:
     global embedding_model
     if embedding_model is None:
         embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
     return embedding_model
-
 
 def get_whisper_model():
     global whisper_model
@@ -56,13 +50,11 @@ def get_whisper_model():
         whisper_model = whisper.load_model(WHISPER_MODEL_NAME)
     return whisper_model
 
-
 def get_collection(name: str):
     return client.get_or_create_collection(
         name=name,
         metadata={"hnsw:space": "cosine"},
     )
-
 
 def chunk_text(text: str, chunk_size: int = 1200, overlap: int = 250) -> List[str]:
     text = (text or "").strip()
@@ -99,7 +91,6 @@ def chunk_text(text: str, chunk_size: int = 1200, overlap: int = 250) -> List[st
     if current:
         chunks.append(current)
 
-    # Thêm overlap mềm giữa các chunk liền kề
     merged: List[str] = []
 
     for i, chunk in enumerate(chunks):
@@ -121,7 +112,6 @@ def health() -> Dict[str, Any]:
         "whisperModel": WHISPER_MODEL_NAME,
     }
 
-
 @app.post("/embed")
 def embed(req: EmbedRequest) -> Dict[str, Any]:
     if not req.text or not req.text.strip():
@@ -129,7 +119,6 @@ def embed(req: EmbedRequest) -> Dict[str, Any]:
 
     collection = get_collection(req.collection)
 
-    # Xóa vector cũ cùng context trước khi embed lại
     try:
         existing = collection.get(where={"contextId": req.id})
         ids = existing.get("ids", [])
@@ -169,7 +158,6 @@ def embed(req: EmbedRequest) -> Dict[str, Any]:
         "chunks": len(chunks),
     }
 
-
 @app.post("/search")
 def search(req: SearchRequest) -> Dict[str, Any]:
     if not req.query or not req.query.strip():
@@ -208,13 +196,11 @@ def search(req: SearchRequest) -> Dict[str, Any]:
         "distances": distances,
     }
 
-
 class GraphRequest(BaseModel):
     userId: str
     collection: str = "velora_vectors"
     minSimilarity: float = Field(default=0.55, ge=0.0, le=1.0)
     maxEdgesPerNode: int = Field(default=5, ge=1, le=20)
-
 
 @app.post("/graph")
 def build_knowledge_graph(req: GraphRequest) -> Dict[str, Any]:
@@ -269,8 +255,6 @@ def build_knowledge_graph(req: GraphRequest) -> Dict[str, Any]:
         np.mean(buckets[cid]["vectors"], axis=0) for cid in context_ids
     ])
 
-    # Vector đã được normalize khi embed -> cosine similarity = dot product,
-    # nhưng centroid (trung bình) có thể không còn norm = 1 nên chuẩn hoá lại.
     norms = np.linalg.norm(centroids, axis=1, keepdims=True)
     norms[norms == 0] = 1e-9
     normalized = centroids / norms
@@ -281,7 +265,7 @@ def build_knowledge_graph(req: GraphRequest) -> Dict[str, Any]:
     n = len(context_ids)
 
     for i in range(n):
-        # Với mỗi node, chỉ giữ lại vài liên kết mạnh nhất để đồ thị không bị rối
+
         scored = [
             (j, float(similarity_matrix[i][j]))
             for j in range(n)
@@ -293,7 +277,6 @@ def build_knowledge_graph(req: GraphRequest) -> Dict[str, Any]:
             pair = tuple(sorted((context_ids[i], context_ids[j])))
             edges.append({"from": pair[0], "to": pair[1], "weight": round(score, 4)})
 
-    # Loại trùng (A-B và B-A đều có thể được thêm từ 2 phía)
     unique_edges = {}
     for e in edges:
         key = (e["from"], e["to"])
@@ -303,7 +286,6 @@ def build_knowledge_graph(req: GraphRequest) -> Dict[str, Any]:
     nodes = [{"id": cid, "type": buckets[cid]["type"]} for cid in context_ids]
 
     return {"nodes": nodes, "edges": list(unique_edges.values())}
-
 
 @app.delete("/embed/{context_id}")
 def delete_embed(context_id: str, collection: str = "velora_vectors") -> Dict[str, Any]:
@@ -321,7 +303,6 @@ def delete_embed(context_id: str, collection: str = "velora_vectors") -> Dict[st
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Delete error: {e}")
-
 
 @app.post("/audio/transcribe")
 async def transcribe_audio(

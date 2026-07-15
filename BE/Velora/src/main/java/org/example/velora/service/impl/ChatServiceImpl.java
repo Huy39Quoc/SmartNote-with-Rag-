@@ -42,26 +42,21 @@ public class ChatServiceImpl implements ChatService {
     public ChatResponse.AskResult ask(UUID userId, UUID sessionId, ChatRequest.Ask req) {
         ChatSession session = findSession(userId, sessionId);
 
-        // Save user message
         ChatMessage userMsg = ChatMessage.builder()
             .session(session).role(ChatMessage.Role.USER).content(req.getMessage()).build();
         messageRepository.save(userMsg);
 
-        // RAG: search relevant chunks
         List<String> chunks = chromaDbClient.search(req.getMessage(), userId.toString(),
             session.getContextId() != null ? session.getContextId().toString() : null);
 
-        // Call LM Studio
         String answer = aiService.chatWithContext(req.getMessage(), chunks);
 
-        // Save assistant message
         ChatMessage assistantMsg = ChatMessage.builder()
             .session(session).role(ChatMessage.Role.ASSISTANT)
             .content(answer)
             .sourceChunks(String.join("|||", chunks)).build();
         messageRepository.save(assistantMsg);
 
-        // Auto-title first exchange
         if (messageRepository.countBySessionId(sessionId) == 2 && session.getTitle() == null) {
             session.setTitle(req.getMessage().length() > 50
                 ? req.getMessage().substring(0, 47) + "..." : req.getMessage());

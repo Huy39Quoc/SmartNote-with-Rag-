@@ -20,7 +20,6 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ChromaDbClient {
 
-
     private final WebClient chromaWebClient;
     private final ObjectMapper objectMapper;
 
@@ -81,10 +80,6 @@ public class ChromaDbClient {
         }
     }
 
-    /**
-     * Gọi Python Whisper service để nhận dạng giọng nói tiếng Việt
-     * Gửi file audio dưới dạng multipart/form-data
-     */
     public String transcribeAudio(String filePath, String language) {
     try {
         java.io.File audioFile = new java.io.File(filePath);
@@ -125,11 +120,6 @@ public class ChromaDbClient {
     }
 }
 
-    /**
-     * Bản đồ tri thức: tận dụng LẠI vector embedding đã có sẵn cho RAG để tính
-     * độ liên quan ngữ nghĩa giữa toàn bộ ghi chú/tài liệu của người dùng.
-     * Trả về danh sách cạnh (từ contextId -> contextId, kèm độ tương đồng).
-     */
     public List<Map<String, Object>> buildKnowledgeGraph(String userId) {
         try {
             String raw = chromaWebClient.post().uri("/graph")

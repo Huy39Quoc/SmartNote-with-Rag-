@@ -15,7 +15,6 @@ public interface ScheduleRepository extends JpaRepository<Schedule, UUID> {
 
     List<Schedule> findByUserIdOrderByDeadlineAsc(UUID userId);
 
-    /** Dùng :done thay vì literal false để tương thích SQL Server */
     @Query("SELECT s FROM Schedule s WHERE s.user.id = :uid AND s.deadline BETWEEN :from AND :to AND s.isDone = :done")
     List<Schedule> findUpcoming(
             @Param("uid")  UUID userId,

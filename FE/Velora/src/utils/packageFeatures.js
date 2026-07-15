@@ -1,23 +1,4 @@
-export const FEATURE_LABELS = {
-    TAG_SUBJECT: 'Tag môn học / chủ đề',
-    CHECKLIST_BASIC: 'Checklist công việc cơ bản',
-    AI_NOTE_FORMAT: 'AI format ghi chú',
-    AI_SUMMARY_BASIC: 'Tóm tắt AI cơ bản',
-    AI_SUMMARY_ADVANCED: 'Tóm tắt & phân tích AI nâng cao',
-    AI_CHAT: 'Hỏi đáp AI với ghi chú / tài liệu',
-    AI_ANALYZE: 'AI phân tích tài liệu chuyên sâu',
-    AI_AUDIO: 'Ghi chú âm thanh (Whisper AI)',
-    DOCUMENT_UPLOAD: 'Upload tài liệu',
-    EXTRACT_SCHEDULE: 'AI trích xuất deadline từ ghi chú',
-    AI_FLASHCARD: 'Flashcard AI tự động',
-    DEADLINE_MANAGEMENT: 'Quản lý deadline thông minh',
-    PRIORITY_SUGGESTION: 'Gợi ý ưu tiên công việc',
-    EXPORT_FILE: 'Export PDF / Word',
-    TEAM_WORK: 'Chia sẻ ghi chú với người khác (VIEW/EDIT)',
-    SHARE_DOCUMENT: 'Chia sẻ tài liệu với người khác (VIEW/EDIT)',
-    AI_PROGRESS_ANALYTICS: 'Thống kê & điểm tiến độ học tập',
-    PRIORITY_SUPPORT: 'Ưu tiên hỗ trợ khách hàng',
-}
+import { PACKAGE_FEATURE_LABELS } from '../constants/packageConstants'
 
 export const parsePackageFeatures = (user) => {
     const raw = user?.packageFeatures || ''
@@ -72,7 +53,8 @@ export const hasAllFeatures = (user, featureCodes = []) => {
 }
 
 export const getFeatureLabel = (featureCode) => {
-    return FEATURE_LABELS[featureCode] || featureCode
+    const normalizedCode = featureCode?.trim()
+    return PACKAGE_FEATURE_LABELS[normalizedCode] || featureCode
 }
 
 export const getUpgradeMessage = (featureCode) => {

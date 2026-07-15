@@ -29,12 +29,12 @@ public class DocumentResponse {
         private Document.Status status;
         private Boolean isEmbedded;
         private String aiSummary;
-        /** Transcript tiếng Việt từ audio */
+
         private String audioTranscript;
         private Integer audioDurationSeconds;
         private LocalDateTime uploadedAt;
         private LocalDateTime updatedAt;
-        /** OWNER / VIEW / EDIT — quyền của người đang xem đối với tài liệu này */
+
         private String myPermission;
     }
 
@@ -51,7 +51,7 @@ public class DocumentResponse {
     @Data @Builder
     public static class ChatHistory {
         private List<ChatMessage> messages;
-        /** Người xem chỉ có quyền VIEW thì không được gửi câu hỏi mới, chỉ đọc lại lịch sử. */
+
         private boolean canAsk;
     }
 
@@ -71,15 +71,14 @@ public class DocumentResponse {
         private Double confidence;
     }
 
-    /** Kết quả transcript + ghi chú từ audio */
     @Data @Builder
     public static class AudioResult {
         private UUID documentId;
         private String rawTranscript;
-        /** Ghi chú có cấu trúc sau khi AI xử lý */
+
         private String structuredNote;
         private String noteTitle;
-        /** Note đã tạo tự động nếu createNote=true */
+
         private UUID createdNoteId;
     }
 

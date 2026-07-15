@@ -3,35 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import packageApi from '../../lib/api/packageApi'
 import Spinner from '../../components/ui/Spinner'
 import useAuthStore from '../../service/authStore'
-
-const SYSTEM_PACKAGE_ORDER = {
-    FREE: 1,
-    PRO: 2,
-    PLUS: 3,
-}
-
-const FEATURE_CODES = [
-    'NOTE_LIMIT',
-    'DEVICE_LIMIT',
-    'AI_NOTE_FORMAT',
-    'DOCUMENT_UPLOAD',
-    'TAG_SUBJECT',
-    'CHECKLIST_BASIC',
-    'AI_SUMMARY_BASIC',
-    'AI_SUMMARY_ADVANCED',
-    'AI_CHAT',
-    'AI_ANALYZE',
-    'AI_AUDIO',
-    'EXTRACT_SCHEDULE',
-    'DEADLINE_MANAGEMENT',
-    'PRIORITY_SUGGESTION',
-    'AI_FLASHCARD',
-    'EXPORT_FILE',
-    'TEAM_WORK',
-    'SHARE_DOCUMENT',
-    'AI_PROGRESS_ANALYTICS',
-    'PRIORITY_SUPPORT',
-]
+import { PACKAGE_FEATURE_CODES, SYSTEM_PACKAGE_ORDER } from '../../constants/packageConstants'
+import { getFeatureLabel } from '../../utils/packageFeatures'
 
 const formatPrice = (value) => {
     const price = Number(value || 0)
@@ -117,33 +90,6 @@ export default function ServicePackages() {
         } finally {
             setBuyingId(null)
         }
-    }
-
-    const getFeatureLabel = (id) => {
-        const featuresMap = {
-            NOTE_LIMIT: 'Số ghi chú',
-            DEVICE_LIMIT: 'Số thiết bị',
-            TAG_SUBJECT: 'Tag môn học / chủ đề',
-            CHECKLIST_BASIC: 'Checklist công việc cơ bản',
-            AI_NOTE_FORMAT: 'AI format ghi chú',
-            AI_SUMMARY_BASIC: 'Tóm tắt AI cơ bản',
-            AI_SUMMARY_ADVANCED: 'Tóm tắt & phân tích AI nâng cao',
-            AI_CHAT: 'Hỏi đáp AI với ghi chú / tài liệu',
-            AI_ANALYZE: 'AI phân tích tài liệu chuyên sâu',
-            AI_AUDIO: 'Ghi chú âm thanh (Whisper AI)',
-            DOCUMENT_UPLOAD: 'Upload tài liệu',
-            EXTRACT_SCHEDULE: 'AI trích xuất deadline từ ghi chú',
-            AI_FLASHCARD: 'Flashcard AI tự động',
-            DEADLINE_MANAGEMENT: 'Quản lý deadline thông minh',
-            PRIORITY_SUGGESTION: 'Gợi ý ưu tiên công việc',
-            EXPORT_FILE: 'Export PDF / Word',
-            TEAM_WORK: 'Chia sẻ ghi chú với người khác (VIEW/EDIT)',
-            SHARE_DOCUMENT: 'Chia sẻ tài liệu với người khác (VIEW/EDIT)',
-            AI_PROGRESS_ANALYTICS: 'Thống kê & điểm tiến độ học tập',
-            PRIORITY_SUPPORT: 'Ưu tiên hỗ trợ khách hàng',
-        }
-
-        return featuresMap[id?.trim()] || id
     }
 
     const formatLimit = (value, suffix = '') => {
@@ -332,7 +278,7 @@ export default function ServicePackages() {
         const pro = getPackageByName('PRO')
         const plus = getPackageByName('PLUS')
 
-        return FEATURE_CODES.map(code => ({
+        return PACKAGE_FEATURE_CODES.map(code => ({
             id: code,
             label: getFeatureLabel(code),
             free: renderPackageFeatureValue(free, code),

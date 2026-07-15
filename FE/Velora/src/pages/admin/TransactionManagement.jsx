@@ -3,13 +3,10 @@ import { IconCash, IconRefresh, IconSearch, IconX } from '@tabler/icons-react'
 import toast from 'react-hot-toast'
 import adminApi from '../../lib/api/adminApi'
 import Spinner from '../../components/ui/Spinner'
-
-const STATUSES = ['', 'PENDING', 'SUCCESS', 'FAILED', 'CANCELLED', 'REFUND_PENDING', 'REFUNDED']
-const today = new Date().toISOString().slice(0, 10)
-const monthAgo = new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10)
+import { DEFAULT_TRANSACTION_FILTERS, TRANSACTION_STATUSES } from '../../constants/adminConstants'
 
 export default function TransactionManagement() {
-  const [filters, setFilters] = useState({ status: '', keyword: '', from: monthAgo, to: today })
+  const [filters, setFilters] = useState(DEFAULT_TRANSACTION_FILTERS)
   const [applied, setApplied] = useState(filters)
   const [page, setPage] = useState(0)
   const [data, setData] = useState({ content: [], totalPages: 0, totalElements: 0 })
@@ -68,7 +65,7 @@ export default function TransactionManagement() {
     {revenue && <RevenueDashboard value={revenue} />}
     <form onSubmit={search} style={styles.filters}>
       <input placeholder="Mã giao dịch, email hoặc gói" value={filters.keyword} onChange={e => setFilters(old => ({ ...old, keyword: e.target.value }))} />
-      <select value={filters.status} onChange={e => setFilters(old => ({ ...old, status: e.target.value }))}>{STATUSES.map(status => <option key={status} value={status}>{status ? statusLabel(status) : 'Tất cả trạng thái'}</option>)}</select>
+      <select value={filters.status} onChange={e => setFilters(old => ({ ...old, status: e.target.value }))}>{TRANSACTION_STATUSES.map(status => <option key={status} value={status}>{status ? statusLabel(status) : 'Tất cả trạng thái'}</option>)}</select>
       <input type="date" value={filters.from} onChange={e => setFilters(old => ({ ...old, from: e.target.value }))} />
       <input type="date" value={filters.to} onChange={e => setFilters(old => ({ ...old, to: e.target.value }))} />
       <button className="btn-primary" type="submit"><IconSearch size={14} /> Lọc</button>

@@ -4,14 +4,7 @@ import scheduleApi from '../../lib/api/scheduleApi'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
 import toast from 'react-hot-toast'
-
-const GROUPS = [
-  { key: 'overdue', label: 'Quá hạn',    color: 'var(--accent-red)' },
-  { key: 'urgent',  label: 'Khẩn',       color: 'var(--accent-amber)' },
-  { key: 'high',    label: 'Ưu tiên cao', color: 'var(--accent-amber)' },
-  { key: 'medium',  label: 'Trung bình',  color: 'var(--accent-blue-dim)' },
-  { key: 'low',     label: 'Thấp',        color: 'var(--text-muted)' },
-]
+import { SCHEDULE_GROUPS } from '../../constants/scheduleConstants'
 
 export default function Schedule() {
   const [taskGroups, setTaskGroups] = useState({})
@@ -95,7 +88,7 @@ export default function Schedule() {
 
   return (
     <div style={styles.wrap}>
-      {/* Trái: AI trích xuất */}
+
       <div style={styles.left}>
         <div style={{ padding: '12px 12px 8px', borderBottom: '.5px solid var(--border)' }}>
           <p style={{ fontSize: 12, fontWeight: 500, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -111,7 +104,6 @@ export default function Schedule() {
           </button>
         </div>
 
-        {/* Thêm task thủ công */}
         <div style={{ padding: '10px 12px', borderBottom: '.5px solid var(--border)' }}>
           <button className="btn-ghost" onClick={() => setShowForm(p => !p)}
             style={{ width: '100%', justifyContent: 'center', fontSize: 12 }}>
@@ -144,10 +136,9 @@ export default function Schedule() {
           )}
         </div>
 
-        {/* Thống kê */}
         <div style={{ padding: '10px 12px' }}>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>Tổng quan</div>
-          {GROUPS.map(({ key, label, color }) => {
+          {SCHEDULE_GROUPS.map(({ key, label, color }) => {
             const count = taskGroups[key]?.length || 0
             if (count === 0) return null
             return (
@@ -163,7 +154,6 @@ export default function Schedule() {
         </div>
       </div>
 
-      {/* Phải: Bảng công việc */}
       <div style={styles.right}>
         {isLoading
           ? <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}><Spinner size={24} /></div>
@@ -171,7 +161,7 @@ export default function Schedule() {
             ? <EmptyState icon={IconCalendar} title="Không có công việc nào" desc="Thêm thủ công hoặc dùng AI trích xuất từ ghi chú" />
             : (
               <div style={{ padding: '12px 16px', overflowY: 'auto', flex: 1 }}>
-                {GROUPS.map(({ key, label, color }) => {
+                {SCHEDULE_GROUPS.map(({ key, label, color }) => {
                   const tasks = taskGroups[key] || []
                   if (tasks.length === 0) return null
                   return (

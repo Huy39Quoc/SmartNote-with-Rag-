@@ -39,12 +39,10 @@ public class VNPayPaymentUtil {
             ipAddress = request.getRemoteAddr();
         }
 
-        // Nếu có nhiều IP do qua Proxy, chỉ lấy IP đầu tiên
         if (ipAddress != null && ipAddress.contains(",")) {
             ipAddress = ipAddress.split(",")[0].trim();
         }
 
-        // Đảm bảo không dính IPv6 ở Localhost
         if ("0:0:0:0:0:0:0:1".equals(ipAddress)) {
             ipAddress = "127.0.0.1";
         }
@@ -62,7 +60,6 @@ public class VNPayPaymentUtil {
                 sb.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII));
                 sb.append('=');
 
-                // Ép Java chuyển dấu "+" thành "%20" để chuẩn hóa với VNPay
                 String encodedValue = URLEncoder.encode(fieldValue, StandardCharsets.UTF_8);
                 encodedValue = encodedValue.replace("+", "%20");
                 sb.append(encodedValue);

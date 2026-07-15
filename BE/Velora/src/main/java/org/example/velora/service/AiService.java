@@ -21,19 +21,10 @@ public interface AiService {
 
     KnowledgeGroupResponse.ClassifyResult classifyContent(String content);
 
-    /**
-     * Gọi LM Studio để transcribe file âm thanh → text tiếng Việt
-     */
     String transcribeAudioFile(String filePath);
 
-    /**
-     * Chuyển transcript thô → ghi chú có cấu trúc markdown
-     */
     String structureTranscript(String rawTranscript, String topic);
 
-    /**
-     * Đề xuất tiêu đề từ nội dung
-     */
     String suggestTitle(String content);
 
     String getPrompt(String promptKey);

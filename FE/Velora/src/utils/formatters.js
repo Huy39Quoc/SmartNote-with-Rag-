@@ -5,6 +5,18 @@ export const formatFileSize = (bytes) => {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+export const parseLocalDate = (value) => {
+    if (!value) return null
+    if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value
+
+    const normalizedValue = typeof value === 'string' && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(value)
+        ? `${value}Z`
+        : value
+    const date = new Date(normalizedValue)
+
+    return Number.isNaN(date.getTime()) ? null : date
+}
+
 export const formatLocalDate = (value, options = {}) => {
     if (!value) return ''
 

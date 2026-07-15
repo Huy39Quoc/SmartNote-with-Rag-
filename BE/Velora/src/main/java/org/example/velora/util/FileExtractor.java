@@ -22,7 +22,7 @@ public class FileExtractor {
             case PDF   -> extractPdf(filePath);
             case DOCX  -> extractDocx(filePath);
             case TXT   -> Files.readString(Paths.get(filePath), StandardCharsets.UTF_8);
-            // Audio không extract text ở đây — được xử lý bởi Whisper trong Python service
+
             case AUDIO -> throw new UnsupportedOperationException("Audio dùng Whisper, không extract trực tiếp");
         };
     }

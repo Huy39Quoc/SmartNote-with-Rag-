@@ -4,35 +4,13 @@ import noteApi from '../../lib/api/noteApi'
 import toast from 'react-hot-toast'
 import useAuthStore from '../../service/authStore'
 import { hasFeature } from '../../utils/packageFeatures'
-
-const ACTIONS = [
-    {
-        key: 'SUMMARIZE',
-        label: 'Tóm tắt',
-        features: ['AI_SUMMARY_BASIC'],
-    },
-    {
-        key: 'STRUCTURE',
-        label: 'Cải thiện cấu trúc',
-        features: ['AI_NOTE_FORMAT'],
-    },
-    {
-        key: 'CREATE_CHECKLIST',
-        label: 'Tạo checklist',
-        features: ['AI_NOTE_FORMAT', 'CHECKLIST_BASIC'],
-    },
-    {
-        key: 'SUGGEST_TITLE',
-        label: 'Đề xuất tiêu đề',
-        features: ['AI_NOTE_FORMAT'],
-    },
-]
+import { AI_NOTE_ACTIONS } from '../../constants/noteConstants'
 
 export default function AiPanel({ noteId, content, title, onApply, onInsertChecklist, onClose }) {
     const { user } = useAuthStore()
 
     const availableActions = useMemo(() => {
-        return ACTIONS.filter(action =>
+        return AI_NOTE_ACTIONS.filter(action =>
             action.features.every(feature => hasFeature(user, feature))
         )
     }, [user?.packageFeatures, user?.role])

@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 
@@ -6,7 +5,6 @@ import useAuthStore from './service/authStore'
 import MainLayout from './components/layout/MainLayout'
 import { ProtectedRoute, AdminRoute, PublicOnlyRoute } from './components/layout/ProtectedRoute'
 
-// Pages
 import Landing from './pages/landing/Landing'
 import Login from './pages/auth/Login'
 import Register from './pages/auth/Register'
@@ -24,7 +22,7 @@ import Notifications from './pages/notifications/Notifications'
 import ServicePackages from './pages/packages/ServicePackages'
 import PaymentResult from './pages/payment/PaymentResult'
 import SharedDocuments from './pages/documents/SharedDocuments'
-// Admin pages
+
 import AdminPanel from './pages/admin/AdminPanel'
 import PackageManagement from './pages/admin/PackageManagement'
 
@@ -39,7 +37,7 @@ export default function App() {
 
     return (
         <Routes>
-            {/* Public */}
+
             <Route path="/" element={<Landing />} />
 
             <Route
@@ -60,10 +58,8 @@ export default function App() {
                 }
             />
 
-            {/* VNPay return page - để ngoài ProtectedRoute để VNPay redirect về không bị đá login */}
             <Route path="/payment/result" element={<PaymentResult />} />
 
-            {/* Protected */}
             <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
                 <Route path="/overview" element={<Overview />} />
 
@@ -82,7 +78,6 @@ export default function App() {
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/service-packages" element={<ServicePackages />} />
 
-                {/* Admin only */}
                 <Route
                     path="/admin"
                     element={
@@ -102,7 +97,6 @@ export default function App() {
                 />
             </Route>
 
-            {/* Fallback */}
             <Route
                 path="*"
                 element={<Navigate to={isAuthenticated ? '/notes' : '/'} replace />}
@@ -110,4 +104,3 @@ export default function App() {
         </Routes>
     )
 }
-

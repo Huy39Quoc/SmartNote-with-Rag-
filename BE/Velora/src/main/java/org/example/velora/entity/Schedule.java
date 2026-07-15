@@ -38,7 +38,6 @@ public class Schedule {
 
     private LocalDate deadline;
 
-    // CHỈNH SỬA: Đổi từ Integer sang Enum Priority và cấu hình lưu String xuống DB
     @Enumerated(EnumType.STRING)
     @Column(name = "priority", length = 10, nullable = false)
     @Builder.Default
@@ -60,9 +59,7 @@ public class Schedule {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // ĐÃ THÊM ENUM NÀY ĐỂ ĐÁP ỨNG BIẾN "Priority" KHÔNG TÌM THẤY
-    // Trong file Schedule.java
     public enum Priority {
-        URGENT, HIGH, MEDIUM, LOW  // <-- THÊM "URGENT" VÀO ĐÂY
+        URGENT, HIGH, MEDIUM, LOW
     }
 }

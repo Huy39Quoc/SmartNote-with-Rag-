@@ -1,4 +1,3 @@
-
         package org.example.velora.service;
 
 import org.example.velora.entity.PackageService;
@@ -26,6 +25,4 @@ public interface UserPackageService {
 
     void increaseAiUsage(User user);
 
-
 }
-

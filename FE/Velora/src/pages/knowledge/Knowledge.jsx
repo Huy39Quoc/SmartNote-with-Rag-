@@ -244,7 +244,7 @@ export default function Knowledge() {
     })
     return (
         <div style={styles.wrap}>
-            {/* Trái: danh sách nhóm */}
+
             <div style={styles.left}>
                 <div style={styles.leftHeader}>
                     <span style={{fontSize: 12, fontWeight: 500}}>Nhóm kiến thức</span>
@@ -335,7 +335,6 @@ export default function Knowledge() {
                 </div>
             </div>
 
-            {/* Phải: ghi chú trong nhóm */}
             <div style={styles.right}>
                 {!select || !details
                     ? <EmptyState icon={IconSitemap} title="Chọn nhóm để xem ghi chú"
@@ -527,7 +526,6 @@ export default function Knowledge() {
         </div>
     )
 }
-
 
 const styles = {
     wrap: {display: 'flex', flex: 1, overflow: 'hidden'},

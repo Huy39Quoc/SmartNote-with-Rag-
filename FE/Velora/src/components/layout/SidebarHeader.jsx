@@ -1,7 +1,3 @@
-/**
- * SidebarHeader — Logo section at the top of the sidebar
- * Tách riêng để dễ thay đổi độc lập với nav và footer
- */
 import logo from '../../assets/logo.svg'
 
 export default function SidebarHeader() {

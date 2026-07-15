@@ -75,7 +75,6 @@ public class AiServiceImpl implements AiService {
         try {
             String raw = lmStudioClient.complete(prompt + "\n\n" + truncated);
 
-            // Sửa đổi: Sử dụng TypeReference để định nghĩa chính xác kiểu dữ liệu Map<String, Object>
             Map<String, Object> parsed = objectMapper.readValue(
                     cleanJson(raw, '{'),
                     new TypeReference<Map<String, Object>>() {
@@ -94,9 +93,7 @@ public class AiServiceImpl implements AiService {
                     .build();
         } catch (Exception e) {
             log.error("analyzeDocument error: {}", e.getMessage());
-            // Trước đây lỗi bị "nuốt" và trả về như 1 kết quả phân tích thành công
-            // (chỉ có dòng summary báo lỗi) -> người dùng không thấy thông báo lỗi rõ ràng.
-            // Giờ ném lỗi thật để FE hiển thị toast lỗi đúng như đã thiết kế.
+
             throw new BadRequestException("AI hiện không thể phân tích tài liệu này. Vui lòng thử lại sau.");
         }
     }
@@ -639,12 +636,6 @@ public class AiServiceImpl implements AiService {
         return false;
     }
 
-    /**
-     * Transcribe audio file → text tiếng Việt. LM Studio hiện chưa hỗ trợ audio
-     * trực tiếp qua /v1/audio/transcriptions nên dùng phương án: đọc file
-     * binary → base64 → gửi kèm prompt mô tả. Trong production nên thay bằng
-     * Whisper API hoặc faster-whisper local.
-     */
     @Override
     public String transcribeAudioFile(String filePath) {
         try {
@@ -809,7 +800,7 @@ public class AiServiceImpl implements AiService {
 
     private List<String> parseJsonArray(String raw) {
         try {
-            // Sửa đổi: Định hình rõ cấu trúc kiểu dữ liệu List<String> khi nhận mảng từ JSON
+
             return objectMapper.readValue(cleanJson(raw, '['), new TypeReference<List<String>>() {
             });
         } catch (Exception e) {
@@ -1103,7 +1094,6 @@ public class AiServiceImpl implements AiService {
                 continue;
             }
 
-            // Giữ nguyên độ thụt lề (dựa vào số khoảng trắng đầu dòng) để bảo toàn cấp bậc.
             int indentSpaces = rawLine.length() - rawLine.replaceAll("^\\s+", "").length();
             String prefix = "  ".repeat(Math.max(1, indentSpaces / 2 + 1));
 
@@ -1116,8 +1106,6 @@ public class AiServiceImpl implements AiService {
                 continue;
             }
 
-            // Loại bỏ id node + mọi ký tự bao hình (ngoặc vuông/tròn/nhọn) còn sót lại,
-            // chỉ giữ lại phần chữ để tránh vỡ cú pháp mindmap khi nội dung dài/phức tạp.
             String textOnly = trimmed
                     .replaceAll("^[A-Za-z][A-Za-z0-9_]*", "")
                     .replaceAll("^[\\[\\(\\{]+", "")
@@ -1129,8 +1117,6 @@ public class AiServiceImpl implements AiService {
                 continue;
             }
 
-            // Nếu AI chưa từng khai báo root, node hợp lệ đầu tiên sẽ được dùng làm root
-            // để đảm bảo mindmap luôn có đúng 1 gốc (bắt buộc với cú pháp Mermaid mindmap).
             if (!rootHandled) {
                 result.add("  root((" + label.replace("(", "-").replace(")", "") + "))");
                 rootHandled = true;
@@ -1426,15 +1412,11 @@ public class AiServiceImpl implements AiService {
     private String sanitizeFlowchartLine(String line) {
         String sanitized = replaceAllNodeShapes(line);
 
-        // Lưới an toàn cuối cùng: sau khi chuẩn hoá, không được còn dấu ngoặc nhọn nào.
         sanitized = sanitized.replace("{", "").replace("}", "");
 
         return "  " + sanitized.trim();
     }
 
-    // Xử lý cả 3 dạng ngoặc node ({...}, (...), [...]) trong CÙNG một lượt quét,
-    // tránh việc lượt sau quét lại kết quả đã được lượt trước chuyển đổi
-    // (từng gây lặp dấu nháy khi dòng gốc dùng {} hoặc () ).
     private static final Pattern NODE_SHAPE_PATTERN = Pattern.compile(
             "([^\\s\\[\\]\\(\\)\\{\\}]+)\\s*(?:\\{([^\\}]*)\\}|\\(([^\\)]*)\\)|\\[([^\\]]*)\\])"
     );

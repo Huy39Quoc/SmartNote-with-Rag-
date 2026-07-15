@@ -46,7 +46,7 @@ const noteApi = {
 
     getSharedNotes: () =>
         client.get('/note-shares/shared-with-me'),
-    
+
     createDiagram: (id, payload) => client.post(`/notes/${id}/diagram`, payload),
 
     getVersions: (id) =>

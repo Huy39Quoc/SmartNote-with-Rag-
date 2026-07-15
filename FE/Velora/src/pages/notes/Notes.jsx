@@ -34,6 +34,7 @@ import toast from 'react-hot-toast'
 import useAuthStore from '../../service/authStore'
 import { hasFeature, getUpgradeMessage } from '../../utils/packageFeatures'
 import { hasRichTextContent, richTextToPlainText } from '../../utils/richText'
+import { DEFAULT_NOTE_TITLE } from '../../constants/noteConstants'
 
 export default function Notes() {
     const { id: idParam } = useParams()
@@ -236,7 +237,7 @@ export default function Notes() {
         if (currentNote?.id === idParam) return
 
         selectNote(idParam)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+
     }, [idParam, currentNote?.id])
 
     const selectNote = async (id) => {
@@ -367,7 +368,7 @@ export default function Notes() {
     const create = async () => {
         try {
             const { data } = await noteApi.create({
-                title: DEFAULT_TITLE,
+                title: DEFAULT_NOTE_TITLE,
                 content: '',
             })
 
@@ -383,7 +384,6 @@ export default function Notes() {
         }
     }
 
-    const DEFAULT_TITLE = 'Ghi chú mới'
 
     const autoSuggestTitle = async (noteId, currentTitle, contentHtml) => {
         const plainText = richTextToPlainText(contentHtml || '').trim()
@@ -399,10 +399,8 @@ export default function Notes() {
             const suggestedTitle = data?.data?.suggestedTitle?.trim()
             if (!suggestedTitle) return
 
-            // Nếu người dùng đã chuyển sang ghi chú khác trong lúc chờ AI, bỏ qua
-            // để tránh ghi đè nhầm tiêu đề của ghi chú không còn đang mở.
             if (currentNoteRef.current?.id !== noteId) return
-            if (currentNoteRef.current?.title?.trim() !== DEFAULT_TITLE) return
+            if (currentNoteRef.current?.title?.trim() !== DEFAULT_NOTE_TITLE) return
 
             const { data: updated } = await noteApi.update(noteId, {
                 title: suggestedTitle,
@@ -417,7 +415,7 @@ export default function Notes() {
 
             toast.success(`Đã tự động đặt tiêu đề: "${suggestedTitle}"`)
         } catch {
-            // Tính năng nền, không làm phiền người dùng nếu AI không phản hồi được.
+
         }
     }
 
@@ -446,10 +444,8 @@ export default function Notes() {
 
             savedVersionRef.current = createNoteMilestone(data.data)
 
-            // Ghi chú mới, chưa từng đặt tên, vừa có nội dung thật sự lần đầu
-            // -> tự động đề xuất và áp dụng tiêu đề (không cần bấm nút thủ công).
             if (
-                data.data.title?.trim() === DEFAULT_TITLE &&
+                data.data.title?.trim() === DEFAULT_NOTE_TITLE &&
                 !processedAutoTitleIdsRef.current.has(data.data.id)
             ) {
                 processedAutoTitleIdsRef.current.add(data.data.id)
@@ -562,9 +558,6 @@ export default function Notes() {
             }
         })
 
-        // Nội dung ghi chú đang được soạn thảo real-time qua Yjs, nên phải đẩy
-        // thẳng vào editor đang chạy (qua ref) thì mới thực sự đổi trên màn hình
-        // và được lưu lại — chỉ đổi state React của component cha là không đủ.
         if (newAppliedContent !== null) {
             richTextEditorRef.current?.setContentHtml(newAppliedContent)
         }
@@ -689,7 +682,7 @@ export default function Notes() {
         if (showShare && currentNote?.id) {
             loadShares()
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+
     }, [showShare, currentNote?.id])
 
     const loadVersionHistory = async () => {
@@ -711,7 +704,7 @@ export default function Notes() {
         if (showHistory && currentNote?.id) {
             loadVersionHistory()
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+
     }, [showHistory, currentNote?.id])
 
     useEffect(() => {
@@ -741,12 +734,12 @@ export default function Notes() {
                     loadVersionHistory()
                 }
             } catch {
-                // Bỏ qua event không đúng định dạng.
+
             }
         })
 
         return () => source.close()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+
     }, [currentNote?.id, showHistory, createNoteMilestone])
 
     const restoreVersion = async (version) => {
@@ -853,24 +846,24 @@ export default function Notes() {
 
         return new RegExp(
             '\\b(?:' +
-            // Giờ cụ thể: 14:30, 9.00, 20 giờ
+
             '\\d{1,2}[:.][0-5]\\d' +
             '|[0-2]?\\d\\s*(?:giờ|h)\\b' +
-            // Ngày tương đối: hôm nay, ngày mai, ngày mốt/kia, hôm qua
+
             '|(?:ngày\\s*)?(?:hôm\\s*nay|hôm\\s*qua)' +
             '|ngày\\s*(?:mai|mốt|kia)' +
-            // Tuần/tháng tương đối
+
             '|tuần\\s*(?:này|sau|tới|trước)' +
             '|tháng\\s*(?:này|sau|tới|trước)' +
             '|cuối\\s*tuần' +
-            // Ngày cụ thể dạng số: ngày 20, 20/7, 20-07-2026, 20/07
+
             '|ngày\\s*\\d{1,2}' +
             '|\\d{1,2}[/\\-]\\d{1,2}(?:[/\\-]\\d{2,4})?' +
             '|tháng\\s*\\d{1,2}' +
-            // Thứ trong tuần
+
             '|thứ\\s*(?:hai|ba|tư|năm|sáu|bảy)\\b' +
             '|chủ\\s*nhật' +
-            // Từ khoá deadline/hạn chót trực tiếp
+
             '|deadline|hạn\\s*(?:chót|nộp)?|nộp\\s*(?:bài|báo\\s*cáo)' +
             ')',
             'i'
@@ -958,7 +951,7 @@ export default function Notes() {
         const t = setTimeout(save, 3000)
 
         return () => clearTimeout(t)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+
     }, [
         currentNote?.content,
         currentNote?.title,
