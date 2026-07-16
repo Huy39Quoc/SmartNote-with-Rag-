@@ -17,3 +17,6 @@ target/
 
 .idea/
 .vscode/
+
+AI/.venv/
+**/.venv/
