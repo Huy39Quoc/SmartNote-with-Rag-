@@ -12,27 +12,27 @@ import authApi from '../../lib/api/authApi'
 import useAuthStore from '../../service/authStore'
 
 export default function Account() {
-    const { nguoiDung, layThongTin } = useAuthStore()
+    const { user, getProfile } = useAuthStore()
 
     const [fullName, setFullName] = useState('')
     const [email, setEmail] = useState('')
     const [role, setRole] = useState('')
-    const [dangLuuThongTin, setDangLuuThongTin] = useState(false)
+    const [isSavingProfile, setSavingProfile] = useState(false)
 
     const [oldPassword, setOldPassword] = useState('')
     const [newPassword, setNewPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
-    const [dangDoiMatKhau, setDangDoiMatKhau] = useState(false)
+    const [isChangingPassword, setChangingPassword] = useState(false)
 
     useEffect(() => {
-        if (nguoiDung) {
-            setFullName(nguoiDung.fullName || '')
-            setEmail(nguoiDung.email || '')
-            setRole(nguoiDung.role || '')
+        if (user) {
+            setFullName(user.fullName || '')
+            setEmail(user.email || '')
+            setRole(user.role || '')
         }
-    }, [nguoiDung])
+    }, [user])
 
-    const capNhatThongTin = async () => {
+    const updateProfile = async () => {
         const name = fullName.trim()
 
         if (!name) {
@@ -40,26 +40,26 @@ export default function Account() {
             return
         }
 
-        setDangLuuThongTin(true)
+        setSavingProfile(true)
 
         try {
-            await authApi.capNhatThongTin({
+            await authApi.updateProfile({
                 fullName: name,
             })
 
-            await layThongTin()
-            toast.success('Đã cập nhật thông tin')
+            await getProfile()
+            toast.success('Đã cập nhật thông message')
         } catch (error) {
             console.error(error)
-            toast.error(error.response?.data?.message || 'Không thể cập nhật thông tin')
+            toast.error(error.response?.data?.message || 'Không thể cập nhật thông message')
         } finally {
-            setDangLuuThongTin(false)
+            setSavingProfile(false)
         }
     }
 
-    const doiMatKhau = async () => {
+    const changePassword = async () => {
         if (!oldPassword || !newPassword || !confirmPassword) {
-            toast.error('Vui lòng nhập đầy đủ thông tin mật khẩu')
+            toast.error('Vui lòng nhập đầy đủ thông message mật khẩu')
             return
         }
 
@@ -83,10 +83,10 @@ export default function Account() {
             return
         }
 
-        setDangDoiMatKhau(true)
+        setChangingPassword(true)
 
         try {
-            await authApi.doiMatKhau({
+            await authApi.changePassword({
                 oldPassword,
                 newPassword,
             })
@@ -99,7 +99,7 @@ export default function Account() {
             console.error(error)
             toast.error(error.response?.data?.message || 'Không thể đổi mật khẩu')
         } finally {
-            setDangDoiMatKhau(false)
+            setChangingPassword(false)
         }
     }
 
@@ -109,7 +109,7 @@ export default function Account() {
                 <div>
                     <h1 style={styles.title}>Tài khoản</h1>
                     <p style={styles.desc}>
-                        Quản lý thông tin cá nhân và bảo mật tài khoản của bạn.
+                        Quản lý thông message cá nhân và bảo mật tài khoản của bạn.
                     </p>
                 </div>
             </div>
@@ -121,7 +121,7 @@ export default function Account() {
                             <IconUser size={18} />
                         </div>
                         <div>
-                            <h2 style={styles.cardTitle}>Thông tin cá nhân</h2>
+                            <h2 style={styles.cardTitle}>Thông message cá nhân</h2>
                             <p style={styles.cardDesc}>Cập nhật tên hiển thị của bạn.</p>
                         </div>
                     </div>
@@ -155,17 +155,17 @@ export default function Account() {
 
                         <button
                             className="btn-primary"
-                            onClick={capNhatThongTin}
-                            disabled={dangLuuThongTin}
+                            onClick={updateProfile}
+                            disabled={isSavingProfile}
                             style={styles.button}
                         >
-                            {dangLuuThongTin ? (
+                            {isSavingProfile ? (
                                 <>
                                     <IconLoader2 size={14} /> Đang lưu...
                                 </>
                             ) : (
                                 <>
-                                    <IconCheck size={14} /> Lưu thông tin
+                                    <IconCheck size={14} /> Lưu thông message
                                 </>
                             )}
                         </button>
@@ -221,11 +221,11 @@ export default function Account() {
 
                         <button
                             className="btn-primary"
-                            onClick={doiMatKhau}
-                            disabled={dangDoiMatKhau}
+                            onClick={changePassword}
+                            disabled={isChangingPassword}
                             style={styles.button}
                         >
-                            {dangDoiMatKhau ? (
+                            {isChangingPassword ? (
                                 <>
                                     <IconLoader2 size={14} /> Đang đổi...
                                 </>

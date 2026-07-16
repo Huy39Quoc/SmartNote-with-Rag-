@@ -40,36 +40,18 @@ import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import * as Y from 'yjs'
 import { sanitizeRichText } from '../../utils/richText'
-
-const COLORS = [
-    '#e8e6de',
-    '#ffffff',
-    '#f87171',
-    '#fb923c',
-    '#facc15',
-    '#4ade80',
-    '#38bdf8',
-    '#a78bfa',
-    '#f472b6',
-]
-const FONT_FAMILIES = [
-    { label: 'Inter', value: 'Inter, sans-serif' },
-    { label: 'Arial', value: 'Arial, sans-serif' },
-    { label: 'Times New Roman', value: '"Times New Roman", serif' },
-    { label: 'Georgia', value: 'Georgia, serif' },
-    { label: 'Courier New', value: '"Courier New", monospace' },
-]
-
-const FONT_SIZES = [
-    { label: '12', value: '12px' },
-    { label: '14', value: '14px' },
-    { label: '16', value: '16px' },
-    { label: '18', value: '18px' },
-    { label: '20', value: '20px' },
-    { label: '24', value: '24px' },
-    { label: '32', value: '32px' },
-]
-
+import {
+    DEFAULT_TABLE_ROW_HEIGHT,
+    EDITOR_COLORS,
+    EDITOR_FONT_FAMILIES,
+    EDITOR_FONT_SIZES,
+    EDITOR_IMAGE_WIDTHS,
+    EDITOR_PRESENCE_COLORS,
+    MAX_TABLE_ROW_HEIGHT,
+    MIN_TABLE_ROW_HEIGHT,
+    TABLE_PICKER_COLUMNS,
+    TABLE_PICKER_ROWS,
+} from '../../constants/noteConstants'
 const CustomTextStyle = TextStyle.extend({
     addAttributes() {
         return {
@@ -99,23 +81,35 @@ const CustomTextStyle = TextStyle.extend({
         }
     },
 })
+const ResizableImage = Image.extend({
+    addAttributes() {
+        return {
+            ...this.parent?.(),
 
-const PRESENCE_COLORS = [
-    '#2563eb',
-    '#16a34a',
-    '#dc2626',
-    '#9333ea',
-    '#0891b2',
-    '#ea580c',
-    '#be123c',
-    '#4f46e5',
-]
+            width: {
+                default: '420px',
+                parseHTML: element => element.style.width || element.getAttribute('width') || '420px',
+                renderHTML: attributes => {
+                    const width = attributes.width || '420px'
 
-const TABLE_PICKER_ROWS = 8
-const TABLE_PICKER_COLS = 10
-const DEFAULT_ROW_HEIGHT = 40
-const MIN_ROW_HEIGHT = 24
-const MAX_ROW_HEIGHT = 240
+                    return {
+                        width,
+                        style: `width: ${width}; max-width: 100%; height: auto;`,
+                    }
+                },
+            },
+
+            alt: {
+                default: null,
+                parseHTML: element => element.getAttribute('alt'),
+                renderHTML: attributes => {
+                    if (!attributes.alt) return {}
+                    return { alt: attributes.alt }
+                },
+            },
+        }
+    },
+})
 
 const ResizableTableRow = TableRow.extend({
     addAttributes() {
@@ -146,7 +140,7 @@ function hashString(value) {
 
 function presenceColor(user) {
     const key = user?.userId || user?.email || user?.sessionId || ''
-    return PRESENCE_COLORS[hashString(key) % PRESENCE_COLORS.length]
+    return EDITOR_PRESENCE_COLORS[hashString(key) % EDITOR_PRESENCE_COLORS.length]
 }
 
 function displayName(user) {
@@ -350,7 +344,7 @@ const RichTextEditor = forwardRef(function RichTextEditor({
         const currentEditor = editorRef.current
         if (!currentEditor || !rowInfo || readOnly) return
 
-        const height = Math.max(MIN_ROW_HEIGHT, Math.min(MAX_ROW_HEIGHT, Number(nextHeight) || DEFAULT_ROW_HEIGHT))
+        const height = Math.max(MIN_TABLE_ROW_HEIGHT, Math.min(MAX_TABLE_ROW_HEIGHT, Number(nextHeight) || DEFAULT_TABLE_ROW_HEIGHT))
         const { tr } = currentEditor.state
 
         tr.setNodeMarkup(rowInfo.pos, undefined, {
@@ -374,7 +368,7 @@ const RichTextEditor = forwardRef(function RichTextEditor({
         const rowElement = currentEditor.view.nodeDOM(rowInfo.pos)
         const startHeight = rowElement instanceof HTMLElement
             ? rowElement.getBoundingClientRect().height
-            : rowInfo.node.attrs.height || DEFAULT_ROW_HEIGHT
+            : rowInfo.node.attrs.height || DEFAULT_TABLE_ROW_HEIGHT
         const startY = event.clientY
 
         event.preventDefault()
@@ -414,7 +408,7 @@ const RichTextEditor = forwardRef(function RichTextEditor({
                     target: '_blank',
                 },
             }),
-            Image.configure({
+            ResizableImage.configure({
                 inline: false,
                 allowBase64: true,
             }),
@@ -482,8 +476,6 @@ const RichTextEditor = forwardRef(function RichTextEditor({
             const currentEditor = editorRef.current
             if (!currentEditor) return
 
-            // Thay toàn bộ nội dung editor (đi qua transaction của TipTap/Yjs
-            // nên sẽ đồng bộ đúng, khác với việc chỉ đổi state React của component cha).
             currentEditor.chain().focus().setContent(html || '', true).run()
         },
         getContentHtml: () => editorRef.current?.getHTML() || '',
@@ -615,7 +607,7 @@ const RichTextEditor = forwardRef(function RichTextEditor({
                 Y.applyUpdate(ydoc, base64ToBytes(payload.update), 'remote')
                 window.requestAnimationFrame(updateCursorLabels)
             } catch {
-                // Ignore malformed collaboration messages.
+
             }
         }
 
@@ -713,9 +705,12 @@ const RichTextEditor = forwardRef(function RichTextEditor({
         const reader = new FileReader()
 
         reader.onload = () => {
-            editor.chain().focus().setImage({ src: reader.result }).run()
+            editor.chain().focus().setImage({
+                src: reader.result,
+                alt: file.name,
+                width: '420px',
+            }).run()
         }
-
         reader.readAsDataURL(file)
     }
     const setFontFamily = (fontFamily) => {
@@ -739,7 +734,25 @@ const RichTextEditor = forwardRef(function RichTextEditor({
 
         editor.chain().focus().setMark('textStyle', { fontSize }).run()
     }
+    const setImageWidth = (width) => {
+        if (!editor || readOnly || !editor.isActive('image')) return
 
+        editor
+            .chain()
+            .focus()
+            .updateAttributes('image', { width })
+            .run()
+    }
+
+    const removeSelectedImage = () => {
+        if (!editor || readOnly || !editor.isActive('image')) return
+
+        editor
+            .chain()
+            .focus()
+            .deleteSelection()
+            .run()
+    }
     const setHeading = (value) => {
         if (!editor || readOnly) return
 
@@ -899,7 +912,7 @@ const RichTextEditor = forwardRef(function RichTextEditor({
                         }}
                     >
                         <option value="">Font</option>
-                        {FONT_FAMILIES.map(font => (
+                        {EDITOR_FONT_FAMILIES.map(font => (
                             <option
                                 key={font.value}
                                 value={font.value}
@@ -920,7 +933,7 @@ const RichTextEditor = forwardRef(function RichTextEditor({
                         }}
                     >
                         <option value="">Size</option>
-                        {FONT_SIZES.map(size => (
+                        {EDITOR_FONT_SIZES.map(size => (
                             <option key={size.value} value={size.value}>
                                 {size.label}
                             </option>
@@ -1045,7 +1058,36 @@ const RichTextEditor = forwardRef(function RichTextEditor({
                     >
                         <IconPhoto size={15} />
                     </button>
+                    {editor?.isActive('image') && (
+                        <>
+                            <select
+                                title="Kích thước ảnh"
+                                value={editor?.getAttributes('image')?.width || '420px'}
+                                onChange={e => setImageWidth(e.target.value)}
+                                style={{
+                                    ...styles.toolSelect,
+                                    ...styles.imageSizeSelect,
+                                }}
+                            >
+                                {EDITOR_IMAGE_WIDTHS.map(size => (
+                                    <option key={size.value} value={size.value}>
+                                        {size.label}
+                                    </option>
+                                ))}
+                            </select>
 
+                            <button
+                                type="button"
+                                className="btn-ghost btn-danger"
+                                title="Xóa ảnh đang chọn"
+                                onMouseDown={keepSelection}
+                                onClick={removeSelectedImage}
+                                style={styles.toolButton}
+                            >
+                                <IconTrash size={15} />
+                            </button>
+                        </>
+                    )}
                     <div style={styles.tablePickerWrap}>
                     <button
                         type="button"
@@ -1070,7 +1112,7 @@ const RichTextEditor = forwardRef(function RichTextEditor({
                             <div style={styles.tablePickerGrid}>
                                 {Array.from({ length: TABLE_PICKER_ROWS }).map((_, rowIndex) => (
                                     <div key={rowIndex} style={styles.tablePickerRow}>
-                                        {Array.from({ length: TABLE_PICKER_COLS }).map((__, colIndex) => {
+                                        {Array.from({ length: TABLE_PICKER_COLUMNS }).map((__, colIndex) => {
                                             const rows = rowIndex + 1
                                             const cols = colIndex + 1
                                             const selected = rows <= tablePickerSize.rows && cols <= tablePickerSize.cols
@@ -1136,8 +1178,8 @@ const RichTextEditor = forwardRef(function RichTextEditor({
                             </button>
                             <input
                                 type="number"
-                                min={MIN_ROW_HEIGHT}
-                                max={MAX_ROW_HEIGHT}
+                                min={MIN_TABLE_ROW_HEIGHT}
+                                max={MAX_TABLE_ROW_HEIGHT}
                                 value={rowHeight}
                                 title="Chiá»u cao hÃ ng"
                                 onChange={event => setCurrentRowHeight(event.target.value)}
@@ -1172,7 +1214,7 @@ const RichTextEditor = forwardRef(function RichTextEditor({
                     <IconPalette size={15} style={{ color: 'var(--text-muted)', marginLeft: 2 }} />
 
                     <div style={styles.colors}>
-                        {COLORS.map(color => (
+                        {EDITOR_COLORS.map(color => (
                             <button
                                 key={color}
                                 type="button"
@@ -1335,6 +1377,9 @@ const styles = {
 
     sizeSelect: {
         width: 72,
+    },
+    imageSizeSelect: {
+        width: 86,
     },
     activeButton: {
         background: 'var(--bg-ai)',

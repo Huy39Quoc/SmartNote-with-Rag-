@@ -16,49 +16,49 @@ function toWebSocketBaseUrl() {
 }
 
 const noteApi = {
-    layTatCa:   (params)     => client.get('/notes', { params }),
-    layTheoId:  (id)         => client.get(`/notes/${id}`),
-    taoMoi:     (data)       => client.post('/notes', data),
-    capNhat:    (id, data)   => client.put(`/notes/${id}`, data),
-    xoa:        (id)         => client.delete(`/notes/${id}`),
-    danhDau:    (id)         => client.patch(`/notes/${id}/bookmark`),
-    caiThienAi: (id, data)   => client.post(`/notes/${id}/ai`, data),
+    getAll:   (params)     => client.get('/notes', { params }),
+    getById:  (id)         => client.get(`/notes/${id}`),
+    create:     (data)       => client.post('/notes', data),
+    update:    (id, data)   => client.put(`/notes/${id}`, data),
+    remove:        (id)         => client.delete(`/notes/${id}`),
+    mark:    (id)         => client.patch(`/notes/${id}/bookmark`),
+    improveWithAi: (id, data)   => client.post(`/notes/${id}/ai`, data),
 
-    xuatPdf:    (id)         => client.get(`/notes/${id}/export/pdf`, {
+    exportPdf:    (id)         => client.get(`/notes/${id}/export/pdf`, {
         responseType: 'blob',
     }),
 
-    xuatWord:   (id)         => client.get(`/notes/${id}/export/docx`, {
+    exportWord:   (id)         => client.get(`/notes/${id}/export/docx`, {
         responseType: 'blob',
     }),
 
-    chiaSe: (noteId, data) =>
+    share: (noteId, data) =>
         client.post(`/note-shares/notes/${noteId}`, data),
 
-    layDanhSachChiaSe: (noteId) =>
+    getShares: (noteId) =>
         client.get(`/note-shares/notes/${noteId}`),
 
-    capNhatQuyenChiaSe: (shareId, data) =>
+    updateSharePermission: (shareId, data) =>
         client.patch(`/note-shares/${shareId}`, data),
 
-    huyChiaSe: (shareId) =>
+    revokeShare: (shareId) =>
         client.delete(`/note-shares/${shareId}`),
 
-    layGhiChuDuocChiaSe: () =>
+    getSharedNotes: () =>
         client.get('/note-shares/shared-with-me'),
-    
-    taoSoDo: (id, payload) => client.post(`/notes/${id}/diagram`, payload),
 
-    layPhienBan: (id) =>
+    createDiagram: (id, payload) => client.post(`/notes/${id}/diagram`, payload),
+
+    getVersions: (id) =>
         client.get(`/notes/${id}/versions`),
 
-    khoiPhucPhienBan: (id, versionId) =>
+    restoreVersion: (id, versionId) =>
         client.post(`/notes/${id}/versions/${versionId}/restore`),
 
-    taoRealtimeUrl: (id, token) =>
+    createRealtimeUrl: (id, token) =>
         `${API_BASE_URL}/notes/${id}/events?token=${encodeURIComponent(token)}`,
 
-    taoCollabUrl: (id, token) =>
+    createCollaborationUrl: (id, token) =>
         `${toWebSocketBaseUrl()}/notes/${id}/collab?token=${encodeURIComponent(token)}`,
 }
 

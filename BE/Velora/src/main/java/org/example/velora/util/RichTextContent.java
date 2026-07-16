@@ -13,8 +13,10 @@ public final class RichTextContent {
     );
 
     private static final Set<String> ALLOWED_COLORS = Set.of(
-            "#e8e6de", "#ffffff", "#f87171", "#fb923c", "#facc15",
-            "#4ade80", "#38bdf8", "#a78bfa", "#f472b6"
+            "#000000", "#111827", "#374151", "#6b7280", "#e8e6de", "#ffffff",
+            "#ef4444", "#f97316", "#f59e0b", "#eab308", "#22c55e",
+            "#10b981", "#06b6d4", "#3b82f6", "#6366f1", "#8b5cf6", "#ec4899",
+            "#f87171", "#fb923c", "#facc15", "#4ade80", "#38bdf8", "#a78bfa", "#f472b6"
     );
 
     private static final Set<String> ALLOWED_FONT_FAMILIES = Set.of(
@@ -29,6 +31,15 @@ public final class RichTextContent {
             "12px", "14px", "16px", "18px", "20px", "24px", "32px"
     );
 
+    private static final Set<String> ALLOWED_IMAGE_WIDTHS = Set.of(
+            "240px", "320px", "420px", "560px", "100%"
+    );
+
+    private static final Pattern IMAGE_WIDTH_STYLE_PATTERN = Pattern.compile(
+            "(?i)(?:^|;)\\s*width\\s*:\\s*(240px|320px|420px|560px|100%)\\s*(?:;|$)"
+    );
+
+    private static final Pattern WIDTH_ATTR_PATTERN = Pattern.compile("(?i)\\bwidth\\s*=\\s*([\"']?)(240px|320px|420px|560px|100%)\\1");
     private static final Set<String> ALLOWED_TEXT_ALIGN = Set.of(
             "left", "center", "right", "justify"
     );
@@ -113,10 +124,13 @@ public final class RichTextContent {
                     String src = extractSafeImageSrc(attrs);
                     if (src != null) {
                         String alt = extractAlt(attrs);
-                        replacement = "<img src=\"" + escapeAttribute(src) + "\"" + (alt == null ? "" : " alt=\"" + escapeAttribute(alt) + "\"") + ">";
+                        String width = extractAllowedImageWidth(attrs);
+
+                        replacement = "<img src=\"" + escapeAttribute(src) + "\""
+                                + (alt == null ? "" : " alt=\"" + escapeAttribute(alt) + "\"")
+                                + (width == null ? "" : " width=\"" + escapeAttribute(width) + "\" style=\"width: " + escapeAttribute(width) + "; max-width: 100%; height: auto;\"")
+                                + ">";
                     }
-                } else {
-                    replacement = "<" + tag + ">";
                 }
             }
 
@@ -130,17 +144,25 @@ public final class RichTextContent {
     public static String toPlainText(String html) {
         if (html == null || html.isBlank()) return "";
 
-        String readable = sanitize(html)
+        String safeHtml = sanitize(html);
+
+        String readable = safeHtml
                 .replaceAll("(?i)<br\\s*/?>", "\n")
                 .replaceAll("(?i)</(?:p|div|li|h[1-3]|blockquote|tr|table)>", "\n")
                 .replaceAll("<[^>]+>", " ");
 
-        return decodeBasicEntities(readable)
+        String result = decodeBasicEntities(readable)
                 .replace('\u00a0', ' ')
                 .replaceAll("[ \\t\\x0B\\f\\r]+", " ")
                 .replaceAll("\\n\\s+", "\n")
                 .replaceAll("\\n{3,}", "\n\n")
                 .trim();
+
+        if (result.isBlank() && safeHtml.toLowerCase().contains("<img")) {
+            return "[Hình ảnh]";
+        }
+
+        return result;
     }
 
     public static boolean hasText(String html) {
@@ -325,5 +347,26 @@ public final class RichTextContent {
                 .replace("&gt;", ">")
                 .replace("&quot;", "\"")
                 .replace("&#39;", "'");
+    }
+
+    private static String extractAllowedImageWidth(String attrs) {
+        if (attrs == null || attrs.isBlank()) return null;
+
+        Matcher styleMatcher = STYLE_ATTR_PATTERN.matcher(attrs);
+        if (styleMatcher.find()) {
+            Matcher widthMatcher = IMAGE_WIDTH_STYLE_PATTERN.matcher(styleMatcher.group(2));
+            if (widthMatcher.find()) {
+                String width = widthMatcher.group(1).trim().toLowerCase();
+                return ALLOWED_IMAGE_WIDTHS.contains(width) ? width : null;
+            }
+        }
+
+        Matcher widthAttrMatcher = WIDTH_ATTR_PATTERN.matcher(attrs);
+        if (widthAttrMatcher.find()) {
+            String width = widthAttrMatcher.group(2).trim().toLowerCase();
+            return ALLOWED_IMAGE_WIDTHS.contains(width) ? width : null;
+        }
+
+        return null;
     }
 }

@@ -13,6 +13,7 @@ import {
     IconArrowBackUp,
 } from '@tabler/icons-react'
 import noteApi from '../../lib/api/noteApi'
+import { NOTE_DIAGRAM_TYPES } from '../../constants/diagramConstants'
 
 mermaid.initialize({
     startOnLoad: false,
@@ -20,15 +21,6 @@ mermaid.initialize({
     theme: 'default',
 })
 
-const DIAGRAM_TYPES = [
-    { value: 'MINDMAP', label: 'Mindmap - Sơ đồ tư duy' },
-    { value: 'FLOWCHART', label: 'Flowchart - Quy trình' },
-    { value: 'ARCHITECTURE', label: 'Architecture - Kiến trúc' },
-    { value: 'SKETCHNOTE', label: 'Sketchnote - Ghi chú trực quan' },
-]
-
-// Loại bỏ mọi phần tử mermaid vô tình chèn thẳng vào <body> khi render lỗi
-// (mermaid tự vẽ 1 icon lỗi và không luôn dọn dẹp phần tử tạm của nó).
 function withBodyLeakCleanup(fn) {
     const before = new Set(Array.from(document.body.children))
 
@@ -242,64 +234,64 @@ function FullscreenModal({ format, code, onClose }) {
     )
 }
 
-export default function NoteDiagramGenerator({ noteId, onDong, onChenVaoGhiChu }) {
+export default function NoteDiagramGenerator({ noteId, onClose, onInsertIntoNote }) {
     const [diagramType, setDiagramType] = useState('MINDMAP')
-    const [ketQua, setKetQua] = useState(null)
+    const [result, setResult] = useState(null)
     const [codeText, setCodeText] = useState('')
-    const [dangTao, setDangTao] = useState(false)
-    const [dangChen, setDangChen] = useState(false)
-    const [dangTai, setDangTai] = useState(false)
-    const [hienCode, setHienCode] = useState(false)
-    const [hienFullscreen, setHienFullscreen] = useState(false)
+    const [isCreating, setCreating] = useState(false)
+    const [isInserting, setInserting] = useState(false)
+    const [isLoading, setLoading] = useState(false)
+    const [showCode, setShowCode] = useState(false)
+    const [showFullscreen, setShowFullscreen] = useState(false)
     const [zoom, setZoom] = useState(1)
 
     useEffect(() => {
-        if (ketQua?.diagramCode != null) {
-            setCodeText(ketQua.diagramCode)
+        if (result?.diagramCode != null) {
+            setCodeText(result.diagramCode)
         }
-    }, [ketQua])
+    }, [result])
 
-    const taoSoDo = async () => {
+    const createDiagram = async () => {
         if (!noteId) {
             toast.error('Không tìm thấy ghi chú')
             return
         }
 
-        setDangTao(true)
-        setKetQua(null)
+        setCreating(true)
+        setResult(null)
         setZoom(1)
 
         const toastId = toast.loading('AI đang tạo sơ đồ từ ghi chú...')
 
         try {
-            const { data } = await noteApi.taoSoDo(noteId, {
+            const { data } = await noteApi.createDiagram(noteId, {
                 diagramType,
             })
 
-            setKetQua(data.data)
+            setResult(data.data)
             toast.success('Đã tạo sơ đồ', { id: toastId })
         } catch (error) {
             toast.error(error.response?.data?.message || 'Không thể tạo sơ đồ', {
                 id: toastId,
             })
         } finally {
-            setDangTao(false)
+            setCreating(false)
         }
     }
 
-    const veLaiTuCode = () => {
+    const redrawFromCode = () => {
         if (!codeText.trim()) {
             toast.error('Code sơ đồ đang trống')
             return
         }
 
-        setKetQua(p => p ? { ...p, diagramCode: codeText } : p)
+        setResult(p => p ? { ...p, diagramCode: codeText } : p)
         toast.success('Đã vẽ lại theo code chỉnh sửa')
     }
 
-    const khoiPhucCodeGoc = () => {
-        // Trường hợp người dùng chỉnh code lỗi, khôi phục lại bản gốc AI đã sinh ra.
-        taoSoDo()
+    const restoreOriginalCode = () => {
+
+        createDiagram()
     }
 
     const copyCode = () => {
@@ -309,73 +301,73 @@ export default function NoteDiagramGenerator({ noteId, onDong, onChenVaoGhiChu }
         toast.success('Đã copy code sơ đồ')
     }
 
-    const chenVaoGhiChu = async () => {
-        if (!ketQua) return
+    const insertIntoNote = async () => {
+        if (!result) return
 
-        setDangChen(true)
+        setInserting(true)
 
         try {
-            if (ketQua.format === 'MERMAID') {
+            if (result.format === 'MERMAID') {
                 const svg = await renderMermaidToSvg(codeText)
                 const pngDataUrl = await svgToPngDataUrl(svg)
-                const html = `<p><img src="${pngDataUrl}" alt="${escapeHtml(ketQua.noteTitle || 'Sơ đồ')}"></p>`
-                onChenVaoGhiChu?.(html)
+                const html = `<p><img src="${pngDataUrl}" alt="${escapeHtml(result.noteTitle || 'Sơ đồ')}"></p>`
+                onInsertIntoNote?.(html)
             } else {
-                const html = buildSketchnoteHtml(codeText, ketQua.noteTitle)
+                const html = buildSketchnoteHtml(codeText, result.noteTitle)
                 if (!html) {
                     toast.error('Sơ đồ chưa hợp lệ, không thể chèn')
                     return
                 }
-                onChenVaoGhiChu?.(html)
+                onInsertIntoNote?.(html)
             }
         } catch {
             toast.error('Không thể chèn sơ đồ (cú pháp chưa hợp lệ)')
         } finally {
-            setDangChen(false)
+            setInserting(false)
         }
     }
 
-    const taiXuongPng = async () => {
-        if (!ketQua || ketQua.format !== 'MERMAID') return
+    const downloadPng = async () => {
+        if (!result || result.format !== 'MERMAID') return
 
-        setDangTai(true)
+        setLoading(true)
         try {
             const svg = await renderMermaidToSvg(codeText)
             const pngDataUrl = await svgToPngDataUrl(svg, 2.5)
-            downloadDataUrl(pngDataUrl, `${(ketQua.noteTitle || 'so-do').replace(/\s+/g, '-')}.png`)
+            downloadDataUrl(pngDataUrl, `${(result.noteTitle || 'so-do').replace(/\s+/g, '-')}.png`)
         } catch {
             toast.error('Không thể xuất PNG (cú pháp chưa hợp lệ)')
         } finally {
-            setDangTai(false)
+            setLoading(false)
         }
     }
 
-    const taiXuongSvg = async () => {
-        if (!ketQua || ketQua.format !== 'MERMAID') return
+    const downloadSvg = async () => {
+        if (!result || result.format !== 'MERMAID') return
 
-        setDangTai(true)
+        setLoading(true)
         try {
             const svg = await renderMermaidToSvg(codeText)
             const blob = new Blob([svg], { type: 'image/svg+xml' })
             const url = URL.createObjectURL(blob)
-            downloadDataUrl(url, `${(ketQua.noteTitle || 'so-do').replace(/\s+/g, '-')}.svg`)
+            downloadDataUrl(url, `${(result.noteTitle || 'so-do').replace(/\s+/g, '-')}.svg`)
             URL.revokeObjectURL(url)
         } catch {
             toast.error('Không thể xuất SVG (cú pháp chưa hợp lệ)')
         } finally {
-            setDangTai(false)
+            setLoading(false)
         }
     }
 
-    const daChinhSuaCode = ketQua && codeText !== ketQua.diagramCode
+    const hasEditedCode = result && codeText !== result.diagramCode
 
     return (
         <div style={styles.panel}>
-            {hienFullscreen && ketQua && (
+            {showFullscreen && result && (
                 <FullscreenModal
-                    format={ketQua.format}
+                    format={result.format}
                     code={codeText}
-                    onClose={() => setHienFullscreen(false)}
+                    onClose={() => setShowFullscreen(false)}
                 />
             )}
 
@@ -388,7 +380,7 @@ export default function NoteDiagramGenerator({ noteId, onDong, onChenVaoGhiChu }
                     </div>
                 </div>
 
-                <button className="btn-ghost" onClick={onDong} style={{ padding: 4 }}>
+                <button className="btn-ghost" onClick={onClose} style={{ padding: 4 }}>
                     <IconX size={15} />
                 </button>
             </div>
@@ -399,7 +391,7 @@ export default function NoteDiagramGenerator({ noteId, onDong, onChenVaoGhiChu }
                     onChange={e => setDiagramType(e.target.value)}
                     style={styles.select}
                 >
-                    {DIAGRAM_TYPES.map(type => (
+                    {NOTE_DIAGRAM_TYPES.map(type => (
                         <option key={type.value} value={type.value}>
                             {type.label}
                         </option>
@@ -408,24 +400,24 @@ export default function NoteDiagramGenerator({ noteId, onDong, onChenVaoGhiChu }
 
                 <button
                     className="btn-primary"
-                    onClick={taoSoDo}
-                    disabled={dangTao}
+                    onClick={createDiagram}
+                    disabled={isCreating}
                     style={styles.generateButton}
                 >
-                    {dangTao ? 'Đang tạo...' : ketQua ? 'Tạo sơ đồ mới' : 'Tạo sơ đồ'}
+                    {isCreating ? 'Đang tạo...' : result ? 'Tạo sơ đồ mới' : 'Tạo sơ đồ'}
                 </button>
 
-                {ketQua && (
+                {result && (
                     <div style={styles.resultBox}>
                         <div style={styles.resultHeader}>
                             <div>
                                 <div style={styles.resultTitle}>
-                                    {ketQua.noteTitle}
+                                    {result.noteTitle}
                                 </div>
 
                                 <div style={styles.resultMeta}>
-                                    {ketQua.diagramType} · {ketQua.format}
-                                    {daChinhSuaCode && ' · đã chỉnh sửa'}
+                                    {result.diagramType} · {result.format}
+                                    {hasEditedCode && ' · đã chỉnh sửa'}
                                 </div>
                             </div>
 
@@ -448,7 +440,7 @@ export default function NoteDiagramGenerator({ noteId, onDong, onChenVaoGhiChu }
                                 </button>
                                 <button
                                     className="btn-ghost"
-                                    onClick={() => setHienFullscreen(true)}
+                                    onClick={() => setShowFullscreen(true)}
                                     title="Xem toàn màn hình"
                                     style={styles.iconButton}
                                 >
@@ -459,7 +451,7 @@ export default function NoteDiagramGenerator({ noteId, onDong, onChenVaoGhiChu }
 
                         <div style={styles.previewBox}>
                             <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top left', width: 'fit-content' }}>
-                                {ketQua.format === 'MERMAID' ? (
+                                {result.format === 'MERMAID' ? (
                                     <MermaidViewer code={codeText} />
                                 ) : (
                                     <SketchnoteViewer jsonText={codeText} />
@@ -470,19 +462,19 @@ export default function NoteDiagramGenerator({ noteId, onDong, onChenVaoGhiChu }
                         <div style={styles.actionsGrid}>
                             <button
                                 className="btn-primary"
-                                onClick={chenVaoGhiChu}
-                                disabled={dangChen}
+                                onClick={insertIntoNote}
+                                disabled={isInserting}
                                 style={styles.actionButton}
                             >
-                                {dangChen ? 'Đang chèn...' : 'Chèn vào ghi chú'}
+                                {isInserting ? 'Đang chèn...' : 'Chèn vào ghi chú'}
                             </button>
 
-                            {ketQua.format === 'MERMAID' && (
+                            {result.format === 'MERMAID' && (
                                 <>
                                     <button
                                         className="btn-ghost"
-                                        onClick={taiXuongPng}
-                                        disabled={dangTai}
+                                        onClick={downloadPng}
+                                        disabled={isLoading}
                                         style={styles.actionButton}
                                         title="Tải xuống PNG"
                                     >
@@ -490,8 +482,8 @@ export default function NoteDiagramGenerator({ noteId, onDong, onChenVaoGhiChu }
                                     </button>
                                     <button
                                         className="btn-ghost"
-                                        onClick={taiXuongSvg}
-                                        disabled={dangTai}
+                                        onClick={downloadSvg}
+                                        disabled={isLoading}
                                         style={styles.actionButton}
                                         title="Tải xuống SVG"
                                     >
@@ -511,13 +503,13 @@ export default function NoteDiagramGenerator({ noteId, onDong, onChenVaoGhiChu }
 
                         <button
                             className="btn-ghost"
-                            onClick={() => setHienCode(p => !p)}
+                            onClick={() => setShowCode(p => !p)}
                             style={{ ...styles.summary, marginTop: 10, width: '100%', justifyContent: 'flex-start' }}
                         >
-                            {hienCode ? 'Ẩn code' : 'Xem & sửa code'}
+                            {showCode ? 'Ẩn code' : 'Xem & sửa code'}
                         </button>
 
-                        {hienCode && (
+                        {showCode && (
                             <div style={{ marginTop: 8 }}>
                                 <textarea
                                     value={codeText}
@@ -529,16 +521,16 @@ export default function NoteDiagramGenerator({ noteId, onDong, onChenVaoGhiChu }
                                 <div style={styles.toolRow}>
                                     <button
                                         className="btn-primary"
-                                        onClick={veLaiTuCode}
+                                        onClick={redrawFromCode}
                                         style={{ ...styles.actionButton, flex: 1 }}
                                     >
                                         Vẽ lại theo code này
                                     </button>
 
-                                    {daChinhSuaCode && (
+                                    {hasEditedCode && (
                                         <button
                                             className="btn-ghost"
-                                            onClick={khoiPhucCodeGoc}
+                                            onClick={restoreOriginalCode}
                                             title="Khôi phục code gốc do AI tạo (tạo lại)"
                                             style={styles.actionButton}
                                         >

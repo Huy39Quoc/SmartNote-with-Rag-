@@ -46,7 +46,6 @@ public class KnowledgeGroup {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // Relationships
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "knowledge_group_notes",

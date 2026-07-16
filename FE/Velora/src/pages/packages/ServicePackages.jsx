@@ -3,60 +3,43 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import packageApi from '../../lib/api/packageApi'
 import Spinner from '../../components/ui/Spinner'
 import useAuthStore from '../../service/authStore'
+import { PACKAGE_FEATURE_CODES, SYSTEM_PACKAGE_ORDER } from '../../constants/packageConstants'
+import { getFeatureLabel } from '../../utils/packageFeatures'
 
-const PACKAGE_RANK = {
-    FREE: 0,
-    PRO: 1,
-    PLUS: 2,
+const formatPrice = (value) => {
+    const price = Number(value || 0)
+
+    return price.toLocaleString('vi-VN', {
+        style: 'currency',
+        currency: 'VND',
+        maximumFractionDigits: 0,
+    })
 }
 
-const FEATURE_CODES = [
-    'NOTE_LIMIT',
-    'DEVICE_LIMIT',
-    'AI_NOTE_FORMAT',
-    'DOCUMENT_UPLOAD',
-    'TAG_SUBJECT',
-    'CHECKLIST_BASIC',
-    'AI_SUMMARY_BASIC',
-    'AI_SUMMARY_ADVANCED',
-    'AI_CHAT',
-    'AI_ANALYZE',
-    'AI_AUDIO',
-    'EXTRACT_SCHEDULE',
-    'DEADLINE_MANAGEMENT',
-    'PRIORITY_SUGGESTION',
-    'AI_FLASHCARD',
-    'EXPORT_FILE',
-    'TEAM_WORK',
-    'SHARE_DOCUMENT',
-    'AI_PROGRESS_ANALYTICS',
-    'PRIORITY_SUPPORT',
-]
-
 export default function ServicePackages() {
-    const { nguoiDung, layThongTin } = useAuthStore()
+    const { user, getProfile } = useAuthStore()
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
 
-    const [danhSachGoi, setDanhSachGoi] = useState([])
+    const [packages, setPackages] = useState([])
     const [loading, setLoading] = useState(true)
     const [buyingId, setBuyingId] = useState(null)
     const [billingCycle, setBillingCycle] = useState('monthly')
 
-    const currentPackageName = nguoiDung?.packageName || 'FREE'
-    const usedAi = nguoiDung?.aiUsedThisMonth || 0
-    const maxAi = nguoiDung?.maxAiFormatsPerMonth
-    const noteCount = nguoiDung?.noteCount || 0
-    const maxNotes = nguoiDung?.maxNotes
-    const storageUsedBytes = nguoiDung?.storageUsedBytes || 0
-    const storageGb = nguoiDung?.storageGb
+    const currentPackageName = user?.packageName || 'FREE'
+    const usedAi = user?.aiUsedThisMonth || 0
+    const maxAi = user?.maxAiFormatsPerMonth
+    const noteCount = user?.noteCount || 0
+    const maxNotes = user?.maxNotes
+    const storageUsedBytes = user?.storageUsedBytes || 0
+    const storageGb = user?.storageGb
     const maxStorageBytes =
         storageGb === null || storageGb === undefined || Number(storageGb) < 0
             ? null
             : Number(storageGb) * 1024 * 1024 * 1024
 
     useEffect(() => {
-        taiGoiDichVu()
+        loadServicePackages()
     }, [])
 
     useEffect(() => {
@@ -64,16 +47,16 @@ export default function ServicePackages() {
 
         if (!status) return
 
-        layThongTin?.()
+        getProfile?.()
         navigate('/service-packages', { replace: true })
-    }, [searchParams, navigate, layThongTin])
+    }, [searchParams, navigate, getProfile])
 
-    const taiGoiDichVu = async () => {
+    const loadServicePackages = async () => {
         setLoading(true)
 
         try {
-            const { data } = await packageApi.layDanhSachGoiHoatDong()
-            setDanhSachGoi(data.data || data || [])
+            const { data } = await packageApi.getActivePackages()
+            setPackages(data.data || data || [])
         } catch (error) {
             console.error(error)
             alert('Không thể tải danh sách gói dịch vụ')
@@ -82,16 +65,16 @@ export default function ServicePackages() {
         }
     }
 
-    const handleMuaGoi = async (id) => {
+    const handlePurchasePackage = async (id) => {
         setBuyingId(id)
 
         try {
-            const { data } = await packageApi.muaGoiDichVu(id, billingCycle)
+            const { data } = await packageApi.purchaseServicePackage(id, billingCycle)
             const responseData = data.data || data
 
             if (responseData?.activated) {
-                await layThongTin?.()
-                await taiGoiDichVu()
+                await getProfile?.()
+                await loadServicePackages()
                 return
             }
 
@@ -109,34 +92,7 @@ export default function ServicePackages() {
         }
     }
 
-    const getFeatureLabel = (id) => {
-        const featuresMap = {
-            NOTE_LIMIT: 'Số ghi chú',
-            DEVICE_LIMIT: 'Số thiết bị',
-            TAG_SUBJECT: 'Tag môn học / chủ đề',
-            CHECKLIST_BASIC: 'Checklist công việc cơ bản',
-            AI_NOTE_FORMAT: 'AI format ghi chú',
-            AI_SUMMARY_BASIC: 'Tóm tắt AI cơ bản',
-            AI_SUMMARY_ADVANCED: 'Tóm tắt & phân tích AI nâng cao',
-            AI_CHAT: 'Hỏi đáp AI với ghi chú / tài liệu',
-            AI_ANALYZE: 'AI phân tích tài liệu chuyên sâu',
-            AI_AUDIO: 'Ghi chú âm thanh (Whisper AI)',
-            DOCUMENT_UPLOAD: 'Upload tài liệu',
-            EXTRACT_SCHEDULE: 'AI trích xuất deadline từ ghi chú',
-            AI_FLASHCARD: 'Flashcard AI tự động',
-            DEADLINE_MANAGEMENT: 'Quản lý deadline thông minh',
-            PRIORITY_SUGGESTION: 'Gợi ý ưu tiên công việc',
-            EXPORT_FILE: 'Export PDF / Word',
-            TEAM_WORK: 'Chia sẻ ghi chú với người khác (VIEW/EDIT)',
-            SHARE_DOCUMENT: 'Chia sẻ tài liệu với người khác (VIEW/EDIT)',
-            AI_PROGRESS_ANALYTICS: 'Thống kê & điểm tiến độ học tập',
-            PRIORITY_SUPPORT: 'Ưu tiên hỗ trợ khách hàng',
-        }
-
-        return featuresMap[id?.trim()] || id
-    }
-
-    const hienThiGioiHan = (value, suffix = '') => {
+    const formatLimit = (value, suffix = '') => {
         if (value === null || value === undefined || Number(value) < 0) {
             return 'Vô hạn'
         }
@@ -144,75 +100,100 @@ export default function ServicePackages() {
         return `${value}${suffix}`
     }
 
-    const getPackageName = (goi) => {
-        return goi?.name?.toUpperCase() || 'FREE'
+    const getPackageName = (packageItem) => {
+        return packageItem?.name?.toUpperCase() || 'FREE'
     }
 
     const getCurrentPackageName = () => {
         return currentPackageName?.toUpperCase() || 'FREE'
     }
 
+    const getComparablePrice = (packageItem) => {
+        const monthly = Number(packageItem?.priceMonthly || 0)
+        const yearly = Number(packageItem?.priceYearly || 0)
+
+        if (monthly > 0) return monthly
+        if (yearly > 0) return yearly / 12
+
+        return 0
+    }
+
+    const sortPackages = (packages) => {
+        return [...packages].sort((a, b) => {
+            const aName = getPackageName(a)
+            const bName = getPackageName(b)
+
+            const aKnown = SYSTEM_PACKAGE_ORDER[aName]
+            const bKnown = SYSTEM_PACKAGE_ORDER[bName]
+
+            if (aKnown && bKnown) {
+                return aKnown - bKnown
+            }
+
+            if (aKnown && !bKnown) return -1
+            if (!aKnown && bKnown) return 1
+
+            const priceDiff = getComparablePrice(a) - getComparablePrice(b)
+
+            if (priceDiff !== 0) {
+                return priceDiff
+            }
+
+            return aName.localeCompare(bName)
+        })
+    }
+
     const getPackageRank = (packageName) => {
-        return PACKAGE_RANK[packageName?.toUpperCase()] ?? 0
+        const target = packageName?.toUpperCase() || 'FREE'
+        const orderedNames = sortPackages(packages).map(getPackageName)
+        const index = orderedNames.findIndex(name => name === target)
+
+        if (index >= 0) return index
+
+        if (SYSTEM_PACKAGE_ORDER[target]) {
+            return SYSTEM_PACKAGE_ORDER[target] - 1
+        }
+
+        return orderedNames.length
     }
 
-    const laGoiHienTai = (goi) => {
-        return getCurrentPackageName() === getPackageName(goi)
+    const isCurrentPackage = (packageItem) => {
+        return getCurrentPackageName() === getPackageName(packageItem)
     }
 
-    const isHigherPackage = (goi) => {
+    const isHigherPackage = (packageItem) => {
         const currentRank = getPackageRank(getCurrentPackageName())
-        const targetRank = getPackageRank(getPackageName(goi))
+        const targetRank = getPackageRank(getPackageName(packageItem))
 
         return targetRank > currentRank
     }
 
-    const isLowerPackage = (goi) => {
+    const isLowerPackage = (packageItem) => {
         const currentRank = getPackageRank(getCurrentPackageName())
-        const targetRank = getPackageRank(getPackageName(goi))
+        const targetRank = getPackageRank(getPackageName(packageItem))
 
         return targetRank < currentRank
     }
 
-    const getPackageActionLabel = (goi) => {
-        return `Nâng cấp lên ${getPackageName(goi)}`
+    const getPackageActionLabel = (packageItem) => {
+        const currentRank = getPackageRank(getCurrentPackageName())
+        const targetRank = getPackageRank(getPackageName(packageItem))
+
+        return targetRank > currentRank
+            ? `Nâng cấp lên ${getPackageName(packageItem)}`
+            : `Chọn gói ${getPackageName(packageItem)}`
     }
 
-    const getUnavailablePackageText = (goi) => {
-        if (laGoiHienTai(goi)) {
+    const getUnavailablePackageText = (packageItem) => {
+        if (isCurrentPackage(packageItem)) {
             return 'Gói hiện tại'
         }
 
-        if (isLowerPackage(goi)) {
+        if (isLowerPackage(packageItem)) {
             return `Đã bao gồm trong gói ${getCurrentPackageName()}`
         }
 
         return 'Không khả dụng'
-    }
-
-    const formatGia = (price) => {
-        const value = Number(price || 0)
-
-        if (value === 0) return '0₫'
-
-        return value.toLocaleString('vi-VN', {
-            style: 'currency',
-            currency: 'VND',
-        })
-    }
-
-    const sapXepGoi = (packages) => {
-        const order = {
-            FREE: 1,
-            PRO: 2,
-            PLUS: 3,
-        }
-
-        return [...packages].sort((a, b) => {
-            const aOrder = order[a.name?.toUpperCase()] || 99
-            const bOrder = order[b.name?.toUpperCase()] || 99
-            return aOrder - bOrder
-        })
     }
 
     const formatBytes = (bytes) => {
@@ -230,7 +211,7 @@ export default function ServicePackages() {
         return `${gb.toFixed(2)} GB`
     }
 
-    const tinhPhanTram = (used, max) => {
+    const calculatePercentage = (used, max) => {
         if (max === null || max === undefined || Number(max) < 0) {
             return 100
         }
@@ -255,41 +236,41 @@ export default function ServicePackages() {
     }
 
     const getPackageByName = (name) => {
-        return danhSachGoi.find(
-            goi => goi.name?.toUpperCase() === name.toUpperCase()
+        return packages.find(
+            packageItem => getPackageName(packageItem) === name.toUpperCase()
         )
     }
 
-    const packageHasFeature = (goi, featureCode) => {
-        if (!goi?.features) return false
+    const packageHasFeature = (packageItem, featureCode) => {
+        if (!packageItem?.features) return false
 
-        return goi.features
+        return packageItem.features
             .split(',')
             .map(item => item.trim())
             .filter(Boolean)
             .includes(featureCode)
     }
 
-    const renderPackageFeatureValue = (goi, featureCode) => {
-        if (!goi) return false
+    const renderPackageFeatureValue = (packageItem, featureCode) => {
+        if (!packageItem) return false
 
         if (featureCode === 'AI_NOTE_FORMAT') {
-            return hienThiGioiHan(goi.maxAiFormatsPerMonth, ' lần/tháng')
+            return formatLimit(packageItem.maxAiFormatsPerMonth, ' lần/tháng')
         }
 
         if (featureCode === 'DOCUMENT_UPLOAD') {
-            return hienThiGioiHan(goi.storageGb, ' GB')
+            return formatLimit(packageItem.storageGb, ' GB')
         }
 
         if (featureCode === 'NOTE_LIMIT') {
-            return hienThiGioiHan(goi.maxNotes, ' ghi chú')
+            return formatLimit(packageItem.maxNotes, ' ghi chú')
         }
 
         if (featureCode === 'DEVICE_LIMIT') {
-            return hienThiGioiHan(goi.maxDevices, ' thiết bị')
+            return formatLimit(packageItem.maxDevices, ' thiết bị')
         }
 
-        return packageHasFeature(goi, featureCode)
+        return packageHasFeature(packageItem, featureCode)
     }
 
     const buildDynamicCompareRows = () => {
@@ -297,7 +278,7 @@ export default function ServicePackages() {
         const pro = getPackageByName('PRO')
         const plus = getPackageByName('PLUS')
 
-        return FEATURE_CODES.map(code => ({
+        return PACKAGE_FEATURE_CODES.map(code => ({
             id: code,
             label: getFeatureLabel(code),
             free: renderPackageFeatureValue(free, code),
@@ -330,9 +311,9 @@ export default function ServicePackages() {
                         <div style={styles.usagePackage}>{currentPackageName}</div>
                     </div>
 
-                    {nguoiDung?.packageExpiryDate && (
+                    {user?.packageExpiryDate && (
                         <div style={styles.expiryText}>
-                            Hết hạn: {new Date(nguoiDung.packageExpiryDate).toLocaleDateString('vi-VN')}
+                            Hết hạn: {new Date(user.packageExpiryDate).toLocaleDateString('vi-VN')}
                         </div>
                     )}
                 </div>
@@ -341,19 +322,19 @@ export default function ServicePackages() {
                     <UsageItem
                         label="AI tháng này"
                         value={`${usedAi}/${maxAi === null || maxAi === undefined || maxAi < 0 ? '∞' : maxAi} lượt`}
-                        percent={tinhPhanTram(usedAi, maxAi)}
+                        percent={calculatePercentage(usedAi, maxAi)}
                     />
 
                     <UsageItem
                         label="Ghi chú"
                         value={`${noteCount}/${maxNotes === null || maxNotes === undefined || maxNotes < 0 ? '∞' : maxNotes}`}
-                        percent={tinhPhanTram(noteCount, maxNotes)}
+                        percent={calculatePercentage(noteCount, maxNotes)}
                     />
 
                     <UsageItem
                         label="Dung lượng"
                         value={`${formatBytes(storageUsedBytes)}/${maxStorageBytes ? formatBytes(maxStorageBytes) : 'Vô hạn'}`}
-                        percent={maxStorageBytes ? tinhPhanTram(storageUsedBytes, maxStorageBytes) : 100}
+                        percent={maxStorageBytes ? calculatePercentage(storageUsedBytes, maxStorageBytes) : 100}
                     />
                 </div>
             </section>
@@ -383,21 +364,21 @@ export default function ServicePackages() {
             </div>
 
             <div style={styles.grid}>
-                {sapXepGoi(danhSachGoi).map((goi) => {
+                {sortPackages(packages).map((packageItem) => {
                     const price = billingCycle === 'monthly'
-                        ? goi.priceMonthly
-                        : goi.priceYearly
+                        ? packageItem.priceMonthly
+                        : packageItem.priceYearly
 
                     const durationText = billingCycle === 'monthly'
                         ? '/ tháng'
                         : '/ năm'
 
-                    const current = laGoiHienTai(goi)
-                    const canUpgrade = isHigherPackage(goi)
+                    const current = isCurrentPackage(packageItem)
+                    const canUpgrade = isHigherPackage(packageItem)
 
                     return (
                         <div
-                            key={goi.id}
+                            key={packageItem.id}
                             style={{
                                 ...styles.card,
                                 ...(current ? styles.currentCard : {}),
@@ -410,48 +391,48 @@ export default function ServicePackages() {
                             )}
 
                             <div style={styles.cardTop}>
-                                <h3 style={styles.packageName}>{goi.name}</h3>
+                                <h3 style={styles.packageName}>{packageItem.name}</h3>
 
                                 <div style={styles.priceRow}>
-                                    <span style={styles.price}>{formatGia(price)}</span>
+                                    <span style={styles.price}>{formatPrice(price)}</span>
                                     <span style={styles.duration}>{durationText}</span>
                                 </div>
                             </div>
 
                             <p style={styles.description}>
-                                {goi.description || 'Gói dịch vụ tiêu chuẩn'}
+                                {packageItem.description || 'Gói dịch vụ tiêu chuẩn'}
                             </p>
 
                             <div style={styles.specsList}>
                                 <div style={styles.specItem}>
                                     <span>📝 Ghi chú</span>
-                                    <strong>{hienThiGioiHan(goi.maxNotes, ' ghi chú')}</strong>
+                                    <strong>{formatLimit(packageItem.maxNotes, ' ghi chú')}</strong>
                                 </div>
 
                                 <div style={styles.specItem}>
                                     <span>🤖 AI</span>
-                                    <strong>{hienThiGioiHan(goi.maxAiFormatsPerMonth, ' lần/tháng')}</strong>
+                                    <strong>{formatLimit(packageItem.maxAiFormatsPerMonth, ' lần/tháng')}</strong>
                                 </div>
 
                                 <div style={styles.specItem}>
                                     <span>💾 Lưu trữ</span>
-                                    <strong>{hienThiGioiHan(goi.storageGb, ' GB')}</strong>
+                                    <strong>{formatLimit(packageItem.storageGb, ' GB')}</strong>
                                 </div>
 
                                 <div style={styles.specItem}>
                                     <span>📱 Thiết bị</span>
-                                    <strong>{hienThiGioiHan(goi.maxDevices, ' thiết bị')}</strong>
+                                    <strong>{formatLimit(packageItem.maxDevices, ' thiết bị')}</strong>
                                 </div>
                             </div>
 
-                            {goi.features && (
+                            {packageItem.features && (
                                 <div style={styles.featuresSection}>
                                     <div style={styles.featuresTitle}>
                                         Tính năng bao gồm:
                                     </div>
 
                                     <ul style={styles.featuresList}>
-                                        {goi.features
+                                        {packageItem.features
                                             .split(',')
                                             .map(f => f.trim())
                                             .filter(Boolean)
@@ -468,16 +449,16 @@ export default function ServicePackages() {
                                 <button
                                     className="btn-primary"
                                     style={styles.buyBtn}
-                                    disabled={buyingId === goi.id}
-                                    onClick={() => handleMuaGoi(goi.id)}
+                                    disabled={buyingId === packageItem.id}
+                                    onClick={() => handlePurchasePackage(packageItem.id)}
                                 >
-                                    {buyingId === goi.id
+                                    {buyingId === packageItem.id
                                         ? 'Đang chuyển hướng...'
-                                        : getPackageActionLabel(goi)}
+                                        : getPackageActionLabel(packageItem)}
                                 </button>
                             ) : (
                                 <div style={styles.unavailableBtn}>
-                                    {getUnavailablePackageText(goi)}
+                                    {getUnavailablePackageText(packageItem)}
                                 </div>
                             )}
                         </div>

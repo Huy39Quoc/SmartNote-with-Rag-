@@ -78,8 +78,6 @@ public class KnowledgeServiceImpl implements KnowledgeService {
             String to = String.valueOf(e.get("to"));
             double weight = e.get("weight") instanceof Number num ? num.doubleValue() : 0.0;
 
-            // Chỉ giữ lại cạnh nối 2 ghi chú/tài liệu mà người dùng còn sở hữu
-            // (tránh rác nếu note/document đã bị xoá nhưng vector chưa kịp dọn).
             boolean fromKnown = noteTitles.containsKey(from) || docTitles.containsKey(from);
             boolean toKnown = noteTitles.containsKey(to) || docTitles.containsKey(to);
             if (!fromKnown || !toKnown) continue;
@@ -107,7 +105,6 @@ public class KnowledgeServiceImpl implements KnowledgeService {
                 .edges(edges)
                 .build();
     }
-
 
     public KnowledgeGroupResponse.Detail create(UUID userId, KnowledgeGroupRequest.Create req) {
         User user = getUser(userId);

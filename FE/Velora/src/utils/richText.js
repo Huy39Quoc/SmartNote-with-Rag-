@@ -43,8 +43,25 @@ function normalizeColor(value = '') {
 }
 
 const ALLOWED_COLORS = new Set([
+    '#000000',
+    '#111827',
+    '#374151',
+    '#6b7280',
     '#e8e6de',
     '#ffffff',
+
+    '#ef4444',
+    '#f97316',
+    '#f59e0b',
+    '#eab308',
+    '#22c55e',
+    '#10b981',
+    '#06b6d4',
+    '#3b82f6',
+    '#6366f1',
+    '#8b5cf6',
+    '#ec4899',
+
     '#f87171',
     '#fb923c',
     '#facc15',
@@ -70,6 +87,19 @@ const ALLOWED_FONT_FAMILIES = new Map([
     ['georgia, serif', 'Georgia, serif'],
     ['courier new, monospace', '"Courier New", monospace'],
 ])
+
+const ALLOWED_IMAGE_WIDTHS = new Set([
+    '240px',
+    '320px',
+    '420px',
+    '560px',
+    '100%',
+])
+
+function normalizeImageWidth(value = '') {
+    const width = value.trim().toLowerCase()
+    return ALLOWED_IMAGE_WIDTHS.has(width) ? width : ''
+}
 
 function normalizeFontSize(value = '') {
     const size = value.trim().toLowerCase()
@@ -170,7 +200,21 @@ export function sanitizeRichText(html = '') {
 
             if (isSafeImageSrc(src)) {
                 clean.setAttribute('src', src.trim())
-                if (alt) clean.setAttribute('alt', alt.slice(0, 200))
+
+                if (alt) {
+                    clean.setAttribute('alt', alt.slice(0, 200))
+                }
+
+                const width = normalizeImageWidth(
+                    node.style.width || node.getAttribute('width') || ''
+                )
+
+                if (width) {
+                    clean.style.width = width
+                }
+
+                clean.style.maxWidth = '100%'
+                clean.style.height = 'auto'
             }
         }
 
@@ -185,8 +229,7 @@ export function sanitizeRichText(html = '') {
         }
 
         if (node.tagName === 'INPUT') {
-            // Chỉ cho phép checkbox của checklist, không cho phép loại input khác
-            // (tránh chèn form field tuỳ ý qua nội dung ghi chú).
+
             if (node.getAttribute('type') !== 'checkbox') {
                 return document.createTextNode('')
             }

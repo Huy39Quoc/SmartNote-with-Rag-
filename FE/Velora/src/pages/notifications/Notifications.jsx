@@ -12,16 +12,16 @@ import EmptyState from '../../components/ui/EmptyState'
 
 export default function Notifications() {
     const [items, setItems] = useState([])
-    const [dangTai, setDangTai] = useState(true)
-    const [chiChuaDoc, setChiChuaDoc] = useState(false)
-    const [dangXuLy, setDangXuLy] = useState(false)
+    const [isLoading, setLoading] = useState(true)
+    const [unreadOnly, setUnreadOnly] = useState(false)
+    const [isProcessing, setProcessing] = useState(false)
 
-    const taiThongBao = async () => {
-        setDangTai(true)
+    const loadNotifications = async () => {
+        setLoading(true)
 
         try {
-            const { data } = await notificationApi.layTatCa({
-                unreadOnly: chiChuaDoc,
+            const { data } = await notificationApi.getAll({
+                unreadOnly: unreadOnly,
             })
 
             setItems(data.data || [])
@@ -29,17 +29,17 @@ export default function Notifications() {
             console.error(error)
             toast.error('Không tải được thông báo')
         } finally {
-            setDangTai(false)
+            setLoading(false)
         }
     }
 
     useEffect(() => {
-        taiThongBao()
-    }, [chiChuaDoc])
+        loadNotifications()
+    }, [unreadOnly])
 
-    const danhDauDaDoc = async (id) => {
+    const markAsRead = async (id) => {
         try {
-            const { data } = await notificationApi.danhDauDaDoc(id)
+            const { data } = await notificationApi.markAsRead(id)
             const updated = data.data
 
             setItems(p => p.map(item => item.id === id ? updated : item))
@@ -51,11 +51,11 @@ export default function Notifications() {
         }
     }
 
-    const danhDauTatCa = async () => {
-        setDangXuLy(true)
+    const markAll = async () => {
+        setProcessing(true)
 
         try {
-            await notificationApi.danhDauTatCaDaDoc()
+            await notificationApi.markAllAsRead()
             setItems(p => p.map(item => ({ ...item, isRead: true })))
             window.dispatchEvent(new Event('velora:notifications-changed'))
             toast.success('Đã đánh dấu tất cả là đã đọc')
@@ -63,7 +63,7 @@ export default function Notifications() {
             console.error(error)
             toast.error('Không thể cập nhật thông báo')
         } finally {
-            setDangXuLy(false)
+            setProcessing(false)
         }
     }
 
@@ -90,22 +90,22 @@ export default function Notifications() {
 
                 <div style={styles.actions}>
                     <button
-                        className={chiChuaDoc ? 'btn-ai' : 'btn-ghost'}
-                        onClick={() => setChiChuaDoc(p => !p)}
+                        className={unreadOnly ? 'btn-ai' : 'btn-ghost'}
+                        onClick={() => setUnreadOnly(p => !p)}
                     >
                         Chỉ chưa đọc
                     </button>
 
-                    <button className="btn-ghost" onClick={taiThongBao}>
+                    <button className="btn-ghost" onClick={loadNotifications}>
                         <IconRefresh size={14} /> Làm mới
                     </button>
 
                     <button
                         className="btn-primary"
-                        onClick={danhDauTatCa}
-                        disabled={dangXuLy || unreadCount === 0}
+                        onClick={markAll}
+                        disabled={isProcessing || unreadCount === 0}
                     >
-                        {dangXuLy ? (
+                        {isProcessing ? (
                             <>
                                 <IconLoader2 size={14} /> Đang xử lý...
                             </>
@@ -137,7 +137,7 @@ export default function Notifications() {
             </div>
 
             <div style={styles.list}>
-                {dangTai ? (
+                {isLoading ? (
                     <div style={styles.loading}>
                         <IconLoader2 size={18} />
                         <span>Đang tải thông báo...</span>
@@ -182,7 +182,7 @@ export default function Notifications() {
                             {!item.isRead && (
                                 <button
                                     className="btn-ghost"
-                                    onClick={() => danhDauDaDoc(item.id)}
+                                    onClick={() => markAsRead(item.id)}
                                     style={{ flexShrink: 0 }}
                                 >
                                     <IconCheck size={13} />

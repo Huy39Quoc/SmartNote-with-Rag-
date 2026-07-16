@@ -107,7 +107,6 @@ public class AdminServiceImpl implements AdminService {
         return Map.of("message", "AI usage stats — implement with ActivityLog");
     }
 
-    // Bổ sung hoặc ghi đè vào AdminServiceImpl.java
     @Override
     public PackageService createOrUpdatePackage(PackageServiceRequest request) {
         PackageService pkg = packageServiceRepository.findByName(request.getName())
@@ -121,7 +120,6 @@ public class AdminServiceImpl implements AdminService {
         pkg.setMaxAiFormatsPerMonth(request.getMaxAiFormatsPerMonth());
         pkg.setStorageGb(request.getStorageGb());
 
-        // Chuyển List thành chuỗi phân tách bằng dấu phẩy để lưu DB đơn giản
         if (request.getFeatures() != null) {
             pkg.setFeatures(String.join(",", request.getFeatures()));
         }
@@ -149,7 +147,6 @@ public class AdminServiceImpl implements AdminService {
         PackageService pkg = packageServiceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy gói dịch vụ yêu cầu."));
 
-        // Kiểm tra trùng tên với gói khác nếu đổi tên
         packageServiceRepository.findByName(request.getName()).ifPresent(existing -> {
             if (!existing.getId().equals(id)) {
                 throw new BadRequestException("Tên gói dịch vụ này đã bị trùng với gói khác!");

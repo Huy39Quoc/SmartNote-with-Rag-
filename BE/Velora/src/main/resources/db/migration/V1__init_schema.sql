@@ -1,8 +1,3 @@
--- ============================================================
--- Velora - SQL Server Schema (UTF-8 / NVARCHAR cho tiếng Việt)
--- ============================================================
-
--- Users
 CREATE TABLE users (
     id              UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
     email           NVARCHAR(255)    NOT NULL UNIQUE,
@@ -14,7 +9,6 @@ CREATE TABLE users (
     updated_at      DATETIME2(6)
 );
 
--- Refresh tokens
 CREATE TABLE refresh_tokens (
     id          UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
     user_id     UNIQUEIDENTIFIER NOT NULL,
@@ -24,7 +18,6 @@ CREATE TABLE refresh_tokens (
     CONSTRAINT fk_rt_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Tags
 CREATE TABLE tags (
     id          UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
     user_id     UNIQUEIDENTIFIER NOT NULL,
@@ -35,7 +28,6 @@ CREATE TABLE tags (
     CONSTRAINT uq_user_tag UNIQUE (user_id, name)
 );
 
--- Notes
 CREATE TABLE notes (
     id              UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
     user_id         UNIQUEIDENTIFIER NOT NULL,
@@ -48,7 +40,6 @@ CREATE TABLE notes (
     CONSTRAINT fk_note_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Note-tag join
 CREATE TABLE note_tags (
     note_id     UNIQUEIDENTIFIER NOT NULL,
     tag_id      UNIQUEIDENTIFIER NOT NULL,
@@ -57,7 +48,6 @@ CREATE TABLE note_tags (
     CONSTRAINT fk_nt_tag  FOREIGN KEY (tag_id)  REFERENCES tags(id)
 );
 
--- Documents
 CREATE TABLE documents (
     id                      UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
     user_id                 UNIQUEIDENTIFIER NOT NULL,
@@ -77,7 +67,6 @@ CREATE TABLE documents (
     CONSTRAINT fk_doc_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Chat sessions
 CREATE TABLE chat_sessions (
     id              UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
     user_id         UNIQUEIDENTIFIER NOT NULL,
@@ -89,7 +78,6 @@ CREATE TABLE chat_sessions (
     CONSTRAINT fk_cs_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Chat messages
 CREATE TABLE chat_messages (
     id              UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
     session_id      UNIQUEIDENTIFIER NOT NULL,
@@ -101,7 +89,6 @@ CREATE TABLE chat_messages (
     CONSTRAINT fk_cm_session FOREIGN KEY (session_id) REFERENCES chat_sessions(id) ON DELETE CASCADE
 );
 
--- Schedules
 CREATE TABLE schedules (
     id                  UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
     user_id             UNIQUEIDENTIFIER NOT NULL,
@@ -118,7 +105,6 @@ CREATE TABLE schedules (
     CONSTRAINT fk_sch_note FOREIGN KEY (note_id) REFERENCES notes(id)
 );
 
--- Knowledge groups
 CREATE TABLE knowledge_groups (
     id              UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
     user_id         UNIQUEIDENTIFIER NOT NULL,
@@ -130,7 +116,6 @@ CREATE TABLE knowledge_groups (
     CONSTRAINT fk_kg_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Knowledge group notes join
 CREATE TABLE knowledge_group_notes (
     group_id    UNIQUEIDENTIFIER NOT NULL,
     note_id     UNIQUEIDENTIFIER NOT NULL,
@@ -139,7 +124,6 @@ CREATE TABLE knowledge_group_notes (
     CONSTRAINT fk_kgn_note  FOREIGN KEY (note_id)  REFERENCES notes(id)
 );
 
--- System prompts
 CREATE TABLE system_prompts (
     id              UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
     prompt_key      NVARCHAR(100)    NOT NULL UNIQUE,
@@ -151,7 +135,6 @@ CREATE TABLE system_prompts (
     updated_at      DATETIME2(6)
 );
 
--- Notifications
 CREATE TABLE notifications (
     id              UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
     user_id         UNIQUEIDENTIFIER,
@@ -164,7 +147,6 @@ CREATE TABLE notifications (
     CONSTRAINT fk_notif_user FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
--- Activity logs
 CREATE TABLE activity_logs (
     id              UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
     user_id         UNIQUEIDENTIFIER,

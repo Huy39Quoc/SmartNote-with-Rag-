@@ -94,10 +94,8 @@ public class AiServiceImpl implements AiService {
                     .build();
         } catch (Exception e) {
             log.error("analyzeDocument error: {}", e.getMessage());
-            // Trước đây lỗi bị "nuốt" và trả về như 1 kết quả phân tích thành công
-            // (chỉ có dòng summary báo lỗi) -> người dùng không thấy thông báo lỗi rõ ràng.
-            // Giờ ném lỗi thật để FE hiển thị toast lỗi đúng như đã thiết kế.
-            throw new BadRequestException("AI hiện không thể phân tích tài liệu này. Vui lòng thử lại sau.");
+            return DocumentResponse.AnalysisResult.builder()
+                    .summary("Không thể phân tích tài liệu lúc này").build();
         }
     }
 
@@ -1069,86 +1067,11 @@ public class AiServiceImpl implements AiService {
 
     private String normalizeMindmap(String cleaned, String title, String content) {
         int index = cleaned.indexOf("mindmap");
-
-        if (index < 0) {
-            return buildFallbackMindmap(title, content);
+        if (index >= 0) {
+            return cleaned.substring(index).trim();
         }
 
-        String body = cleaned.substring(index).trim();
-        return sanitizeMindmapMermaid(body, title);
-    }
-
-    private String sanitizeMindmapMermaid(String mermaid, String title) {
-        String safeTitle = escapeMermaid(title).replace("(", "-").replace(")", "");
-
-        if (!StringUtils.hasText(mermaid)) {
-            return "mindmap\n  root((" + safeTitle + "))\n";
-        }
-
-        String[] lines = mermaid.replace("\r", "").split("\n");
-        List<String> result = new ArrayList<>();
-        boolean rootHandled = false;
-
-        Pattern rootPattern = Pattern.compile("^[A-Za-z0-9_]*\\(\\((.*)\\)\\)$");
-
-        for (String rawLine : lines) {
-            if (!StringUtils.hasText(rawLine)) {
-                continue;
-            }
-
-            String trimmed = rawLine.trim();
-
-            if (trimmed.equalsIgnoreCase("mindmap")) {
-                result.add("mindmap");
-                continue;
-            }
-
-            // Giữ nguyên độ thụt lề (dựa vào số khoảng trắng đầu dòng) để bảo toàn cấp bậc.
-            int indentSpaces = rawLine.length() - rawLine.replaceAll("^\\s+", "").length();
-            String prefix = "  ".repeat(Math.max(1, indentSpaces / 2 + 1));
-
-            Matcher rootMatcher = rootPattern.matcher(trimmed);
-
-            if (!rootHandled && rootMatcher.matches()) {
-                String label = sanitizeMermaidLabel(rootMatcher.group(1)).replace("(", "-").replace(")", "");
-                result.add("  root((" + (StringUtils.hasText(label) ? label : safeTitle) + "))");
-                rootHandled = true;
-                continue;
-            }
-
-            // Loại bỏ id node + mọi ký tự bao hình (ngoặc vuông/tròn/nhọn) còn sót lại,
-            // chỉ giữ lại phần chữ để tránh vỡ cú pháp mindmap khi nội dung dài/phức tạp.
-            String textOnly = trimmed
-                    .replaceAll("^[A-Za-z][A-Za-z0-9_]*", "")
-                    .replaceAll("^[\\[\\(\\{]+", "")
-                    .replaceAll("[\\]\\)\\}]+$", "");
-
-            String label = sanitizeMermaidLabel(textOnly);
-
-            if (!StringUtils.hasText(label)) {
-                continue;
-            }
-
-            // Nếu AI chưa từng khai báo root, node hợp lệ đầu tiên sẽ được dùng làm root
-            // để đảm bảo mindmap luôn có đúng 1 gốc (bắt buộc với cú pháp Mermaid mindmap).
-            if (!rootHandled) {
-                result.add("  root((" + label.replace("(", "-").replace(")", "") + "))");
-                rootHandled = true;
-                continue;
-            }
-
-            result.add(prefix + label);
-        }
-
-        if (!rootHandled) {
-            result.add(1, "  root((" + safeTitle + "))");
-        }
-
-        if (result.size() <= 1) {
-            return "mindmap\n  root((" + safeTitle + "))\n";
-        }
-
-        return String.join("\n", result);
+        return buildFallbackMindmap(title, content);
     }
 
     private String normalizeFlowchart(
@@ -1253,8 +1176,7 @@ public class AiServiceImpl implements AiService {
 
         StringBuilder sb = new StringBuilder();
         sb.append("mindmap\n");
-        String safeTitle = escapeMermaid(title).replace("(", "-").replace(")", "");
-        sb.append("  root((").append(safeTitle).append("))\n");
+        sb.append("  root((").append(escapeMermaid(title)).append("))\n");
 
         for (String line : lines) {
             sb.append("    ").append(escapeMermaid(line)).append("\n");
@@ -1288,13 +1210,13 @@ public class AiServiceImpl implements AiService {
 
         StringBuilder sb = new StringBuilder();
         sb.append("flowchart LR\n");
-        sb.append("  A[\"").append(escapeMermaid(title)).append("\"]\n");
+        sb.append("  A[").append(escapeMermaid(title)).append("]\n");
 
         for (int i = 0; i < lines.size(); i++) {
             char node = (char) ('B' + i);
-            sb.append("  ").append(node).append("[\"")
+            sb.append("  ").append(node).append("[")
                     .append(escapeMermaid(lines.get(i)))
-                    .append("\"]\n");
+                    .append("]\n");
             sb.append("  A --> ").append(node).append("\n");
         }
 
@@ -1424,32 +1346,16 @@ public class AiServiceImpl implements AiService {
     }
 
     private String sanitizeFlowchartLine(String line) {
-        String sanitized = replaceAllNodeShapes(line);
+        String sanitized = line;
 
-        // Lưới an toàn cuối cùng: sau khi chuẩn hoá, không được còn dấu ngoặc nhọn nào.
-        sanitized = sanitized.replace("{", "").replace("}", "");
+        Pattern nodePattern = Pattern.compile("([A-Za-z][A-Za-z0-9_]*)\\s*[\\[\\(\\{]([^\\]\\)\\}]+)[\\]\\)\\}]");
+        Matcher matcher = nodePattern.matcher(sanitized);
 
-        return "  " + sanitized.trim();
-    }
-
-    // Xử lý cả 3 dạng ngoặc node ({...}, (...), [...]) trong CÙNG một lượt quét,
-    // tránh việc lượt sau quét lại kết quả đã được lượt trước chuyển đổi
-    // (từng gây lặp dấu nháy khi dòng gốc dùng {} hoặc () ).
-    private static final Pattern NODE_SHAPE_PATTERN = Pattern.compile(
-            "([^\\s\\[\\]\\(\\)\\{\\}]+)\\s*(?:\\{([^\\}]*)\\}|\\(([^\\)]*)\\)|\\[([^\\]]*)\\])"
-    );
-
-    private String replaceAllNodeShapes(String line) {
-        Matcher matcher = NODE_SHAPE_PATTERN.matcher(line);
         StringBuffer sb = new StringBuffer();
 
         while (matcher.find()) {
             String nodeId = matcher.group(1);
-            String rawLabel = matcher.group(2) != null ? matcher.group(2)
-                    : matcher.group(3) != null ? matcher.group(3)
-                    : matcher.group(4);
-
-            String label = sanitizeMermaidLabel(rawLabel);
+            String label = sanitizeMermaidLabel(matcher.group(2));
 
             matcher.appendReplacement(
                     sb,
@@ -1459,7 +1365,7 @@ public class AiServiceImpl implements AiService {
 
         matcher.appendTail(sb);
 
-        return sb.toString();
+        return "  " + sb.toString().trim();
     }
 
     private String sanitizeMermaidLabel(String label) {

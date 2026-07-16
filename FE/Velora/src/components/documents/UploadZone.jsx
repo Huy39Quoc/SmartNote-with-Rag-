@@ -1,25 +1,15 @@
 import { useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { IconUpload, IconFileText, IconMusic } from '@tabler/icons-react'
+import { DOCUMENT_UPLOAD_ACCEPT, DOCUMENT_UPLOAD_MAX_FILES } from '../../constants/documentConstants'
 
-const CHAP_NHAN = {
-  'application/pdf': ['.pdf'],
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-  'text/plain': ['.txt'],
-  'audio/mpeg': ['.mp3'],
-  'audio/wav': ['.wav'],
-  'audio/mp4': ['.m4a'],
-  'audio/webm': ['.webm'],
-  'audio/ogg': ['.ogg'],
-}
-
-export default function UploadZone({ onUpload, dangTaiLen }) {
+export default function UploadZone({ onUpload, isUploading }) {
   const onDrop = useCallback(files => {
     files.forEach(f => onUpload(f))
   }, [onUpload])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop, accept: CHAP_NHAN, disabled: dangTaiLen, maxFiles: 5,
+    onDrop, accept: DOCUMENT_UPLOAD_ACCEPT, disabled: isUploading, maxFiles: DOCUMENT_UPLOAD_MAX_FILES,
   })
 
   return (
@@ -29,7 +19,7 @@ export default function UploadZone({ onUpload, dangTaiLen }) {
       borderColor: isDragActive ? 'var(--accent-blue)' : 'var(--border)',
     }}>
       <input {...getInputProps()} />
-      {dangTaiLen
+      {isUploading
         ? <><div className="spinner" /><span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Đang tải lên...</span></>
         : (
           <>

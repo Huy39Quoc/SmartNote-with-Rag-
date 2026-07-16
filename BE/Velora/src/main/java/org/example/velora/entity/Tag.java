@@ -40,7 +40,6 @@ public class Tag {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    // Relationships
     @ManyToMany(mappedBy = "tags")
     @Builder.Default
     private List<Note> notes = new ArrayList<>();

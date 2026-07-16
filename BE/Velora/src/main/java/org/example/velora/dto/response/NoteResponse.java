@@ -93,7 +93,7 @@ public class NoteResponse {
         private UUID noteId;
         private String noteTitle;
         private String diagramType;
-        private String format;       // MERMAID hoặc JSON
-        private String diagramCode;  // Mermaid code hoặc JSON text
+        private String format;
+        private String diagramCode;
     }
 }

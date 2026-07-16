@@ -2,8 +2,8 @@ import { create } from 'zustand'
 
 const useUiStore = create((set) => ({
   modal: null,
-  moModal: (ten, data) => set({ modal: { ten, data } }),
-  dongModal: () => set({ modal: null }),
+  openModal: (name, data) => set({ modal: { name, data } }),
+  closeModal: () => set({ modal: null }),
 }))
 
 export default useUiStore

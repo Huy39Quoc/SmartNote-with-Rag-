@@ -22,7 +22,7 @@ public class PackageService {
     private Double priceMonthly;
     private Double priceYearly;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "NVARCHAR(MAX)")
     private String description;
 
     @Column(name = "max_notes")
@@ -37,7 +37,7 @@ public class PackageService {
     @Column(name = "max_devices")
     private Integer maxDevices;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "NVARCHAR(MAX)")
     private String features;
 
     @Column(name = "is_active")

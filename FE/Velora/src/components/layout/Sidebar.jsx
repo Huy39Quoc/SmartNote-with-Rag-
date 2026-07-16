@@ -22,60 +22,47 @@ import useAuthStore from '../../service/authStore'
 import logo from '../../assets/logo.svg'
 import notificationApi from '../../lib/api/notificationApi'
 import useThemeStore from '../../service/themeStore'
-
-const menu = [
-    { to: '/overview', label: 'Tổng quan', icon: IconLayoutDashboard },
-    { to: '/service-packages', label: 'Gói Premium', icon: IconSparkles },
-    { to: '/notes', label: 'Ghi chú', icon: IconNotes },
-    { to: '/shared-notes', label: 'Ghi chú được chia sẻ', icon: IconShare },
-    { to: '/chat', label: 'Hỏi đáp AI', icon: IconMessages },
-    { to: '/documents', label: 'Tài liệu', icon: IconFileText },
-    { to: '/shared-documents', label: 'Tài liệu được chia sẻ', icon: IconFolderShare },
-    { to: '/schedule', label: 'Lịch & Deadline', icon: IconCalendar },
-    { to: '/knowledge', label: 'Kiến thức', icon: IconBrain },
-    { to: '/account', label: 'Tài khoản', icon: IconUser },
-    { to: '/notifications', label: 'Thông báo', icon: IconBell },
-]
+import { SIDEBAR_MENU } from '../../constants/layoutConstants'
 
 export default function Sidebar() {
-    const { nguoiDung, dangXuat, laAdmin } = useAuthStore()
+    const { user, logout, isAdmin } = useAuthStore()
     const navigate = useNavigate()
     const location = useLocation()
-    const [soThongBaoChuaDoc, setSoThongBaoChuaDoc] = useState(0)
+    const [unreadNotificationCount, setUnreadNotificationCount] = useState(0)
     const { isDark, toggleTheme } = useThemeStore()
     const ThemeIcon = isDark ? IconSun : IconMoon
 
-    const handleDangXuat = async () => {
-        await dangXuat()
-        setSoThongBaoChuaDoc(0)
+    const handleLogout = async () => {
+        await logout()
+        setUnreadNotificationCount(0)
         navigate('/login')
     }
 
-    const taiSoThongBaoChuaDoc = async () => {
+    const loadUnreadNotificationCount = async () => {
         if (!localStorage.getItem('velora_token')) {
-            setSoThongBaoChuaDoc(0)
+            setUnreadNotificationCount(0)
             return
         }
 
         try {
-            const { data } = await notificationApi.demChuaDoc()
-            setSoThongBaoChuaDoc(data.data?.count || 0)
+            const { data } = await notificationApi.unreadCount()
+            setUnreadNotificationCount(data.data?.count || 0)
         } catch (error) {
-            setSoThongBaoChuaDoc(0)
+            setUnreadNotificationCount(0)
         }
     }
 
     useEffect(() => {
-        taiSoThongBaoChuaDoc()
-    }, [location.pathname, nguoiDung?.id])
+        loadUnreadNotificationCount()
+    }, [location.pathname, user?.id])
 
     useEffect(() => {
-        taiSoThongBaoChuaDoc()
+        loadUnreadNotificationCount()
 
-        const interval = setInterval(taiSoThongBaoChuaDoc, 30000)
+        const interval = setInterval(loadUnreadNotificationCount, 30000)
 
-        const handleFocus = () => taiSoThongBaoChuaDoc()
-        const handleNotificationChanged = () => taiSoThongBaoChuaDoc()
+        const handleFocus = () => loadUnreadNotificationCount()
+        const handleNotificationChanged = () => loadUnreadNotificationCount()
 
         window.addEventListener('focus', handleFocus)
         window.addEventListener('velora:notifications-changed', handleNotificationChanged)
@@ -85,7 +72,7 @@ export default function Sidebar() {
             window.removeEventListener('focus', handleFocus)
             window.removeEventListener('velora:notifications-changed', handleNotificationChanged)
         }
-    }, [nguoiDung?.id])
+    }, [user?.id])
 
     return (
         <aside
@@ -96,7 +83,7 @@ export default function Sidebar() {
                 borderRight: '1px solid var(--border)',
             }}
         >
-            {/* Logo */}
+
             <div
                 className="flex items-center gap-2 px-5 py-4 shrink-0"
                 style={{ borderBottom: '1px solid var(--border)' }}
@@ -104,7 +91,6 @@ export default function Sidebar() {
                 <img src={logo} alt="Velora" style={{ height: 24 }} />
             </div>
 
-            {/* Quick create */}
             <div className="px-4 pt-4 pb-2">
                 <button
                     onClick={() => navigate('/notes')}
@@ -116,10 +102,9 @@ export default function Sidebar() {
                 </button>
             </div>
 
-            {/* Nav */}
             <nav className="flex-1 px-3 py-2 flex flex-col gap-0.5 overflow-y-auto">
-                {menu.map(({ to, icon: Icon, label }) => {
-                    const laThongBao = to === '/notifications'
+                {SIDEBAR_MENU.map(({ to, icon: Icon, label }) => {
+                    const isNotification = to === '/notifications'
 
                     return (
                         <NavLink
@@ -138,7 +123,7 @@ export default function Sidebar() {
                             <Icon size={17} style={{ flexShrink: 0 }} />
                             <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{label}</span>
 
-                            {laThongBao && soThongBaoChuaDoc > 0 && (
+                            {isNotification && unreadNotificationCount > 0 && (
                                 <span
                                     className="flex items-center justify-center rounded-full text-[10px] font-semibold"
                                     style={{
@@ -150,14 +135,14 @@ export default function Sidebar() {
                                         lineHeight: 1,
                                     }}
                                 >
-                                    {soThongBaoChuaDoc > 99 ? '99+' : soThongBaoChuaDoc}
+                                    {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
                                 </span>
                             )}
                         </NavLink>
                     )
                 })}
 
-                {laAdmin() && (
+                {isAdmin() && (
                     <>
                         <div className="my-1.5 mx-1" style={{ height: 1, background: 'var(--border)' }} />
                         <NavLink
@@ -190,14 +175,13 @@ export default function Sidebar() {
                 )}
             </nav>
 
-            {/* Bottom: user + plan card + actions */}
             <div className="px-3 pb-3 pt-2 shrink-0" style={{ borderTop: '1px solid var(--border)' }}>
                 <div className="flex items-center gap-2.5 px-2 py-2 mb-1">
                     <div
                         className="flex items-center justify-center rounded-full font-semibold shrink-0"
                         style={{ width: 32, height: 32, background: 'var(--bg-ai)', color: 'var(--accent-blue-dim)', fontSize: 13 }}
                     >
-                        {nguoiDung?.fullName?.[0]?.toUpperCase() || 'U'}
+                        {user?.fullName?.[0]?.toUpperCase() || 'U'}
                     </div>
 
                     <div className="flex-1 overflow-hidden">
@@ -205,13 +189,13 @@ export default function Sidebar() {
                             className="overflow-hidden text-ellipsis whitespace-nowrap"
                             style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)' }}
                         >
-                            {nguoiDung?.fullName || 'Người dùng'}
+                            {user?.fullName || 'Người dùng'}
                         </div>
                         <div
                             className="overflow-hidden text-ellipsis whitespace-nowrap"
                             style={{ fontSize: 10.5, color: 'var(--text-faint)' }}
                         >
-                            {nguoiDung?.email}
+                            {user?.email}
                         </div>
                     </div>
                 </div>
@@ -242,7 +226,7 @@ export default function Sidebar() {
 
                 <button
                     className="btn-ghost w-full justify-start"
-                    onClick={handleDangXuat}
+                    onClick={handleLogout}
                     style={{ padding: '7px 10px' }}
                 >
                     <IconLogout size={15} />

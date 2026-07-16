@@ -22,79 +22,57 @@ import toast from 'react-hot-toast'
 import useAuthStore from '../../service/authStore'
 import { getUpgradeMessage, hasFeature } from '../../utils/packageFeatures'
 import flashcardApi from '../../lib/api/flashcardApi'
+import { DOCUMENT_STATUS_CONFIG } from '../../constants/documentConstants'
 
-const TRANG_THAI = {
-    PENDING: {
-        nhan: 'Chờ xử lý',
-        mau: 'var(--text-muted)',
-    },
-    PROCESSING: {
-        nhan: 'Đang xử lý',
-        mau: 'var(--accent-amber)',
-    },
-    DONE: {
-        nhan: 'Hoàn tất',
-        mau: 'var(--accent-green)',
-    },
-    SUCCESS: {
-        nhan: 'Hoàn tất',
-        mau: 'var(--accent-green)',
-    },
-    FAILED: {
-        nhan: 'Lỗi',
-        mau: 'var(--accent-red)',
-    },
-}
-
-export default function TaiLieu() {
-    const { nguoiDung, layThongTin } = useAuthStore()
+export default function Documents() {
+    const { user, getProfile } = useAuthStore()
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
 
-    const [danhSach, setDanhSach] = useState([])
-    const [chon, setChon] = useState(null)
+    const [items, setItems] = useState([])
+    const [select, setSelected] = useState(null)
 
-    const [dangTai, setDangTai] = useState(true)
-    const [dangTaiLen, setDangTaiLen] = useState(false)
-    const [dangXuLyLai, setDangXuLyLai] = useState(false)
-    const [dangMoFile, setDangMoFile] = useState(false)
+    const [isLoading, setLoading] = useState(true)
+    const [isUploading, setUploading] = useState(false)
+    const [isReprocessing, setReprocessing] = useState(false)
+    const [isOpeningFile, setOpeningFile] = useState(false)
 
-    const [ketQuaAi, setKetQuaAi] = useState(null)
-    const [dangXuLyAi, setDangXuLyAi] = useState(false)
+    const [aiResult, setAiResult] = useState(null)
+    const [isProcessingAi, setProcessingAi] = useState(false)
 
-    const [cauHoi, setCauHoi] = useState('')
-    const [phanHoiChat, setPhanHoiChat] = useState(null)
-    const [lichSuChatTaiLieu, setLichSuChatTaiLieu] = useState([])
-    const [dangTaiChat, setDangTaiChat] = useState(false)
+    const [question, setQuestion] = useState('')
+    const [chatResponse, setChatResponse] = useState(null)
+    const [documentChatHistory, setDocumentChatHistory] = useState([])
+    const [isLoadingChat, setLoadingChat] = useState(false)
     const [canAskChat, setCanAskChat] = useState(true)
 
-    const [lichGoiY, setLichGoiY] = useState(false)
-    const [dangTrichLich, setDangTrichLich] = useState(false)
+    const [suggestedSchedule, setSuggestedSchedule] = useState(false)
+    const [isExtractingSchedule, setExtractingSchedule] = useState(false)
 
-    const [dangTaoFlashcard, setDangTaoFlashcard] = useState(false)
+    const [isCreatingFlashcards, setCreatingFlashcards] = useState(false)
 
-    const [hienShareTaiLieu, setHienShareTaiLieu] = useState(false)
+    const [showDocumentShare, setShowDocumentShare] = useState(false)
     const [documentShareEmail, setDocumentShareEmail] = useState('')
     const [documentSharePermission, setDocumentSharePermission] = useState('VIEW')
     const [documentShareList, setDocumentShareList] = useState([])
-    const [shareDangCapNhat, setShareDangCapNhat] = useState(new Set())
-    const [dangShareDocument, setDangShareDocument] = useState(false)
+    const [shareBeingUpdated, setShareBeingUpdated] = useState(new Set())
+    const [isSharingDocument, setSharingDocument] = useState(false)
 
-    const dangHoiTaiLieuRef = useRef(false)
+    const isAskingDocumentRef = useRef(false)
 
-    const coUploadTaiLieu = hasFeature(nguoiDung, 'DOCUMENT_UPLOAD')
-    const coAiAnalyze = hasFeature(nguoiDung, 'AI_ANALYZE')
-    const coAiChat = hasFeature(nguoiDung, 'AI_CHAT')
-    const coExtractSchedule = hasFeature(nguoiDung, 'EXTRACT_SCHEDULE')
-    const coAiFlashcard = hasFeature(nguoiDung, 'AI_FLASHCARD')
-    const coTeamWork = hasFeature(nguoiDung, 'TEAM_WORK')
+    const hasDocumentUpload = hasFeature(user, 'DOCUMENT_UPLOAD')
+    const canUseAiAnalyze = hasFeature(user, 'AI_ANALYZE')
+    const canUseAiChat = hasFeature(user, 'AI_CHAT')
+    const coExtractSchedule = hasFeature(user, 'EXTRACT_SCHEDULE')
+    const canUseAiFlashcards = hasFeature(user, 'AI_FLASHCARD')
+    const coTeamWork = hasFeature(user, 'TEAM_WORK')
 
     const selectedDocumentId = searchParams.get('documentId')
 
-    const coDangTraLoiTaiLieu =
-        dangXuLyAi ||
-        dangHoiTaiLieuRef.current ||
-        lichSuChatTaiLieu.some(item => item.loading)
+    const isAnsweringDocument =
+        isProcessingAi ||
+        isAskingDocumentRef.current ||
+        documentChatHistory.some(item => item.loading)
 
     const isDocumentReady = (doc) => {
         return doc?.status === 'DONE' || doc?.status === 'SUCCESS'
@@ -115,94 +93,92 @@ export default function TaiLieu() {
         return `${gb.toFixed(2)} GB`
     }
 
-    const taiLichSuChat = async (documentId) => {
+    const loadChatHistory = async (documentId) => {
         if (!documentId) {
-            setLichSuChatTaiLieu([])
+            setDocumentChatHistory([])
             setCanAskChat(true)
             return
         }
 
-        setDangTaiChat(true)
+        setLoadingChat(true)
 
         try {
-            const { data } = await documentApi.layLichSuChat(documentId)
+            const { data } = await documentApi.getChatHistory(documentId)
             const messages = data.data?.messages || []
 
-            // BE lưu từng dòng USER/ASSISTANT riêng theo thứ tự thời gian ->
-            // ghép lại thành từng cặp hỏi/đáp để hiển thị giống giao diện cũ.
             const cap = []
             for (let i = 0; i < messages.length; i++) {
                 const msg = messages[i]
                 if (msg.role !== 'USER') continue
 
-                const traLoi = messages[i + 1]?.role === 'ASSISTANT' ? messages[i + 1] : null
+                const answer = messages[i + 1]?.role === 'ASSISTANT' ? messages[i + 1] : null
 
                 cap.push({
                     id: msg.id,
                     question: msg.content,
-                    answer: traLoi?.content || '',
+                    answer: answer?.content || '',
                     loading: false,
-                    error: !traLoi,
+                    error: !answer,
                     senderName: msg.senderName,
                     createdAt: msg.createdAt,
                 })
             }
 
-            setLichSuChatTaiLieu(cap)
+            setDocumentChatHistory(cap)
             setCanAskChat(data.data?.canAsk !== false)
         } catch {
-            setLichSuChatTaiLieu([])
+            setDocumentChatHistory([])
         } finally {
-            setDangTaiChat(false)
+            setLoadingChat(false)
         }
     }
 
     const resetRightPanel = () => {
-        setKetQuaAi(null)
-        setPhanHoiChat(null)
-        setLichGoiY(false)
+        setAiResult(null)
+        setChatResponse(null)
+        setSuggestedSchedule(false)
         setCanAskChat(true)
-        setHienShareTaiLieu(false)
+        setShowDocumentShare(false)
         setDocumentShareEmail('')
         setDocumentSharePermission('VIEW')
         setDocumentShareList([])
     }
 
-    const chonTaiLieu = (doc) => {
-        setChon(doc)
+    const selectDocument = (doc) => {
+        setSelected(doc)
         resetRightPanel()
     }
 
-    const tai = async () => {
-        setDangTai(true)
+    const download = async () => {
+        setLoading(true)
 
         try {
-            const { data } = await documentApi.layTatCa({
+            const { data } = await documentApi.getAll({
                 page: 0,
                 size: 30,
             })
 
-            setDanhSach(data.data?.content || [])
+            setItems(data.data?.content || [])
         } catch (error) {
             toast.error(error.response?.data?.message || 'Không thể tải danh sách tài liệu')
         } finally {
-            setDangTai(false)
+            setLoading(false)
         }
     }
 
-    const taiTaiLieuTuLink = async () => {
+    const uploadDocumentFromLink = async () => {
         if (!selectedDocumentId) return
 
         try {
-            const { data } = await documentApi.layTheoId(selectedDocumentId)
+            const { data } = await documentApi.getById(selectedDocumentId)
             const doc = {
                 ...data.data,
                 _shared: true,
             }
 
-            setChon(doc)
+            setSelected(doc)
 
-            setDanhSach(prev => {
+            setItems(prev => {
                 const existed = prev.some(item => item.id === doc.id)
 
                 if (existed) {
@@ -223,13 +199,13 @@ export default function TaiLieu() {
         }
     }
 
-    const xoaLichSuChatTaiLieu = async () => {
-        if (!chon?.id) return
+    const clearDocumentChatHistory = async () => {
+        if (!select?.id) return
 
         try {
-            await documentApi.xoaLichSuChat(chon.id)
-            setLichSuChatTaiLieu([])
-            setPhanHoiChat(null)
+            await documentApi.clearChatHistory(select.id)
+            setDocumentChatHistory([])
+            setChatResponse(null)
             toast.success('Đã xóa lịch sử hỏi đáp')
         } catch (error) {
             toast.error(error.response?.data?.message || 'Không thể xóa lịch sử hỏi đáp')
@@ -237,53 +213,50 @@ export default function TaiLieu() {
     }
 
     useEffect(() => {
-        tai()
+        download()
     }, [])
 
     useEffect(() => {
-        taiTaiLieuTuLink()
+        uploadDocumentFromLink()
     }, [selectedDocumentId])
 
     useEffect(() => {
-        taiLichSuChat(chon?.id)
-    }, [chon?.id])
+        loadChatHistory(select?.id)
+    }, [select?.id])
 
-    // Danh sách tài liệu (Summary) không có aiSummary/audioTranscript/myPermission
-    // -> luôn lấy lại chi tiết đầy đủ khi chọn 1 tài liệu, để hiển thị đúng kết
-    // quả phân tích AI đã lưu trước đó và đúng quyền hạn của người xem hiện tại.
     useEffect(() => {
-        if (!chon?.id) return
+        if (!select?.id) return
 
-        let huy = false
+        let cancel = false
 
-        documentApi.layTheoId(chon.id)
+        documentApi.getById(select.id)
             .then(({ data }) => {
-                if (huy) return
-                setChon(prev => (prev && prev.id === chon.id ? { ...prev, ...data.data } : prev))
+                if (cancel) return
+                setSelected(prev => (prev && prev.id === select.id ? { ...prev, ...data.data } : prev))
             })
             .catch(() => {})
 
-        return () => { huy = true }
-    }, [chon?.id])
+        return () => { cancel = true }
+    }, [select?.id])
 
     useEffect(() => {
-        const xuLy = danhSach.filter(
+        const handleAction = items.filter(
             d => d.status === 'PROCESSING' || d.status === 'PENDING'
         )
 
-        if (xuLy.length === 0) return undefined
+        if (handleAction.length === 0) return undefined
 
         const id = setInterval(async () => {
-            for (const d of xuLy) {
+            for (const d of handleAction) {
                 try {
-                    const { data } = await documentApi.layTheoId(d.id)
+                    const { data } = await documentApi.getById(d.id)
 
                     const nextDoc = {
                         ...data.data,
                         _shared: d._shared,
                     }
 
-                    setDanhSach(prev =>
+                    setItems(prev =>
                         prev.map(item =>
                             item.id === d.id
                                 ? nextDoc
@@ -291,139 +264,139 @@ export default function TaiLieu() {
                         )
                     )
 
-                    if (chon?.id === d.id) {
-                        setChon(nextDoc)
+                    if (select?.id === d.id) {
+                        setSelected(nextDoc)
                     }
                 } catch {
-                    // Bỏ qua lỗi polling tạm thời
+
                 }
             }
         }, 3000)
 
         return () => clearInterval(id)
-    }, [danhSach, chon?.id])
+    }, [items, select?.id])
 
     useEffect(() => {
-        if (hienShareTaiLieu && chon?.id && !chon?._shared) {
-            taiDanhSachShareTaiLieu()
+        if (showDocumentShare && select?.id && !select?._shared) {
+            loadDocumentShares()
         }
-    }, [hienShareTaiLieu, chon?.id])
+    }, [showDocumentShare, select?.id])
 
-    const coTheTrichLich = (text) => {
+    const canExtractSchedule = (text) => {
         if (!text) return false
 
         return /\b(?:\d{1,2}[:.][0-5]\d|[0-2]?\d\s*giờ|ngày\s*\d{1,2}|thứ\s*(?:hai|ba|tư|năm|sáu|bảy)|deadline|hẹn)\b/i.test(text)
     }
 
     useEffect(() => {
-        const text = ketQuaAi?.summary || phanHoiChat?.answer || ''
+        const text = aiResult?.summary || chatResponse?.answer || ''
 
-        setLichGoiY(
+        setSuggestedSchedule(
             coExtractSchedule &&
-            coTheTrichLich(text)
+            canExtractSchedule(text)
         )
-    }, [ketQuaAi, phanHoiChat, coExtractSchedule])
+    }, [aiResult, chatResponse, coExtractSchedule])
 
-    const taiLen = async (file) => {
-        if (!coUploadTaiLieu) {
+    const upload = async (file) => {
+        if (!hasDocumentUpload) {
             toast.error(getUpgradeMessage('DOCUMENT_UPLOAD'))
             return
         }
 
-        setDangTaiLen(true)
+        setUploading(true)
 
         try {
-            const { data } = await documentApi.taiLen(file, null)
+            const { data } = await documentApi.upload(file, null)
 
-            setDanhSach(prev => [data.data, ...prev])
-            await layThongTin?.()
+            setItems(prev => [data.data, ...prev])
+            await getProfile?.()
 
             toast.success(`Đã tải lên "${file.name}"`)
         } catch (error) {
             toast.error(error.response?.data?.message || 'Tải lên thất bại')
         } finally {
-            setDangTaiLen(false)
+            setUploading(false)
         }
     }
 
-    const phanTich = async () => {
-        if (!coAiAnalyze) {
+    const analyze = async () => {
+        if (!canUseAiAnalyze) {
             toast.error(getUpgradeMessage('AI_ANALYZE'))
             return
         }
 
-        if (!chon || !isDocumentReady(chon)) {
+        if (!select || !isDocumentReady(select)) {
             toast.error('Tài liệu chưa xử lý xong')
             return
         }
 
-        setDangXuLyAi(true)
-        setKetQuaAi(null)
-        setPhanHoiChat(null)
+        setProcessingAi(true)
+        setAiResult(null)
+        setChatResponse(null)
 
         try {
-            const { data } = await documentApi.phanTich(chon.id)
-            setKetQuaAi(data.data || data)
+            const { data } = await documentApi.analyze(select.id)
+            setAiResult(data.data || data)
         } catch (error) {
             toast.error(error.response?.data?.message || 'AI không phản hồi')
         } finally {
-            setDangXuLyAi(false)
+            setProcessingAi(false)
         }
     }
 
-    const phanTichAmThanh = async () => {
-        if (!coAiAnalyze) {
+    const analyzeAudio = async () => {
+        if (!canUseAiAnalyze) {
             toast.error(getUpgradeMessage('AI_ANALYZE'))
             return
         }
 
-        if (!chon || !isDocumentReady(chon)) {
+        if (!select || !isDocumentReady(select)) {
             toast.error('Tài liệu chưa xử lý xong')
             return
         }
 
-        setDangXuLyAi(true)
-        setKetQuaAi(null)
-        setPhanHoiChat(null)
+        setProcessingAi(true)
+        setAiResult(null)
+        setChatResponse(null)
 
         try {
-            const { data } = await documentApi.phanTichAmThanh(chon.id, {
+            const { data } = await documentApi.analyzeAudio(select.id, {
                 createNote: true,
             })
 
-            setKetQuaAi({
+            setAiResult({
                 summary: data.data?.structuredNote,
                 keyPoints: [],
-                amThanh: true,
+                audio: true,
                 noteTitle: data.data?.noteTitle,
             })
 
             toast.success('Đã phân tích âm thanh và tạo ghi chú!')
-            await layThongTin?.()
+            await getProfile?.()
         } catch (error) {
             toast.error(error.response?.data?.message || 'Phân tích âm thanh thất bại')
         } finally {
-            setDangXuLyAi(false)
+            setProcessingAi(false)
         }
     }
 
-    const taoFlashcardTuTaiLieu = async () => {
-        if (!coAiFlashcard) {
+    const createFlashcardsFromDocument = async () => {
+        if (!canUseAiFlashcards) {
             toast.error(getUpgradeMessage('AI_FLASHCARD'))
             return
         }
 
-        if (!chon || !isDocumentReady(chon)) {
+        if (!select || !isDocumentReady(select)) {
             toast.error('Tài liệu chưa xử lý xong')
             return
         }
 
-        setDangTaoFlashcard(true)
+        setCreatingFlashcards(true)
 
         const toastId = toast.loading('AI đang tạo flashcard từ tài liệu...')
 
         try {
-            const { data } = await flashcardApi.generateFromDocument(chon.id)
+            const { data } = await flashcardApi.generateFromDocument(select.id)
             const result = data.data || data
             const total = result.total || result.cards?.length || 0
 
@@ -451,52 +424,52 @@ export default function TaiLieu() {
                 id: toastId,
             })
         } finally {
-            setDangTaoFlashcard(false)
+            setCreatingFlashcards(false)
         }
     }
 
-    const hoiDap = async () => {
-        if (!coAiChat) {
+    const askDocument = async () => {
+        if (!canUseAiChat) {
             toast.error(getUpgradeMessage('AI_CHAT'))
             return
         }
 
-        if (dangHoiTaiLieuRef.current || lichSuChatTaiLieu.some(item => item.loading)) {
+        if (isAskingDocumentRef.current || documentChatHistory.some(item => item.loading)) {
             toast.error('Vui lòng đợi AI trả lời xong câu trước')
             return
         }
 
-        if (!chon || !cauHoi.trim()) return
+        if (!select || !question.trim()) return
 
-        dangHoiTaiLieuRef.current = true
+        isAskingDocumentRef.current = true
 
-        const question = cauHoi.trim()
+        const trimmedQuestion = question.trim()
         const tempId = `${Date.now()}-${Math.random()}`
 
         const pendingMessage = {
             id: tempId,
-            question,
+            question: trimmedQuestion,
             answer: '',
             loading: true,
             error: false,
-            senderName: nguoiDung?.fullName || 'Bạn',
+            senderName: user?.fullName || 'Bạn',
             createdAt: new Date().toISOString(),
         }
 
-        setLichSuChatTaiLieu(prev => [...prev, pendingMessage])
-        setCauHoi('')
-        setDangXuLyAi(true)
+        setDocumentChatHistory(prev => [...prev, pendingMessage])
+        setQuestion('')
+        setProcessingAi(true)
 
         try {
-            const { data } = await documentApi.hoiDap(chon.id, {
-                question,
+            const { data } = await documentApi.ask(select.id, {
+                question: trimmedQuestion,
             })
 
             const result = data.data || data
 
-            setPhanHoiChat(result)
+            setChatResponse(result)
 
-            setLichSuChatTaiLieu(prev =>
+            setDocumentChatHistory(prev =>
                 prev.map(item =>
                     item.id === tempId
                         ? {
@@ -513,7 +486,7 @@ export default function TaiLieu() {
         } catch (error) {
             const message = error.response?.data?.message || 'AI không phản hồi'
 
-            setLichSuChatTaiLieu(prev =>
+            setDocumentChatHistory(prev =>
                 prev.map(item =>
                     item.id === tempId
                         ? {
@@ -528,39 +501,39 @@ export default function TaiLieu() {
 
             toast.error(message)
         } finally {
-            dangHoiTaiLieuRef.current = false
-            setDangXuLyAi(false)
+            isAskingDocumentRef.current = false
+            setProcessingAi(false)
         }
     }
 
-    const trichXuatLich = async () => {
+    const extractSchedule = async () => {
         if (!coExtractSchedule) {
             toast.error(getUpgradeMessage('EXTRACT_SCHEDULE'))
             return
         }
 
-        const text = ketQuaAi?.summary || phanHoiChat?.answer || ''
+        const text = aiResult?.summary || chatResponse?.answer || ''
 
         if (!text.trim()) return
 
-        setDangTrichLich(true)
+        setExtractingSchedule(true)
 
         try {
-            const { data } = await scheduleApi.trichXuatTuGhiChu({
+            const { data } = await scheduleApi.extractFromNote({
                 content: text,
             })
 
             toast.success(`AI đã tìm ${data.data?.totalFound || 0} lịch / công việc`)
-            setLichGoiY(false)
+            setSuggestedSchedule(false)
         } catch (error) {
             toast.error(error.response?.data?.message || 'Không thể trích xuất lịch từ nội dung tài liệu')
         } finally {
-            setDangTrichLich(false)
+            setExtractingSchedule(false)
         }
     }
 
-    const xoa = async (id) => {
-        const doc = danhSach.find(item => item.id === id)
+    const remove = async (id) => {
+        const doc = items.find(item => item.id === id)
 
         if (doc?._shared) {
             toast.error('Bạn không thể xóa tài liệu được chia sẻ')
@@ -570,13 +543,13 @@ export default function TaiLieu() {
         if (!window.confirm('Xoá tài liệu này?')) return
 
         try {
-            await documentApi.xoa(id)
+            await documentApi.remove(id)
 
-            setDanhSach(prev => prev.filter(d => d.id !== id))
-            await layThongTin?.()
+            setItems(prev => prev.filter(d => d.id !== id))
+            await getProfile?.()
 
-            if (chon?.id === id) {
-                setChon(null)
+            if (select?.id === id) {
+                setSelected(null)
                 resetRightPanel()
             }
 
@@ -586,60 +559,60 @@ export default function TaiLieu() {
         }
     }
 
-    const xemFileGoc = async (documentId, fallbackName) => {
-        setDangMoFile(true)
+    const viewOriginalFile = async (documentId, fallbackName) => {
+        setOpeningFile(true)
         try {
-            const { data } = await documentApi.layFile(documentId)
+            const { data } = await documentApi.getFile(documentId)
             const url = URL.createObjectURL(data)
             window.open(url, '_blank')
             setTimeout(() => URL.revokeObjectURL(url), 60000)
         } catch (error) {
             toast.error(error.response?.data?.message || `Không thể mở file${fallbackName ? ` "${fallbackName}"` : ''}`)
         } finally {
-            setDangMoFile(false)
+            setOpeningFile(false)
         }
     }
 
-    const xuLyLaiTaiLieu = async () => {
-        if (!chon?.id || dangXuLyLai) return
+    const reprocessDocument = async () => {
+        if (!select?.id || isReprocessing) return
 
-        setDangXuLyLai(true)
+        setReprocessing(true)
 
         try {
-            const { data } = await documentApi.xuLyLai(chon.id)
+            const { data } = await documentApi.reprocess(select.id)
 
-            const nextDoc = { ...chon, ...data.data }
-            setChon(nextDoc)
-            setDanhSach(prev => prev.map(d => (d.id === chon.id ? nextDoc : d)))
+            const nextDoc = { ...select, ...data.data }
+            setSelected(nextDoc)
+            setItems(prev => prev.map(d => (d.id === select.id ? nextDoc : d)))
 
             toast.success('Đang xử lý lại tài liệu...')
         } catch (error) {
             toast.error(error.response?.data?.message || 'Không thể xử lý lại tài liệu')
         } finally {
-            setDangXuLyLai(false)
+            setReprocessing(false)
         }
     }
 
-    const taiDanhSachShareTaiLieu = async () => {
-        if (!chon?.id) return
+    const loadDocumentShares = async () => {
+        if (!select?.id) return
 
         try {
-            const { data } = await documentApi.layDanhSachChiaSe(chon.id)
+            const { data } = await documentApi.getShares(select.id)
             setDocumentShareList(data.data || [])
         } catch {
             setDocumentShareList([])
         }
     }
 
-    const chiaSeTaiLieu = async () => {
+    const shareDocument = async () => {
         if (!coTeamWork) {
             toast.error(getUpgradeMessage('TEAM_WORK'))
             return
         }
 
-        if (!chon?.id) return
+        if (!select?.id) return
 
-        if (chon?._shared) {
+        if (select?._shared) {
             toast.error('Bạn không thể chia sẻ lại tài liệu của người khác')
             return
         }
@@ -651,10 +624,10 @@ export default function TaiLieu() {
             return
         }
 
-        setDangShareDocument(true)
+        setSharingDocument(true)
 
         try {
-            await documentApi.chiaSe(chon.id, {
+            await documentApi.share(select.id, {
                 email,
                 permission: documentSharePermission,
             })
@@ -662,39 +635,36 @@ export default function TaiLieu() {
             toast.success('Đã chia sẻ tài liệu')
             setDocumentShareEmail('')
             setDocumentSharePermission('VIEW')
-            taiDanhSachShareTaiLieu()
+            loadDocumentShares()
         } catch (error) {
             toast.error(error.response?.data?.message || 'Chia sẻ tài liệu thất bại')
         } finally {
-            setDangShareDocument(false)
+            setSharingDocument(false)
         }
     }
 
-    const huyChiaSeTaiLieu = async (shareId) => {
+    const revokeDocumentShare = async (shareId) => {
         try {
-            await documentApi.huyChiaSe(shareId)
+            await documentApi.revokeShare(shareId)
 
             toast.success('Đã hủy chia sẻ')
-            taiDanhSachShareTaiLieu()
+            loadDocumentShares()
         } catch (error) {
             toast.error(error.response?.data?.message || 'Hủy chia sẻ thất bại')
         }
     }
 
-    const doiQuyenChiaSe = async (item, permission) => {
+    const changeSharePermission = async (item, permission) => {
         if (item.permission === permission) return
 
-        setShareDangCapNhat(prev => new Set(prev).add(item.id))
+        setShareBeingUpdated(prev => new Set(prev).add(item.id))
 
-        // Đổi quyền trực tiếp bằng cách gọi lại API chia sẻ với email cũ + quyền mới
-        // (BE tự nhận diện và cập nhật thay vì tạo bản ghi trùng), không cần
-        // hủy chia sẻ rồi thêm lại như trước.
         setDocumentShareList(prev =>
             prev.map(s => (s.id === item.id ? { ...s, permission } : s))
         )
 
         try {
-            await documentApi.chiaSe(chon.id, {
+            await documentApi.share(select.id, {
                 email: item.sharedWithEmail,
                 permission,
             })
@@ -705,7 +675,7 @@ export default function TaiLieu() {
                 prev.map(s => (s.id === item.id ? { ...s, permission: item.permission } : s))
             )
         } finally {
-            setShareDangCapNhat(prev => {
+            setShareBeingUpdated(prev => {
                 const next = new Set(prev)
                 next.delete(item.id)
                 return next
@@ -721,10 +691,10 @@ export default function TaiLieu() {
                         Tải lên tài liệu
                     </p>
 
-                    {coUploadTaiLieu ? (
+                    {hasDocumentUpload ? (
                         <UploadZone
-                            onUpload={taiLen}
-                            dangTaiLen={dangTaiLen}
+                            onUpload={upload}
+                            isUploading={isUploading}
                         />
                     ) : (
                         <div style={styles.lockedBox}>
@@ -735,28 +705,28 @@ export default function TaiLieu() {
                 </div>
 
                 <div style={styles.listArea}>
-                    {dangTai ? (
+                    {isLoading ? (
                         <div style={styles.centerBox}>
                             <Spinner />
                         </div>
-                    ) : danhSach.length === 0 ? (
+                    ) : items.length === 0 ? (
                         <EmptyState
                             icon={IconFile}
                             title="Chưa có tài liệu"
                             desc="Tải lên PDF, DOCX, TXT hoặc audio"
                         />
                     ) : (
-                        danhSach.map(d => {
+                        items.map(d => {
                             const DocIcon = d.fileType === 'AUDIO' ? IconMusic : IconFileText
-                            const tt = TRANG_THAI[d.status] || TRANG_THAI.PENDING
+                            const tt = DOCUMENT_STATUS_CONFIG[d.status] || DOCUMENT_STATUS_CONFIG.PENDING
 
                             return (
                                 <div
                                     key={d.id}
-                                    onClick={() => chonTaiLieu(d)}
+                                    onClick={() => selectDocument(d)}
                                     style={{
                                         ...styles.docRow,
-                                        ...(chon?.id === d.id ? styles.docRowActive : {}),
+                                        ...(select?.id === d.id ? styles.docRowActive : {}),
                                     }}
                                 >
                                     <DocIcon
@@ -775,8 +745,8 @@ export default function TaiLieu() {
                                         </div>
 
                                         <div style={styles.docMeta}>
-                                            <span style={{ color: tt.mau }}>
-                                                {tt.nhan}
+                                            <span style={{ color: tt.color }}>
+                                                {tt.label}
                                             </span>
 
                                             {d.fileSize && (
@@ -798,7 +768,7 @@ export default function TaiLieu() {
                                             className="btn-ghost"
                                             onClick={e => {
                                                 e.stopPropagation()
-                                                xoa(d.id)
+                                                remove(d.id)
                                             }}
                                             style={{ padding: 3 }}
                                             title="Xóa tài liệu"
@@ -814,7 +784,7 @@ export default function TaiLieu() {
             </div>
 
             <div style={styles.right}>
-                {!chon ? (
+                {!select ? (
                     <EmptyState
                         icon={IconFile}
                         title="Chọn tài liệu để xem"
@@ -823,7 +793,7 @@ export default function TaiLieu() {
                 ) : (
                     <div style={styles.detailWrap}>
                         <div style={styles.docHeader}>
-                            {chon.fileType === 'AUDIO' ? (
+                            {select.fileType === 'AUDIO' ? (
                                 <IconMusic
                                     size={18}
                                     style={{ color: 'var(--accent-purple)' }}
@@ -837,72 +807,72 @@ export default function TaiLieu() {
 
                             <div style={{ flex: 1 }}>
                                 <div style={{ fontWeight: 500, fontSize: 14 }}>
-                                    {chon.originalName}
+                                    {select.originalName}
                                 </div>
 
                                 <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                                    {TRANG_THAI[chon.status]?.nhan || chon.status}
+                                    {DOCUMENT_STATUS_CONFIG[select.status]?.label || select.status}
                                     {' · '}
-                                    {dungLuong(chon.fileSize)}
-                                    {chon._shared ? ' · Được chia sẻ với bạn' : ''}
+                                    {dungLuong(select.fileSize)}
+                                    {select._shared ? ' · Được chia sẻ với bạn' : ''}
                                 </div>
                             </div>
 
                             <button
                                 className="btn-ghost"
-                                onClick={() => xemFileGoc(chon.id, chon.originalName)}
-                                disabled={dangMoFile}
+                                onClick={() => viewOriginalFile(select.id, select.originalName)}
+                                disabled={isOpeningFile}
                                 style={{ gap: 4 }}
                                 title="Xem / tải file gốc"
                             >
                                 <IconFile size={13} />
-                                {dangMoFile ? 'Đang mở...' : 'Xem file gốc'}
+                                {isOpeningFile ? 'Đang mở...' : 'Xem file gốc'}
                             </button>
 
-                            {isDocumentReady(chon) && coAiAnalyze && chon.myPermission !== 'VIEW' && (
+                            {isDocumentReady(select) && canUseAiAnalyze && select.myPermission !== 'VIEW' && (
                                 <div style={{ display: 'flex', gap: 6 }}>
-                                    {chon.fileType === 'AUDIO' ? (
+                                    {select.fileType === 'AUDIO' ? (
                                         <button
                                             className="btn-ai"
-                                            onClick={phanTichAmThanh}
-                                            disabled={dangXuLyAi}
+                                            onClick={analyzeAudio}
+                                            disabled={isProcessingAi}
                                         >
-                                            {dangXuLyAi ? <Spinner size={12} /> : <IconSparkles size={12} />}
+                                            {isProcessingAi ? <Spinner size={12} /> : <IconSparkles size={12} />}
                                             Phân tích & tạo ghi chú
                                         </button>
                                     ) : (
                                         <button
                                             className="btn-ai"
-                                            onClick={phanTich}
-                                            disabled={dangXuLyAi}
+                                            onClick={analyze}
+                                            disabled={isProcessingAi}
                                         >
-                                            {dangXuLyAi ? <Spinner size={12} /> : <IconSparkles size={12} />}
+                                            {isProcessingAi ? <Spinner size={12} /> : <IconSparkles size={12} />}
                                             Phân tích AI
                                         </button>
                                     )}
                                 </div>
                             )}
 
-                            {isDocumentReady(chon) && coAiFlashcard && chon.myPermission !== 'VIEW' && (
+                            {isDocumentReady(select) && canUseAiFlashcards && select.myPermission !== 'VIEW' && (
                                 <button
                                     className="btn-ghost"
-                                    onClick={taoFlashcardTuTaiLieu}
-                                    disabled={dangTaoFlashcard}
+                                    onClick={createFlashcardsFromDocument}
+                                    disabled={isCreatingFlashcards}
                                     style={{ gap: 4 }}
                                     title="Tạo flashcard từ tài liệu"
                                 >
                                     <IconCards
                                         size={13}
-                                        className={dangTaoFlashcard ? 'animate-spin' : ''}
+                                        className={isCreatingFlashcards ? 'animate-spin' : ''}
                                     />
-                                    {dangTaoFlashcard ? 'Đang tạo...' : 'Flashcard AI'}
+                                    {isCreatingFlashcards ? 'Đang tạo...' : 'Flashcard AI'}
                                 </button>
                             )}
 
-                            {isDocumentReady(chon) && coTeamWork && !chon._shared && (
+                            {isDocumentReady(select) && coTeamWork && !select._shared && (
                                 <button
-                                    className={hienShareTaiLieu ? 'btn-ai' : 'btn-ghost'}
-                                    onClick={() => setHienShareTaiLieu(prev => !prev)}
+                                    className={showDocumentShare ? 'btn-ai' : 'btn-ghost'}
+                                    onClick={() => setShowDocumentShare(prev => !prev)}
                                     style={{ gap: 4 }}
                                     title="Chia sẻ tài liệu"
                                 >
@@ -911,34 +881,34 @@ export default function TaiLieu() {
                                 </button>
                             )}
 
-                            {isDocumentReady(chon) && !coAiAnalyze && (
+                            {isDocumentReady(select) && !canUseAiAnalyze && (
                                 <div style={styles.smallLockedText}>
                                     Gói hiện tại chưa hỗ trợ phân tích AI
                                 </div>
                             )}
 
-                            {(chon.status === 'PENDING' || chon.status === 'PROCESSING') && (
+                            {(select.status === 'PENDING' || select.status === 'PROCESSING') && (
                                 <div style={styles.processingText}>
                                     <Spinner size={12} />
                                     Đang xử lý tài liệu...
                                 </div>
                             )}
 
-                            {chon.status === 'FAILED' && !chon._shared && (
+                            {select.status === 'FAILED' && !select._shared && (
                                 <button
                                     className="btn-ai"
-                                    onClick={xuLyLaiTaiLieu}
-                                    disabled={dangXuLyLai}
+                                    onClick={reprocessDocument}
+                                    disabled={isReprocessing}
                                     style={{ gap: 4 }}
                                 >
-                                    {dangXuLyLai ? <Spinner size={12} /> : <IconRefresh size={13} />}
-                                    {dangXuLyLai ? 'Đang thử lại...' : 'Thử xử lý lại'}
+                                    {isReprocessing ? <Spinner size={12} /> : <IconRefresh size={13} />}
+                                    {isReprocessing ? 'Đang thử lại...' : 'Thử xử lý lại'}
                                 </button>
                             )}
                         </div>
 
                         <div style={styles.contentArea}>
-                            {hienShareTaiLieu && !chon._shared && (
+                            {showDocumentShare && !select._shared && (
                                 <div style={styles.sharePanel}>
                                     <div style={styles.sharePanelHeader}>
                                         <div style={styles.panelTitle}>
@@ -954,7 +924,7 @@ export default function TaiLieu() {
 
                                         <button
                                             className="btn-ghost"
-                                            onClick={() => setHienShareTaiLieu(false)}
+                                            onClick={() => setShowDocumentShare(false)}
                                             style={{ padding: 3 }}
                                             title="Đóng"
                                         >
@@ -982,12 +952,12 @@ export default function TaiLieu() {
 
                                             <button
                                                 className="btn-primary"
-                                                onClick={chiaSeTaiLieu}
-                                                disabled={dangShareDocument}
+                                                onClick={shareDocument}
+                                                disabled={isSharingDocument}
                                                 style={styles.shareButton}
                                             >
                                                 <IconUserPlus size={12} />
-                                                {dangShareDocument ? 'Đang chia sẻ...' : 'Chia sẻ'}
+                                                {isSharingDocument ? 'Đang chia sẻ...' : 'Chia sẻ'}
                                             </button>
                                         </div>
 
@@ -1013,8 +983,8 @@ export default function TaiLieu() {
 
                                                             <select
                                                                 value={item.permission}
-                                                                disabled={shareDangCapNhat.has(item.id)}
-                                                                onChange={e => doiQuyenChiaSe(item, e.target.value)}
+                                                                disabled={shareBeingUpdated.has(item.id)}
+                                                                onChange={e => changeSharePermission(item, e.target.value)}
                                                                 style={styles.sharePermissionSelect}
                                                             >
                                                                 <option value="VIEW">Chỉ xem</option>
@@ -1024,7 +994,7 @@ export default function TaiLieu() {
 
                                                         <button
                                                             className="btn-ghost"
-                                                            onClick={() => huyChiaSeTaiLieu(item.id)}
+                                                            onClick={() => revokeDocumentShare(item.id)}
                                                             style={{ padding: 4 }}
                                                             title="Hủy chia sẻ"
                                                         >
@@ -1038,47 +1008,47 @@ export default function TaiLieu() {
                                 </div>
                             )}
 
-                            {ketQuaAi && (
+                            {aiResult && (
                                 <div style={styles.aiResult}>
                                     <div style={styles.aiLabel}>
                                         <IconSparkles
                                             size={12}
                                             style={{ color: 'var(--accent-blue-dim)' }}
                                         />
-                                        {ketQuaAi.amThanh ? 'Ghi chú từ âm thanh' : 'Phân tích AI'}
+                                        {aiResult.audio ? 'Ghi chú từ âm thanh' : 'Phân tích AI'}
                                     </div>
 
-                                    {ketQuaAi.noteTitle && (
+                                    {aiResult.noteTitle && (
                                         <div style={{ marginBottom: 10 }}>
                                             <div style={styles.subLabel}>
                                                 Tiêu đề ghi chú
                                             </div>
 
                                             <p style={{ fontWeight: 500 }}>
-                                                {ketQuaAi.noteTitle}
+                                                {aiResult.noteTitle}
                                             </p>
                                         </div>
                                     )}
 
-                                    {ketQuaAi.summary && (
+                                    {aiResult.summary && (
                                         <div style={{ marginBottom: 10 }}>
                                             <div style={styles.subLabel}>
                                                 Tóm tắt
                                             </div>
 
                                             <p style={styles.summaryText}>
-                                                {ketQuaAi.summary}
+                                                {aiResult.summary}
                                             </p>
                                         </div>
                                     )}
 
-                                    {ketQuaAi.keyPoints?.length > 0 && (
+                                    {aiResult.keyPoints?.length > 0 && (
                                         <div style={{ marginBottom: 10 }}>
                                             <div style={styles.subLabel}>
                                                 Điểm chính
                                             </div>
 
-                                            {ketQuaAi.keyPoints.map((item, index) => (
+                                            {aiResult.keyPoints.map((item, index) => (
                                                 <p key={index} style={{ padding: '2px 0' }}>
                                                     • {item}
                                                 </p>
@@ -1086,14 +1056,14 @@ export default function TaiLieu() {
                                         </div>
                                     )}
 
-                                    {ketQuaAi.keywords?.length > 0 && (
+                                    {aiResult.keywords?.length > 0 && (
                                         <div>
                                             <div style={styles.subLabel}>
                                                 Từ khoá
                                             </div>
 
                                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                                                {ketQuaAi.keywords.map((item, index) => (
+                                                {aiResult.keywords.map((item, index) => (
                                                     <span key={index} className="tag tag-blue">
                                                         {item}
                                                     </span>
@@ -1104,26 +1074,26 @@ export default function TaiLieu() {
                                 </div>
                             )}
 
-                            {lichGoiY && (
+                            {suggestedSchedule && (
                                 <div style={styles.schedulePrompt}>
                                     <div style={{ fontSize: 12, marginBottom: 8 }}>
-                                        AI phát hiện thông tin lịch / thời gian trong nội dung.
+                                        AI phát hiện thông message lịch / thời gian trong nội dung.
                                         Bạn có muốn tạo công việc / lịch từ nội dung này?
                                     </div>
 
                                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                                         <button
                                             className="btn-primary"
-                                            onClick={trichXuatLich}
-                                            disabled={dangTrichLich}
+                                            onClick={extractSchedule}
+                                            disabled={isExtractingSchedule}
                                             style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}
                                         >
-                                            {dangTrichLich ? 'Đang xử lý...' : 'Tạo lịch'}
+                                            {isExtractingSchedule ? 'Đang xử lý...' : 'Tạo lịch'}
                                         </button>
 
                                         <button
                                             className="btn-ghost"
-                                            onClick={() => setLichGoiY(false)}
+                                            onClick={() => setSuggestedSchedule(false)}
                                             style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}
                                         >
                                             Không cần
@@ -1132,26 +1102,26 @@ export default function TaiLieu() {
                                 </div>
                             )}
 
-                            {isDocumentReady(chon) && !ketQuaAi && coAiAnalyze && (
+                            {isDocumentReady(select) && !aiResult && canUseAiAnalyze && (
                                 <div style={styles.hintText}>
                                     Nhấn "Phân tích AI" để xem tóm tắt, hoặc hỏi trực tiếp bên dưới.
                                 </div>
                             )}
 
-                            {isDocumentReady(chon) && !coAiAnalyze && coAiChat && (
+                            {isDocumentReady(select) && !canUseAiAnalyze && canUseAiChat && (
                                 <div style={styles.hintText}>
                                     Gói hiện tại chưa hỗ trợ phân tích AI, nhưng bạn vẫn có thể hỏi đáp với tài liệu bên dưới.
                                 </div>
                             )}
 
-                            {isDocumentReady(chon) && !coAiAnalyze && !coAiChat && (
+                            {isDocumentReady(select) && !canUseAiAnalyze && !canUseAiChat && (
                                 <div style={styles.lockedBox}>
                                     Gói hiện tại chưa hỗ trợ các tính năng AI cho tài liệu.
                                     Vui lòng nâng cấp để phân tích và hỏi đáp với tài liệu.
                                 </div>
                             )}
 
-                            {lichSuChatTaiLieu.length > 0 && (
+                            {documentChatHistory.length > 0 && (
                                 <div style={styles.chatHistoryBox}>
                                     <div style={styles.chatHistoryHeader}>
                                         <div style={styles.aiLabel}>
@@ -1164,7 +1134,7 @@ export default function TaiLieu() {
 
                                         <button
                                             className="btn-ghost"
-                                            onClick={xoaLichSuChatTaiLieu}
+                                            onClick={clearDocumentChatHistory}
                                             style={{ padding: '4px 8px', fontSize: 11 }}
                                         >
                                             Xóa lịch sử
@@ -1172,7 +1142,7 @@ export default function TaiLieu() {
                                     </div>
 
                                     <div style={styles.chatHistoryList}>
-                                        {lichSuChatTaiLieu.map(item => (
+                                        {documentChatHistory.map(item => (
                                             <div key={item.id} style={styles.chatTurn}>
                                                 <div style={styles.questionBubble}>
                                                     <div style={styles.bubbleLabel}>
@@ -1231,54 +1201,54 @@ export default function TaiLieu() {
                             )}
                         </div>
 
-                        {isDocumentReady(chon) && coAiChat && !canAskChat && (
+                        {isDocumentReady(select) && canUseAiChat && !canAskChat && (
                             <div style={styles.lockedBox}>
                                 Bạn chỉ có quyền <strong>xem</strong> tài liệu này nên có thể đọc lại lịch sử hỏi đáp,
                                 nhưng không thể đặt câu hỏi mới. Nhờ chủ sở hữu đổi quyền thành "Có thể chỉnh sửa" để tham gia hỏi đáp.
                             </div>
                         )}
 
-                        {isDocumentReady(chon) && coAiChat && canAskChat && (
+                        {isDocumentReady(select) && canUseAiChat && canAskChat && (
                             <div style={styles.chatInput}>
                                 <textarea
-                                    value={cauHoi}
-                                    onChange={e => setCauHoi(e.target.value)}
+                                    value={question}
+                                    onChange={e => setQuestion(e.target.value)}
                                     onKeyDown={e => {
                                         if (e.key === 'Enter' && !e.shiftKey) {
                                             e.preventDefault()
 
                                             if (
-                                                dangHoiTaiLieuRef.current ||
-                                                lichSuChatTaiLieu.some(item => item.loading)
+                                                isAskingDocumentRef.current ||
+                                                documentChatHistory.some(item => item.loading)
                                             ) {
                                                 toast.error('Vui lòng đợi AI trả lời xong câu trước')
                                                 return
                                             }
 
-                                            hoiDap()
+                                            askDocument()
                                         }
                                     }}
                                     placeholder={
-                                        coDangTraLoiTaiLieu
+                                        isAnsweringDocument
                                             ? 'Đợi AI trả lời xong rồi hỏi tiếp...'
-                                            : `Hỏi về "${chon.originalName}"...`
+                                            : `Hỏi về "${select.originalName}"...`
                                     }
-                                    disabled={coDangTraLoiTaiLieu}
+                                    disabled={isAnsweringDocument}
                                     rows={3}
                                     style={styles.chatTextarea}
                                 />
 
                                 <button
                                     className="btn-primary"
-                                    onClick={hoiDap}
-                                    disabled={!cauHoi.trim() || coDangTraLoiTaiLieu}
+                                    onClick={askDocument}
+                                    disabled={!question.trim() || isAnsweringDocument}
                                     style={{
                                         padding: '8px 14px',
                                         flexShrink: 0,
                                         alignSelf: 'flex-end',
                                     }}
                                 >
-                                    {coDangTraLoiTaiLieu ? <Spinner size={12} /> : 'Hỏi'}
+                                    {isAnsweringDocument ? <Spinner size={12} /> : 'Hỏi'}
                                 </button>
                             </div>
                         )}

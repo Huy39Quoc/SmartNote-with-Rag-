@@ -4,83 +4,61 @@ import noteApi from '../../lib/api/noteApi'
 import toast from 'react-hot-toast'
 import useAuthStore from '../../service/authStore'
 import { hasFeature } from '../../utils/packageFeatures'
+import { AI_NOTE_ACTIONS } from '../../constants/noteConstants'
 
-const HANH_DONG = [
-    {
-        key: 'SUMMARIZE',
-        nhan: 'Tóm tắt',
-        features: ['AI_SUMMARY_BASIC'],
-    },
-    {
-        key: 'STRUCTURE',
-        nhan: 'Cải thiện cấu trúc',
-        features: ['AI_NOTE_FORMAT'],
-    },
-    {
-        key: 'CREATE_CHECKLIST',
-        nhan: 'Tạo checklist',
-        features: ['AI_NOTE_FORMAT', 'CHECKLIST_BASIC'],
-    },
-    {
-        key: 'SUGGEST_TITLE',
-        nhan: 'Đề xuất tiêu đề',
-        features: ['AI_NOTE_FORMAT'],
-    },
-]
+export default function AiPanel({ noteId, content, title, onApply, onInsertChecklist, onClose }) {
+    const { user } = useAuthStore()
 
-export default function AiPanel({ noteId, content, title, onApply, onInsertChecklist, onDong }) {
-    const { nguoiDung } = useAuthStore()
-
-    const hanhDongKhaDung = useMemo(() => {
-        return HANH_DONG.filter(action =>
-            action.features.every(feature => hasFeature(nguoiDung, feature))
+    const availableActions = useMemo(() => {
+        return AI_NOTE_ACTIONS.filter(action =>
+            action.features.every(feature => hasFeature(user, feature))
         )
-    }, [nguoiDung?.packageFeatures, nguoiDung?.role])
+    }, [user?.packageFeatures, user?.role])
 
     const [loading, setLoading] = useState(false)
-    const [ketQua, setKetQua] = useState(null)
-    const [hanhDong, setHanhDong] = useState('')
+    const [result, setResult] = useState(null)
+    const [action, setAction] = useState('')
 
-    const actionDangChon = hanhDongKhaDung.find(action => action.key === hanhDong)
-        ? hanhDong
-        : hanhDongKhaDung[0]?.key || ''
+    const selectedAction = availableActions.find(action => action.key === action)
+        ? action
+        : availableActions[0]?.key || ''
 
     useEffect(() => {
-        if (!hanhDong && hanhDongKhaDung.length > 0) {
-            setHanhDong(hanhDongKhaDung[0].key)
+        if (!action && availableActions.length > 0) {
+            setAction(availableActions[0].key)
             return
         }
 
-        const actionConHopLe = hanhDongKhaDung.some(action => action.key === hanhDong)
+        const validAction = availableActions.some(action => action.key === action)
 
-        if (!actionConHopLe) {
-            setHanhDong(hanhDongKhaDung[0]?.key || '')
-            setKetQua(null)
+        if (!validAction) {
+            setAction(availableActions[0]?.key || '')
+            setResult(null)
         }
-    }, [hanhDong, hanhDongKhaDung])
+    }, [action, availableActions])
 
-    const xuLy = async () => {
+    const handleAction = async () => {
         if (!content?.trim()) {
             toast.error('Ghi chú đang trống')
             return
         }
 
-        if (!actionDangChon) {
+        if (!selectedAction) {
             toast.error('Gói hiện tại chưa hỗ trợ tính năng AI ghi chú.')
             return
         }
 
         setLoading(true)
-        setKetQua(null)
+        setResult(null)
 
         try {
-            const { data } = await noteApi.caiThienAi(noteId, {
+            const { data } = await noteApi.improveWithAi(noteId, {
                 content,
                 title,
-                action: actionDangChon,
+                action: selectedAction,
             })
 
-            setKetQua(data.data)
+            setResult(data.data)
         } catch (error) {
             toast.error(error.response?.data?.message || 'AI không phản hồi, thử lại sau')
         } finally {
@@ -88,24 +66,24 @@ export default function AiPanel({ noteId, content, title, onApply, onInsertCheck
         }
     }
 
-    const apDung = async () => {
-        if (!ketQua) return
+    const applyResult = async () => {
+        if (!result) return
 
         try {
-            await onApply?.(ketQua)
-            onDong?.()
+            await onApply?.(result)
+            onClose?.()
             toast.success('Đã áp dụng gợi ý AI')
         } catch (error) {
             toast.error(error?.message || 'Không thể áp dụng gợi ý AI')
         }
     }
 
-    const boQua = () => {
-        setKetQua(null)
+    const skip = () => {
+        setResult(null)
     }
 
-    const chenChecklistVaoGhiChu = () => {
-        const items = (ketQua?.checklist || []).map(text => String(text).trim()).filter(Boolean)
+    const insertChecklistIntoNote = () => {
+        const items = (result?.checklist || []).map(text => String(text).trim()).filter(Boolean)
         if (items.length === 0) return
 
         const escape = (s) => s
@@ -121,7 +99,7 @@ export default function AiPanel({ noteId, content, title, onApply, onInsertCheck
 
         try {
             onInsertChecklist?.(html)
-            onDong?.()
+            onClose?.()
             toast.success('Đã chèn checklist vào ghi chú')
         } catch (error) {
             toast.error(error?.message || 'Không thể chèn checklist')
@@ -136,25 +114,25 @@ export default function AiPanel({ noteId, content, title, onApply, onInsertCheck
           <span style={{ fontSize: 12, fontWeight: 500 }}>Trợ lý AI</span>
         </span>
 
-                <button className="btn-ghost" onClick={onDong} style={{ padding: 3 }}>
+                <button className="btn-ghost" onClick={onClose} style={{ padding: 3 }}>
                     <IconX size={13} />
                 </button>
             </div>
 
             <div style={styles.body}>
-                {hanhDongKhaDung.length > 0 ? (
+                {availableActions.length > 0 ? (
                     <div style={styles.actions}>
-                        {hanhDongKhaDung.map(h => (
+                        {availableActions.map(h => (
                             <button
                                 key={h.key}
                                 onClick={() => {
-                                    setHanhDong(h.key)
-                                    setKetQua(null)
+                                    setAction(h.key)
+                                    setResult(null)
                                 }}
-                                className={actionDangChon === h.key ? 'btn-ai' : 'btn-ghost'}
+                                className={selectedAction === h.key ? 'btn-ai' : 'btn-ghost'}
                                 style={{ fontSize: 11, padding: '3px 9px' }}
                             >
-                                {h.nhan}
+                                {h.label}
                             </button>
                         ))}
                     </div>
@@ -166,15 +144,15 @@ export default function AiPanel({ noteId, content, title, onApply, onInsertCheck
 
                 <button
                     className="btn-primary"
-                    onClick={xuLy}
-                    disabled={loading || hanhDongKhaDung.length === 0}
+                    onClick={handleAction}
+                    disabled={loading || availableActions.length === 0}
                     style={{
                         width: '100%',
                         justifyContent: 'center',
                         padding: '7px',
                         fontSize: 12,
-                        opacity: hanhDongKhaDung.length === 0 ? 0.6 : 1,
-                        cursor: hanhDongKhaDung.length === 0 ? 'not-allowed' : 'pointer',
+                        opacity: availableActions.length === 0 ? 0.6 : 1,
+                        cursor: availableActions.length === 0 ? 'not-allowed' : 'pointer',
                     }}
                 >
                     {loading ? (
@@ -187,26 +165,26 @@ export default function AiPanel({ noteId, content, title, onApply, onInsertCheck
                     )}
                 </button>
 
-                {ketQua && (
+                {result && (
                     <div style={styles.result}>
-                        {ketQua.suggestedTitle && (
+                        {result.suggestedTitle && (
                             <div style={{ marginBottom: 8 }}>
                                 <div style={styles.resultLabel}>Tiêu đề gợi ý</div>
-                                <div style={styles.resultText}>{ketQua.suggestedTitle}</div>
+                                <div style={styles.resultText}>{result.suggestedTitle}</div>
                             </div>
                         )}
 
-                        {ketQua.summary && (
+                        {result.summary && (
                             <div style={{ marginBottom: 8 }}>
                                 <div style={styles.resultLabel}>Tóm tắt</div>
-                                <div style={styles.resultText}>{ketQua.summary}</div>
+                                <div style={styles.resultText}>{result.summary}</div>
                             </div>
                         )}
 
-                        {ketQua.checklist?.length > 0 && (
+                        {result.checklist?.length > 0 && (
                             <div style={{ marginBottom: 8 }}>
                                 <div style={styles.resultLabel}>Checklist</div>
-                                {ketQua.checklist.map((c, i) => (
+                                {result.checklist.map((c, i) => (
                                     <div key={i} style={styles.checkItem}>
                                         ☐ {c}
                                     </div>
@@ -214,20 +192,20 @@ export default function AiPanel({ noteId, content, title, onApply, onInsertCheck
                             </div>
                         )}
 
-                        {ketQua.improvedContent && (
+                        {result.improvedContent && (
                             <div style={{ marginBottom: 8 }}>
                                 <div style={styles.resultLabel}>Nội dung đã cải thiện</div>
                                 <div style={{ ...styles.resultText, maxHeight: 120, overflow: 'auto' }}>
-                                    {ketQua.improvedContent}
+                                    {result.improvedContent}
                                 </div>
                             </div>
                         )}
 
-                        {ketQua.checklist?.length > 0 ? (
+                        {result.checklist?.length > 0 ? (
                             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                                 <button
                                     className="btn-primary"
-                                    onClick={chenChecklistVaoGhiChu}
+                                    onClick={insertChecklistIntoNote}
                                     style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}
                                 >
                                     <IconCheck size={12} /> Chèn vào ghi chú
@@ -235,18 +213,18 @@ export default function AiPanel({ noteId, content, title, onApply, onInsertCheck
 
                                 <button
                                     className="btn-ghost"
-                                    onClick={apDung}
+                                    onClick={applyResult}
                                     style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}
                                     title="Tạo các task có deadline trong Lịch, dựa theo checklist này"
                                 >
                                     Tạo task có deadline
                                 </button>
                             </div>
-                        ) : ketQua.improvedContent ? (
+                        ) : result.improvedContent ? (
                             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                                 <button
                                     className="btn-primary"
-                                    onClick={apDung}
+                                    onClick={applyResult}
                                     style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}
                                 >
                                     <IconCheck size={12} /> Chấp nhận AI
@@ -254,7 +232,7 @@ export default function AiPanel({ noteId, content, title, onApply, onInsertCheck
 
                                 <button
                                     className="btn-ghost"
-                                    onClick={boQua}
+                                    onClick={skip}
                                     style={{ flex: 1, justifyContent: 'center', fontSize: 12 }}
                                 >
                                     Giữ nguyên
@@ -263,7 +241,7 @@ export default function AiPanel({ noteId, content, title, onApply, onInsertCheck
                         ) : (
                             <button
                                 className="btn-primary"
-                                onClick={apDung}
+                                onClick={applyResult}
                                 style={{ width: '100%', justifyContent: 'center', fontSize: 12 }}
                             >
                                 <IconCheck size={12} /> Áp dụng

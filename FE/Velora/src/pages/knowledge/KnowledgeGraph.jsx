@@ -5,47 +5,41 @@ import toast from 'react-hot-toast'
 import knowledgeApi from '../../lib/api/knowledgeApi'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
-
-const WIDTH = 900
-const HEIGHT = 620
-const CENTER_X = WIDTH / 2
-const CENTER_Y = HEIGHT / 2
-const RADIUS = 260
+import { KNOWLEDGE_GRAPH_LAYOUT } from '../../constants/knowledgeConstants'
 
 export default function KnowledgeGraph() {
     const navigate = useNavigate()
-    const [dangTai, setDangTai] = useState(true)
-    const [duLieu, setDuLieu] = useState({ nodes: [], edges: [] })
+    const [isLoading, setLoading] = useState(true)
+    const [data, setData] = useState({ nodes: [], edges: [] })
     const [nodeHover, setNodeHover] = useState(null)
 
-    const taiDoThi = async () => {
-        setDangTai(true)
+    const loadGraph = async () => {
+        setLoading(true)
         try {
-            const { data } = await knowledgeApi.layDoThi()
-            setDuLieu(data.data || { nodes: [], edges: [] })
+            const { data } = await knowledgeApi.getGraph()
+            setData(data.data || { nodes: [], edges: [] })
         } catch (error) {
             toast.error(error.response?.data?.message || 'Không thể tải bản đồ tri thức')
         } finally {
-            setDangTai(false)
+            setLoading(false)
         }
     }
 
-    useEffect(() => { taiDoThi() }, [])
+    useEffect(() => { loadGraph() }, [])
 
-    // Bố trí node theo vòng tròn, cụm gần nhau hơn nếu liên kết với nhiều node khác
     const layout = useMemo(() => {
-        const { nodes } = duLieu
+        const { nodes } = data
         if (nodes.length === 0) return []
 
         return nodes.map((node, i) => {
             const angle = (i / nodes.length) * Math.PI * 2 - Math.PI / 2
             return {
                 ...node,
-                x: CENTER_X + RADIUS * Math.cos(angle),
-                y: CENTER_Y + RADIUS * Math.sin(angle),
+                x: KNOWLEDGE_GRAPH_LAYOUT.centerX + KNOWLEDGE_GRAPH_LAYOUT.radius * Math.cos(angle),
+                y: KNOWLEDGE_GRAPH_LAYOUT.centerY + KNOWLEDGE_GRAPH_LAYOUT.radius * Math.sin(angle),
             }
         })
-    }, [duLieu])
+    }, [data])
 
     const nodeById = useMemo(() => {
         const map = {}
@@ -61,12 +55,12 @@ export default function KnowledgeGraph() {
 
     const degreeById = useMemo(() => {
         const map = {}
-        duLieu.edges.forEach(e => {
+        data.edges.forEach(e => {
             map[e.from] = (map[e.from] || 0) + 1
             map[e.to] = (map[e.to] || 0) + 1
         })
         return map
-    }, [duLieu.edges])
+    }, [data.edges])
 
     return (
         <div style={styles.wrap}>
@@ -83,7 +77,7 @@ export default function KnowledgeGraph() {
                     </p>
                 </div>
 
-                <button className="btn-ghost" onClick={taiDoThi} disabled={dangTai}>
+                <button className="btn-ghost" onClick={loadGraph} disabled={isLoading}>
                     <IconRefresh size={14} />
                     Làm mới
                 </button>
@@ -102,7 +96,7 @@ export default function KnowledgeGraph() {
             </div>
 
             <div style={styles.canvasBox}>
-                {dangTai ? (
+                {isLoading ? (
                     <div style={styles.centerBox}><Spinner size={22} /></div>
                 ) : layout.length === 0 ? (
                     <div style={styles.centerBox}>
@@ -113,8 +107,8 @@ export default function KnowledgeGraph() {
                         />
                     </div>
                 ) : (
-                    <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} style={styles.svg}>
-                        {duLieu.edges.map((edge, i) => {
+                    <svg viewBox={`0 0 ${KNOWLEDGE_GRAPH_LAYOUT.width} ${KNOWLEDGE_GRAPH_LAYOUT.height}`} style={styles.svg}>
+                        {data.edges.map((edge, i) => {
                             const a = nodeById[edge.from]
                             const b = nodeById[edge.to]
                             if (!a || !b) return null

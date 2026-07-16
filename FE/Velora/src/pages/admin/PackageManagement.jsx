@@ -1,47 +1,14 @@
 import React, { useState, useEffect } from 'react'
 import adminApi from '../../lib/api/adminApi'
 import Spinner from '../../components/ui/Spinner'
-
-const AVAILABLE_FEATURES = [
-    { id: 'TAG_SUBJECT', label: 'Tag môn học / chủ đề / dự án' },
-    { id: 'CHECKLIST_BASIC', label: 'Checklist công việc cơ bản' },
-    { id: 'AI_NOTE_FORMAT', label: 'AI format ghi chú' },
-    { id: 'AI_SUMMARY_BASIC', label: 'Tóm tắt AI cơ bản' },
-    { id: 'AI_SUMMARY_ADVANCED', label: 'Tóm tắt & phân tích AI nâng cao' },
-    { id: 'AI_CHAT', label: 'Hỏi đáp AI với ghi chú / tài liệu' },
-    { id: 'AI_ANALYZE', label: 'AI phân tích tài liệu' },
-    { id: 'DOCUMENT_UPLOAD', label: 'Upload tài liệu' },
-    { id: 'EXTRACT_SCHEDULE', label: 'AI trích xuất deadline từ ghi chú' },
-    { id: 'AI_FLASHCARD', label: 'Flashcard AI tự động' },
-    { id: 'DEADLINE_MANAGEMENT', label: 'Quản lý deadline & lịch học thông minh' },
-    { id: 'PRIORITY_SUGGESTION', label: 'Gợi ý ưu tiên công việc' },
-    { id: 'EXPORT_FILE', label: 'Export PDF / Word' },
-    { id: 'TEAM_WORK', label: 'Học nhóm & chia sẻ ghi chú theo nhóm' },
-    { id: 'AI_PROGRESS_ANALYTICS', label: 'AI phân tích tiến độ học tập' },
-    { id: 'TEAM_DASHBOARD', label: 'Dashboard theo dõi nhóm' },
-    { id: 'GOOGLE_CALENDAR', label: 'Tích hợp Google Calendar' },
-    { id: 'MANAGE_MEMBERS', label: 'Admin quản lý thành viên nhóm' },
-    { id: 'CUSTOM_WORKSPACE', label: 'Custom workspace theo nhóm' },
-    { id: 'PRIORITY_SUPPORT', label: 'Ưu tiên hỗ trợ khách hàng' },
-]
-
-const initialForm = {
-    name: '',
-    priceMonthly: 0,
-    priceYearly: 0,
-    description: '',
-    maxNotes: -1,
-    maxAiFormatsPerMonth: -1,
-    storageGb: 0,
-    maxDevices: -1,
-    features: [],
-}
+import { ADMIN_PACKAGE_FEATURES } from '../../constants/packageConstants'
+import { DEFAULT_PACKAGE_FORM } from '../../constants/adminConstants'
 
 export default function PackageManagement() {
     const [packages, setPackages] = useState([])
     const [loading, setLoading] = useState(false)
     const [editingId, setEditingId] = useState(null)
-    const [formData, setFormData] = useState(initialForm)
+    const [formData, setFormData] = useState(DEFAULT_PACKAGE_FORM)
     const [isFormOpen, setIsFormOpen] = useState(false)
 
     useEffect(() => {
@@ -86,7 +53,7 @@ export default function PackageManagement() {
 
     const handleCreateClick = () => {
         setEditingId(null)
-        setFormData(initialForm)
+        setFormData(DEFAULT_PACKAGE_FORM)
         setIsFormOpen(true)
     }
 
@@ -108,7 +75,7 @@ export default function PackageManagement() {
 
     const handleCancel = () => {
         setEditingId(null)
-        setFormData(initialForm)
+        setFormData(DEFAULT_PACKAGE_FORM)
         setIsFormOpen(false)
     }
 
@@ -219,7 +186,7 @@ export default function PackageManagement() {
     }
 
     const getFeatureLabel = (id) => {
-        const found = AVAILABLE_FEATURES.find(f => f.id === id)
+        const found = ADMIN_PACKAGE_FEATURES.find(f => f.id === id)
         return found ? found.label : id
     }
 
@@ -234,7 +201,7 @@ export default function PackageManagement() {
         })
     }
 
-    const hienThiGioiHan = (value, suffix = '') => {
+    const formatLimit = (value, suffix = '') => {
         if (value === null || value === undefined || Number(value) < 0) {
             return 'Vô hạn'
         }
@@ -441,7 +408,7 @@ export default function PackageManagement() {
                             </label>
 
                             <div style={styles.checkboxGrid}>
-                                {AVAILABLE_FEATURES.map(feat => (
+                                {ADMIN_PACKAGE_FEATURES.map(feat => (
                                     <label key={feat.id} style={styles.checkboxLabel}>
                                         <input
                                             type="checkbox"
@@ -536,28 +503,28 @@ export default function PackageManagement() {
                                             <div style={styles.specItem}>
                                                 📄 Ghi chú:{' '}
                                                 <span style={styles.specValue}>
-                                                    {hienThiGioiHan(pkg.maxNotes, ' ghi chú')}
+                                                    {formatLimit(pkg.maxNotes, ' ghi chú')}
                                                 </span>
                                             </div>
 
                                             <div style={styles.specItem}>
                                                 🤖 AI Format:{' '}
                                                 <span style={styles.specValue}>
-                                                    {hienThiGioiHan(pkg.maxAiFormatsPerMonth, ' lần')}
+                                                    {formatLimit(pkg.maxAiFormatsPerMonth, ' lần')}
                                                 </span>
                                             </div>
 
                                             <div style={styles.specItem}>
                                                 💾 Lưu trữ:{' '}
                                                 <span style={styles.specValue}>
-                                                    {hienThiGioiHan(pkg.storageGb, ' GB')}
+                                                    {formatLimit(pkg.storageGb, ' GB')}
                                                 </span>
                                             </div>
 
                                             <div style={styles.specItem}>
                                                 📱 Thiết bị:{' '}
                                                 <span style={styles.specValue}>
-                                                    {hienThiGioiHan(pkg.maxDevices, ' máy')}
+                                                    {formatLimit(pkg.maxDevices, ' máy')}
                                                 </span>
                                             </div>
                                         </td>

@@ -19,102 +19,102 @@ import EmptyState from '../../components/ui/EmptyState'
 import toast from 'react-hot-toast'
 
 export default function Knowledge() {
-    const [danhSach, setDanhSach] = useState([])
-    const [chon, setChon] = useState(null)
-    const [chiTiet, setChiTiet] = useState(null)
-    const [dangTai, setDangTai] = useState(true)
-    const [dangPhanLoai, setDangPhanLoai] = useState(false)
-    const [hienForm, setHienForm] = useState(false)
-    const [tenNhom, setTenNhom] = useState('')
+    const [items, setItems] = useState([])
+    const [select, setSelected] = useState(null)
+    const [details, setDetails] = useState(null)
+    const [isLoading, setLoading] = useState(true)
+    const [isClassifying, setClassifying] = useState(false)
+    const [showForm, setShowForm] = useState(false)
+    const [groupName, setGroupName] = useState('')
     const navigate = useNavigate()
-    const [tatCaGhiChu, setTatCaGhiChu] = useState([])
-    const [hienThemGhiChu, setHienThemGhiChu] = useState(false)
-    const [timGhiChu, setTimGhiChu] = useState('')
-    const [dangLuuNhom, setDangLuuNhom] = useState(false)
+    const [allNotes, setAllNotes] = useState([])
+    const [showAddNote, setShowAddNote] = useState(false)
+    const [noteSearch, setNoteSearch] = useState('')
+    const [isSavingGroup, setSavingGroup] = useState(false)
     const [feedbackStats, setFeedbackStats] = useState(null)
-    const [dangGuiFeedbackIds, setDangGuiFeedbackIds] = useState(new Set())
-    const tai = async () => {
-        setDangTai(true)
+    const [submittingFeedbackIds, setSubmittingFeedbackIds] = useState(new Set())
+    const download = async () => {
+        setLoading(true)
         try {
-            const {data} = await knowledgeApi.layTatCa()
-            setDanhSach(data.data || [])
+            const {data} = await knowledgeApi.getAll()
+            setItems(data.data || [])
         } catch {
         }
-        setDangTai(false)
+        setLoading(false)
     }
 
-    const taiGhiChu = async () => {
+    const loadNote = async () => {
         try {
-            const {data} = await noteApi.layTatCa({
+            const {data} = await noteApi.getAll({
                 page: 0,
                 size: 100,
             })
 
-            setTatCaGhiChu(data.data?.content || [])
+            setAllNotes(data.data?.content || [])
         } catch (error) {
             console.error(error)
         }
     }
-    const taiThongKeFeedback = async () => {
+    const loadFeedbackStats = async () => {
         try {
-            const { data } = await knowledgeApi.layThongKeFeedback()
+            const { data } = await knowledgeApi.getFeedbackStats()
             setFeedbackStats(data.data)
         } catch {
             setFeedbackStats(null)
         }
     }
     useEffect(() => {
-        tai()
-        taiGhiChu()
-        taiThongKeFeedback()
+        download()
+        loadNote()
+        loadFeedbackStats()
     }, [])
 
-    const chonNhom = async (id) => {
-        setChon(id)
+    const selectGroup = async (id) => {
+        setSelected(id)
         try {
-            const {data} = await knowledgeApi.layTheoId(id)
-            setChiTiet(data.data)
+            const {data} = await knowledgeApi.getById(id)
+            setDetails(data.data)
         } catch {
         }
     }
 
-    const taoMoi = async () => {
-        if (!tenNhom.trim()) return
+    const create = async () => {
+        if (!groupName.trim()) return
         try {
-            await knowledgeApi.taoMoi({groupName: tenNhom, noteIds: []})
+            await knowledgeApi.create({groupName: groupName, noteIds: []})
             toast.success('Đã tạo nhóm mới')
-            setTenNhom('');
-            setHienForm(false)
-            tai()
+            setGroupName('');
+            setShowForm(false)
+            download()
         } catch {
             toast.error('Tạo thất bại')
         }
     }
 
-    const xoa = async (id) => {
+    const remove = async (id) => {
         if (!window.confirm('Xoá nhóm này?')) return
-        await knowledgeApi.xoa(id)
-        if (chon === id) {
-            setChon(null);
-            setChiTiet(null)
+        await knowledgeApi.remove(id)
+        if (select === id) {
+            setSelected(null);
+            setDetails(null)
         }
-        tai()
+        download()
         toast.success('Đã xoá nhóm')
     }
 
-    const capNhatNoteIds = async (noteIds) => {
-        if (!chiTiet) return
+    const updateNoteIds = async (noteIds) => {
+        if (!details) return
 
-        setDangLuuNhom(true)
+        setSavingGroup(true)
 
         try {
-            const {data} = await knowledgeApi.capNhat(chiTiet.id, {
-                groupName: chiTiet.groupName,
+            const {data} = await knowledgeApi.update(details.id, {
+                groupName: details.groupName,
                 noteIds,
             })
 
-            setChiTiet(data.data)
-            setDanhSach(p =>
+            setDetails(data.data)
+            setItems(p =>
                 p.map(g =>
                     g.id === data.data.id
                         ? {...g, noteCount: data.data.notes?.length || 0}
@@ -127,53 +127,53 @@ export default function Knowledge() {
             console.error(error)
             toast.error('Không thể cập nhật nhóm')
         } finally {
-            setDangLuuNhom(false)
+            setSavingGroup(false)
         }
     }
 
-    const themGhiChuVaoNhom = async (note) => {
-        if (!chiTiet) return
+    const addNoteToGroup = async (note) => {
+        if (!details) return
 
-        const currentIds = chiTiet.notes?.map(n => n.id) || []
+        const currentIds = details.notes?.map(n => n.id) || []
 
         if (currentIds.includes(note.id)) {
             toast.error('Ghi chú đã có trong nhóm')
             return
         }
 
-        await capNhatNoteIds([...currentIds, note.id])
+        await updateNoteIds([...currentIds, note.id])
     }
 
-    const goGhiChuKhoiNhom = async (noteId) => {
-        if (!chiTiet) return
+    const removeNoteFromGroup = async (noteId) => {
+        if (!details) return
 
-        const currentIds = chiTiet.notes?.map(n => n.id) || []
+        const currentIds = details.notes?.map(n => n.id) || []
         const nextIds = currentIds.filter(id => id !== noteId)
 
-        await capNhatNoteIds(nextIds)
+        await updateNoteIds(nextIds)
     }
 
-    const phanLoaiLai = async () => {
-        setDangPhanLoai(true)
+    const reclassify = async () => {
+        setClassifying(true)
         try {
-            await knowledgeApi.phanLoaiLai()
+            await knowledgeApi.reclassify()
             toast.success('AI đã phân loại lại toàn bộ ghi chú!')
-            tai()
+            download()
         } catch {
             toast.error('AI không phản hồi')
         }
-        setDangPhanLoai(false)
+        setClassifying(false)
     }
 
-    const guiFeedbackPhanLoai = async (note, correct) => {
-        if (!chiTiet || !note) return
+    const submitClassificationFeedback = async (note, correct) => {
+        if (!details || !note) return
 
-        let correctedGroupName = chiTiet.groupName
+        let correctedGroupName = details.groupName
 
         if (!correct) {
             const input = window.prompt(
-                `AI đã phân loại "${note.title}" vào nhóm "${chiTiet.groupName}".\nNhập tên nhóm đúng:`,
-                chiTiet.groupName
+                `AI đã phân loại "${note.title}" vào nhóm "${details.groupName}".\nNhập tên nhóm đúng:`,
+                details.groupName
             )
 
             if (input === null) return
@@ -186,20 +186,20 @@ export default function Knowledge() {
             }
         }
 
-        setDangGuiFeedbackIds(prev => {
+        setSubmittingFeedbackIds(prev => {
             const next = new Set(prev)
             next.add(note.id)
             return next
         })
 
         try {
-            await knowledgeApi.guiFeedbackPhanLoai({
+            await knowledgeApi.submitClassificationFeedback({
                 noteId: note.id,
-                groupId: chiTiet.id,
-                suggestedGroupName: chiTiet.groupName,
+                groupId: details.id,
+                suggestedGroupName: details.groupName,
                 correctedGroupName,
                 correct,
-                aiReasoning: chiTiet.aiReasoning,
+                aiReasoning: details.aiReasoning,
                 comment: correct
                     ? 'Người dùng xác nhận AI phân loại đúng'
                     : 'Người dùng sửa lại nhóm phân loại AI',
@@ -210,21 +210,21 @@ export default function Knowledge() {
                 : 'Đã ghi nhận và chuyển ghi chú sang nhóm đúng'
             )
 
-            await tai()
-            await taiThongKeFeedback()
+            await download()
+            await loadFeedbackStats()
 
-            if (chon) {
+            if (select) {
                 try {
-                    const { data } = await knowledgeApi.layTheoId(chon)
-                    setChiTiet(data.data)
+                    const { data } = await knowledgeApi.getById(select)
+                    setDetails(data.data)
                 } catch {
-                    setChiTiet(null)
+                    setDetails(null)
                 }
             }
         } catch (error) {
             toast.error(error.response?.data?.message || 'Không thể gửi đánh giá')
         } finally {
-            setDangGuiFeedbackIds(prev => {
+            setSubmittingFeedbackIds(prev => {
                 const next = new Set(prev)
                 next.delete(note.id)
                 return next
@@ -232,46 +232,46 @@ export default function Knowledge() {
         }
     }
 
-    const noteIdsTrongNhom = new Set(chiTiet?.notes?.map(n => n.id) || [])
+    const noteIdsInGroup = new Set(details?.notes?.map(n => n.id) || [])
 
-    const ghiChuCoTheThem = tatCaGhiChu.filter(note => {
+    const availableNotes = allNotes.filter(note => {
         const matchSearch =
-            !timGhiChu.trim() ||
-            note.title?.toLowerCase().includes(timGhiChu.toLowerCase()) ||
-            note.contentPreview?.toLowerCase().includes(timGhiChu.toLowerCase())
+            !noteSearch.trim() ||
+            note.title?.toLowerCase().includes(noteSearch.toLowerCase()) ||
+            note.contentPreview?.toLowerCase().includes(noteSearch.toLowerCase())
 
-        return matchSearch && !noteIdsTrongNhom.has(note.id)
+        return matchSearch && !noteIdsInGroup.has(note.id)
     })
     return (
         <div style={styles.wrap}>
-            {/* Trái: danh sách nhóm */}
+
             <div style={styles.left}>
                 <div style={styles.leftHeader}>
                     <span style={{fontSize: 12, fontWeight: 500}}>Nhóm kiến thức</span>
-                    <button className="btn-ghost" onClick={() => setHienForm(p => !p)} style={{padding: 4}}
+                    <button className="btn-ghost" onClick={() => setShowForm(p => !p)} style={{padding: 4}}
                             title="Tạo nhóm mới">
                         <IconPlus size={14}/>
                     </button>
                 </div>
 
-                {hienForm && (
+                {showForm && (
                     <div style={{padding: '8px 10px', borderBottom: '.5px solid var(--border)'}}>
-                        <input placeholder="Tên nhóm..." value={tenNhom}
-                               onChange={e => setTenNhom(e.target.value)}
-                               onKeyDown={e => e.key === 'Enter' && taoMoi()}
+                        <input placeholder="Tên nhóm..." value={groupName}
+                               onChange={e => setGroupName(e.target.value)}
+                               onKeyDown={e => e.key === 'Enter' && create()}
                                style={{fontSize: 12, marginBottom: 6}} autoFocus/>
                         <div style={{display: 'flex', gap: 5}}>
-                            <button className="btn-primary" onClick={taoMoi}
+                            <button className="btn-primary" onClick={create}
                                     style={{flex: 1, justifyContent: 'center', fontSize: 11}}>Tạo
                             </button>
-                            <button onClick={() => setHienForm(false)} style={{fontSize: 11}}>Huỷ</button>
+                            <button onClick={() => setShowForm(false)} style={{fontSize: 11}}>Huỷ</button>
                         </div>
                     </div>
                 )}
 
-                <button className="btn-ai" onClick={phanLoaiLai} disabled={dangPhanLoai}
+                <button className="btn-ai" onClick={reclassify} disabled={isClassifying}
                         style={{margin: '8px 10px 4px', justifyContent: 'center', padding: '6px'}}>
-                    {dangPhanLoai ? <Spinner size={12}/> : <IconSparkles size={12}/>}
+                    {isClassifying ? <Spinner size={12}/> : <IconSparkles size={12}/>}
                     AI phân loại lại tất cả
                 </button>
 
@@ -305,16 +305,16 @@ export default function Knowledge() {
                     </div>
                 )}
                 <div style={{flex: 1, overflowY: 'auto'}}>
-                    {dangTai
+                    {isLoading
                         ? <div style={{display: 'flex', justifyContent: 'center', padding: 20}}><Spinner/></div>
-                        : danhSach.length === 0
+                        : items.length === 0
                             ? <EmptyState icon={IconSitemap} title="Chưa có nhóm nào"
                                           desc='Nhấn "AI phân loại lại" để bắt đầu'/>
-                            : danhSach.map(g => (
-                                <div key={g.id} onClick={() => chonNhom(g.id)}
+                            : items.map(g => (
+                                <div key={g.id} onClick={() => selectGroup(g.id)}
                                      style={{
                                          ...styles.groupRow,
-                                         background: chon === g.id ? 'var(--bg-selected)' : 'transparent'
+                                         background: select === g.id ? 'var(--bg-selected)' : 'transparent'
                                      }}>
                                     <div style={{flex: 1}}>
                                         <div style={{fontSize: 12, fontWeight: 500}}>{g.groupName}</div>
@@ -326,7 +326,7 @@ export default function Knowledge() {
                                     </div>
                                     <button className="btn-ghost" onClick={e => {
                                         e.stopPropagation();
-                                        xoa(g.id)
+                                        remove(g.id)
                                     }} style={{padding: 3}}>
                                         <IconTrash size={11}/>
                                     </button>
@@ -335,9 +335,8 @@ export default function Knowledge() {
                 </div>
             </div>
 
-            {/* Phải: ghi chú trong nhóm */}
             <div style={styles.right}>
-                {!chon || !chiTiet
+                {!select || !details
                     ? <EmptyState icon={IconSitemap} title="Chọn nhóm để xem ghi chú"
                                   desc="Mỗi nhóm chứa các ghi chú cùng chủ đề được AI phân loại tự động"/>
                     : (
@@ -346,27 +345,27 @@ export default function Knowledge() {
                                 <IconSitemap size={18} style={{color: 'var(--accent-green)'}}/>
 
                                 <div style={{flex: 1}}>
-                                    <h2 style={{fontSize: 16, margin: 0}}>{chiTiet.groupName}</h2>
+                                    <h2 style={{fontSize: 16, margin: 0}}>{details.groupName}</h2>
 
-                                    {chiTiet.aiReasoning && (
+                                    {details.aiReasoning && (
                                         <p style={{fontSize: 11, color: 'var(--text-muted)', marginTop: 2}}>
-                                            AI: {chiTiet.aiReasoning}
+                                            AI: {details.aiReasoning}
                                         </p>
                                     )}
                                 </div>
 
-                                {chiTiet.suggestedByAi && <span className="tag tag-blue">AI gợi ý</span>}
+                                {details.suggestedByAi && <span className="tag tag-blue">AI gợi ý</span>}
 
                                 <button
                                     className="btn-primary"
-                                    onClick={() => setHienThemGhiChu(p => !p)}
+                                    onClick={() => setShowAddNote(p => !p)}
                                     style={{fontSize: 12, padding: '6px 10px'}}
                                 >
                                     <IconPlus size={13}/>
                                     Thêm ghi chú
                                 </button>
                             </div>
-                            {hienThemGhiChu && (
+                            {showAddNote && (
                                 <div style={styles.addBox}>
                                     <div style={styles.searchBox}>
                                         <IconSearch
@@ -381,20 +380,20 @@ export default function Knowledge() {
                                         />
 
                                         <input
-                                            value={timGhiChu}
-                                            onChange={e => setTimGhiChu(e.target.value)}
+                                            value={noteSearch}
+                                            onChange={e => setNoteSearch(e.target.value)}
                                             placeholder="Tìm ghi chú để thêm..."
                                             style={{paddingLeft: 28, fontSize: 12, height: 32}}
                                         />
                                     </div>
 
                                     <div style={styles.addList}>
-                                        {ghiChuCoTheThem.length === 0 ? (
+                                        {availableNotes.length === 0 ? (
                                             <div style={{fontSize: 12, color: 'var(--text-muted)', padding: 8}}>
                                                 Không còn ghi chú phù hợp để thêm
                                             </div>
                                         ) : (
-                                            ghiChuCoTheThem.map(note => (
+                                            availableNotes.map(note => (
                                                 <div key={note.id} style={styles.addNoteRow}>
                                                     <IconFileText size={13} style={{color: 'var(--text-muted)'}}/>
 
@@ -408,8 +407,8 @@ export default function Knowledge() {
 
                                                     <button
                                                         className="btn-ghost"
-                                                        onClick={() => themGhiChuVaoNhom(note)}
-                                                        disabled={dangLuuNhom}
+                                                        onClick={() => addNoteToGroup(note)}
+                                                        disabled={isSavingGroup}
                                                         style={{padding: '4px 8px', fontSize: 11}}
                                                     >
                                                         <IconCheck size={12}/>
@@ -421,11 +420,11 @@ export default function Knowledge() {
                                     </div>
                                 </div>
                             )}
-                            {chiTiet.notes?.length === 0
+                            {details.notes?.length === 0
                                 ? <EmptyState icon={IconFileText} title="Nhóm chưa có ghi chú"/>
                                 : (
                                     <div style={{display: 'flex', flexDirection: 'column', gap: 6, marginTop: 14}}>
-                                        {chiTiet.notes.map(n => (
+                                        {details.notes.map(n => (
                                             <div key={n.id} style={styles.noteCard}>
                                                 <IconFileText
                                                     size={13}
@@ -480,23 +479,23 @@ export default function Knowledge() {
 
                                                 <button
                                                     className="btn-ghost btn-danger"
-                                                    onClick={() => goGhiChuKhoiNhom(n.id)}
-                                                    disabled={dangLuuNhom}
+                                                    onClick={() => removeNoteFromGroup(n.id)}
+                                                    disabled={isSavingGroup}
                                                     style={{padding: 4, alignSelf: 'center'}}
                                                     title="Gỡ khỏi nhóm"
                                                 >
                                                     <IconX size={12}/>
                                                 </button>
 
-                                                {chiTiet.suggestedByAi && (
+                                                {details.suggestedByAi && (
                                                     <div style={styles.feedbackActions}>
                                                         <button
                                                             className="btn-ghost"
                                                             onClick={(e) => {
                                                                 e.stopPropagation()
-                                                                guiFeedbackPhanLoai(n, true)
+                                                                submitClassificationFeedback(n, true)
                                                             }}
-                                                            disabled={dangGuiFeedbackIds.has(n.id)}
+                                                            disabled={submittingFeedbackIds.has(n.id)}
                                                             style={styles.feedbackOkButton}
                                                             title="AI phân loại đúng"
                                                         >
@@ -507,9 +506,9 @@ export default function Knowledge() {
                                                             className="btn-ghost"
                                                             onClick={(e) => {
                                                                 e.stopPropagation()
-                                                                guiFeedbackPhanLoai(n, false)
+                                                                submitClassificationFeedback(n, false)
                                                             }}
-                                                            disabled={dangGuiFeedbackIds.has(n.id)}
+                                                            disabled={submittingFeedbackIds.has(n.id)}
                                                             style={styles.feedbackWrongButton}
                                                             title="AI phân loại sai"
                                                         >
@@ -527,7 +526,6 @@ export default function Knowledge() {
         </div>
     )
 }
-
 
 const styles = {
     wrap: {display: 'flex', flex: 1, overflow: 'hidden'},

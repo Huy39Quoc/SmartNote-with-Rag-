@@ -1,21 +1,21 @@
 import client from './client'
 
 const knowledgeApi = {
-    layTatCa:    ()          => client.get('/knowledge'),
-    layTheoId:   (id)        => client.get(`/knowledge/${id}`),
-    taoMoi:      (data)      => client.post('/knowledge', data),
-    capNhat:     (id, data)  => client.put(`/knowledge/${id}`, data),
-    xoa:         (id)        => client.delete(`/knowledge/${id}`),
-    phanLoai:    (data)      => client.post('/knowledge/classify', data),
-    phanLoaiLai: ()          => client.post('/knowledge/reclassify'),
+    getAll:    ()          => client.get('/knowledge'),
+    getById:   (id)        => client.get(`/knowledge/${id}`),
+    create:      (data)      => client.post('/knowledge', data),
+    update:     (id, data)  => client.put(`/knowledge/${id}`, data),
+    remove:         (id)        => client.delete(`/knowledge/${id}`),
+    classify:    (data)      => client.post('/knowledge/classify', data),
+    reclassify: ()          => client.post('/knowledge/reclassify'),
 
-    guiFeedbackPhanLoai: (data) =>
+    submitClassificationFeedback: (data) =>
         client.post('/knowledge/classification-feedback', data),
 
-    layThongKeFeedback: () =>
+    getFeedbackStats: () =>
         client.get('/knowledge/classification-feedback/stats'),
 
-    layDoThi: () =>
+    getGraph: () =>
         client.get('/knowledge/graph'),
 }
 

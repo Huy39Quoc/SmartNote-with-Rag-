@@ -1,7 +1,3 @@
-/**
- * SidebarNav — Navigation links in the middle of the sidebar
- * Tách riêng để dễ quản lý menu items, badges, admin links
- */
 import { NavLink } from 'react-router-dom'
 import {
   IconLayoutDashboard,
@@ -16,28 +12,15 @@ import {
   IconPackage,
 } from '@tabler/icons-react'
 import useAuthStore from '../../service/authStore'
+import { COMPACT_SIDEBAR_MENU } from '../../constants/layoutConstants'
 
-const menu = [
-  { to: '/overview',         label: 'Tổng quan',           icon: IconLayoutDashboard },
-  { to: '/service-packages', label: 'Gói Premium',          icon: IconPackage },
-  { to: '/notes',            label: 'Ghi chú',             icon: IconNotes },
-  { to: '/shared-notes',     label: 'Được chia sẻ',        icon: IconShare },
-  { to: '/chat',             label: 'Hỏi đáp AI',          icon: IconMessages },
-  { to: '/documents',        label: 'Tài liệu',            icon: IconFileText },
-  { to: '/shared-documents', label: 'TL được chia sẻ',    icon: IconShare },
-  { to: '/schedule',         label: 'Lịch & Deadline',     icon: IconCalendar },
-  { to: '/knowledge',        label: 'Kiến thức',           icon: IconShare },
-  { to: '/account',          label: 'Tài khoản',           icon: IconUser },
-  { to: '/notifications',    label: 'Thông báo',           icon: IconBell },
-]
-
-export default function SidebarNav({ soThongBaoChuaDoc = 0 }) {
-  const { laAdmin } = useAuthStore()
+export default function SidebarNav({ unreadNotificationCount = 0 }) {
+  const { isAdmin } = useAuthStore()
 
   return (
     <nav style={styles.nav}>
-      {menu.map(({ to, icon: Icon, label }) => {
-        const laThongBao = to === '/notifications'
+      {COMPACT_SIDEBAR_MENU.map(({ to, icon: Icon, label }) => {
+        const isNotification = to === '/notifications'
 
         return (
           <NavLink
@@ -49,16 +32,16 @@ export default function SidebarNav({ soThongBaoChuaDoc = 0 }) {
             <Icon size={17} />
             <span style={styles.label}>{label}</span>
 
-            {laThongBao && soThongBaoChuaDoc > 0 && (
+            {isNotification && unreadNotificationCount > 0 && (
               <span style={styles.badge}>
-                {soThongBaoChuaDoc > 99 ? '99+' : soThongBaoChuaDoc}
+                {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
               </span>
             )}
           </NavLink>
         )
       })}
 
-      {laAdmin() && (
+      {isAdmin() && (
         <>
           <div style={styles.divider} />
           <NavLink to="/admin" style={navStyle} className={({ isActive }) => isActive ? 'active' : ''}>
@@ -81,7 +64,7 @@ const navStyle = ({ isActive }) => ({
   gap: 9,
   padding: '8px 10px',
   borderRadius: 7,
-  fontSize: 14,            // tăng từ 13px
+  fontSize: 14,
   fontWeight: isActive ? 500 : 400,
   color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
   background: isActive ? 'var(--bg-elevated)' : 'transparent',

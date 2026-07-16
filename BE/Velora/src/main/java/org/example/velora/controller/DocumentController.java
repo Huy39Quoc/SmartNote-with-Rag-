@@ -22,10 +22,6 @@ public class DocumentController {
 
     private final DocumentService documentService;
 
-    /**
-     * Upload file: PDF, DOCX, TXT, hoặc Audio (mp3, wav, m4a, webm, ogg)
-     * FE gửi multipart/form-data với key "file"
-     */
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<DocumentResponse.Summary>> upload(
             @AuthenticationPrincipal UserDetailsImpl.UserDetailsWithId u,
@@ -34,10 +30,6 @@ public class DocumentController {
             documentService.upload(u.getUserId(), file)));
     }
 
-    /**
-     * Lấy kết quả transcript + ghi chú từ file audio đã upload
-     * Có thể tự động tạo Note từ transcript nếu createNote=true
-     */
     @PostMapping("/{id}/transcribe")
     public ResponseEntity<ApiResponse<DocumentResponse.AudioResult>> transcribe(
             @AuthenticationPrincipal UserDetailsImpl.UserDetailsWithId u,
@@ -67,11 +59,6 @@ public class DocumentController {
             documentService.ask(u.getUserId(), id, req)));
     }
 
-    /**
-     * Lịch sử hỏi đáp AI của tài liệu — DÙNG CHUNG cho chủ sở hữu và người
-     * được chia sẻ (thay vì lưu riêng từng người), để chia sẻ tài liệu thực
-     * sự có ý nghĩa: quyền VIEW xem được (canAsk=false), quyền EDIT hỏi được.
-     */
     @GetMapping("/{id}/chat")
     public ResponseEntity<ApiResponse<DocumentResponse.ChatHistory>> getChatHistory(
             @AuthenticationPrincipal UserDetailsImpl.UserDetailsWithId u,
@@ -109,11 +96,6 @@ public class DocumentController {
         return ResponseEntity.ok(ApiResponse.ok(documentService.getById(u.getUserId(), id)));
     }
 
-    /**
-     * Xem/tải file gốc đã upload (PDF, DOCX, TXT, audio...) - không phụ thuộc
-     * vào việc AI đã phân tích/tóm tắt xong hay chưa. Cho phép cả chủ sở hữu
-     * lẫn người được chia sẻ (VIEW hoặc EDIT).
-     */
     @GetMapping("/{id}/file")
     public ResponseEntity<org.springframework.core.io.Resource> getFile(
             @AuthenticationPrincipal UserDetailsImpl.UserDetailsWithId u,

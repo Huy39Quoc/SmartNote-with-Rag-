@@ -5,38 +5,38 @@ import useAuthStore from '../../service/authStore'
 import logo from '../../assets/logo.svg'
 
 export default function Register() {
-  const [form, setForm] = useState({ hoTen: '', email: '', matKhau: '', xacNhan: '' })
-  const [hienMatKhau, setHienMatKhau] = useState(false)
-  const [loi, setLoi] = useState({})
-  const { dangKy, dangTai } = useAuthStore()
+  const [form, setForm] = useState({ fullName: '', email: '', password: '', confirm: '' })
+  const [showPassword, setShowPassword] = useState(false)
+  const [errors, setErrors] = useState({})
+  const { register, isLoading } = useAuthStore()
   const navigate = useNavigate()
 
   const validate = () => {
     const e = {}
-      if (!form.hoTen.trim()) e.hoTen = 'Vui lòng nhập họ tên'
+      if (!form.fullName.trim()) e.fullName = 'Vui lòng nhập họ tên'
     if (!form.email)    e.email  = 'Vui lòng nhập email'
     else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Email không hợp lệ'
-    if (!form.matKhau)  e.matKhau = 'Vui lòng nhập mật khẩu'
-    else if (form.matKhau.length < 6) e.matKhau = 'Mật khẩu ít nhất 6 ký tự'
-    else if (form.matKhau !== form.matKhau.trim()) {
-        e.matKhau = 'Mật khẩu không được bắt đầu hoặc kết thúc bằng khoảng trắng'
+    if (!form.password)  e.password = 'Vui lòng nhập mật khẩu'
+    else if (form.password.length < 6) e.password = 'Mật khẩu ít nhất 6 ký tự'
+    else if (form.password !== form.password.trim()) {
+        e.password = 'Mật khẩu không được bắt đầu hoặc kết thúc bằng khoảng trắng'
     }
-    if (form.xacNhan !== form.matKhau) e.xacNhan = 'Mật khẩu không khớp'
+    if (form.confirm !== form.password) e.confirm = 'Mật khẩu không khớp'
     return e
   }
 
-  const xuLyDangKy = async e => {
+  const handleRegister = async e => {
       e.preventDefault()
       const err = validate()
       if (Object.keys(err).length) {
-          setLoi(err);
+          setErrors(err);
           return
       }
 
-      const ok = await dangKy(
+      const ok = await register(
           form.email.trim().toLowerCase(),
-          form.matKhau,
-          form.hoTen.trim()
+          form.password,
+          form.fullName.trim()
       )
 
         if (ok) {
@@ -64,11 +64,11 @@ export default function Register() {
       <div className="flex items-center justify-center p-10" style={{ width: 440 }}>
         <div className="w-full">
           <h2 style={{ marginBottom: 6, fontSize: 22, fontWeight: 700, color: 'var(--text-primary)' }}>Tạo tài khoản</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 24 }}>Điền thông tin để đăng ký</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 24 }}>Điền thông message để đăng ký</p>
 
-          <form onSubmit={xuLyDangKy} noValidate>
+          <form onSubmit={handleRegister} noValidate>
             {[
-              { key: 'hoTen',   label: 'Họ và tên',       type: 'text',     placeholder: 'Nguyễn Văn A' },
+              { key: 'fullName',   label: 'Họ và tên',       type: 'text',     placeholder: 'Nguyễn Văn A' },
               { key: 'email',   label: 'Email',            type: 'email',    placeholder: 'ban@example.com' },
             ].map(({ key, label, type, placeholder }) => (
               <div key={key} style={styles.field}>
@@ -77,37 +77,37 @@ export default function Register() {
                   value={form[key]}
                   onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
                   className="rounded-xl"
-                  style={loi[key] ? styles.inputLoi : {}} />
-                {loi[key] && <span style={styles.loiText}>{loi[key]}</span>}
+                  style={errors[key] ? styles.inputLoi : {}} />
+                {errors[key] && <span style={styles.errorText}>{errors[key]}</span>}
               </div>
             ))}
 
-            {['matKhau', 'xacNhan'].map(key => (
+            {['password', 'confirm'].map(key => (
               <div key={key} style={styles.field}>
-                <label style={styles.label}>{key === 'matKhau' ? 'Mật khẩu' : 'Xác nhận mật khẩu'}</label>
+                <label style={styles.label}>{key === 'password' ? 'Mật khẩu' : 'Xác nhận mật khẩu'}</label>
                 <div style={{ position: 'relative' }}>
-                  <input type={hienMatKhau ? 'text' : 'password'}
-                    placeholder={key === 'matKhau' ? 'Ít nhất 6 ký tự' : 'Nhập lại mật khẩu'}
+                  <input type={showPassword ? 'text' : 'password'}
+                    placeholder={key === 'password' ? 'Ít nhất 6 ký tự' : 'Nhập lại mật khẩu'}
                     value={form[key]}
                     onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
                     className="rounded-xl"
-                    style={{ ...loi[key] ? styles.inputLoi : {}, paddingRight: 36 }} />
-                  {key === 'matKhau' && (
+                    style={{ ...errors[key] ? styles.inputLoi : {}, paddingRight: 36 }} />
+                  {key === 'password' && (
                     <button type="button" className="btn-ghost"
-                      onClick={() => setHienMatKhau(p => !p)}
+                      onClick={() => setShowPassword(p => !p)}
                       style={styles.eyeBtn}>
-                      {hienMatKhau ? <IconEyeOff size={14} /> : <IconEye size={14} />}
+                      {showPassword ? <IconEyeOff size={14} /> : <IconEye size={14} />}
                     </button>
                   )}
                 </div>
-                {loi[key] && <span style={styles.loiText}>{loi[key]}</span>}
+                {errors[key] && <span style={styles.errorText}>{errors[key]}</span>}
               </div>
             ))}
 
             <button type="submit" className="btn-primary rounded-xl"
               style={{ width: '100%', justifyContent: 'center', padding: 11, marginTop: 8 }}
-              disabled={dangTai}>
-              {dangTai ? <><div className="spinner" style={{ width: 14, height: 14 }} />Đang đăng ký...</> : 'Tạo tài khoản'}
+              disabled={isLoading}>
+              {isLoading ? <><div className="spinner" style={{ width: 14, height: 14 }} />Đang đăng ký...</> : 'Tạo tài khoản'}
             </button>
           </form>
 
@@ -130,6 +130,6 @@ const styles = {
   field: { marginBottom: 14 },
   label: { display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 5 },
   inputLoi: { borderColor: 'var(--accent-red)' },
-  loiText: { fontSize: 11, color: 'var(--accent-red)', marginTop: 3, display: 'block' },
+  errorText: { fontSize: 11, color: 'var(--accent-red)', marginTop: 3, display: 'block' },
   eyeBtn: { position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', border: 'none', padding: 4 },
 }

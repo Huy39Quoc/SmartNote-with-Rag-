@@ -47,7 +47,6 @@ public class ChatSession {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // Relationships
     @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("createdAt ASC")
     @Builder.Default

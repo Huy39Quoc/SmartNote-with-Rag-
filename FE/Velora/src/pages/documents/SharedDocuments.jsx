@@ -2,9 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
     IconFolderShare,
-    IconSearch,
-    IconEye,
-    IconEdit,
     IconUser,
     IconClock,
     IconFile,
@@ -14,25 +11,13 @@ import {
 } from '@tabler/icons-react'
 import documentApi from '../../lib/api/documentApi'
 import Spinner from '../../components/ui/Spinner'
-import EmptyState from '../../components/ui/EmptyState'
+import PageHeader from '../../components/ui/PageHeader'
+import SearchField from '../../components/ui/SearchField'
+import AsyncContent from '../../components/ui/AsyncContent'
+import PermissionBadge from '../../components/ui/PermissionBadge'
+import OwnerSummary from '../../components/ui/OwnerSummary'
+import { formatFileSize, formatLocalDate } from '../../utils/formatters'
 import toast from 'react-hot-toast'
-
-const formatBytes = (bytes) => {
-    if (!bytes && bytes !== 0) return ''
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
-const formatNgay = (value) => {
-    if (!value) return ''
-    try {
-        return new Date(value).toLocaleDateString('vi-VN', {
-            day: '2-digit', month: '2-digit', year: 'numeric',
-            hour: '2-digit', minute: '2-digit',
-        })
-    } catch { return '' }
-}
 
 const fileIconOf = (type) => {
     if (type === 'AUDIO') return IconFileMusic
@@ -40,148 +25,116 @@ const fileIconOf = (type) => {
     return IconFile
 }
 
-const permissionInfo = (permission) => {
-    if (permission === 'EDIT')
-        return { label: 'Có thể chỉnh sửa', icon: IconEdit, className: 'tag-blue' }
-    return { label: 'Chỉ xem', icon: IconEye, className: 'tag-dim' }
-}
-
 export default function SharedDocuments() {
     const navigate = useNavigate()
-    const [danhSach, setDanhSach] = useState([])
-    const [dangTai, setDangTai] = useState(true)
-    const [tuKhoa, setTuKhoa] = useState('')
-    const [chiTietMo, setChiTietMo] = useState(null)
-    const [chiTietDuLieu, setChiTietDuLieu] = useState(null)
-    const [dangTaiChiTiet, setDangTaiChiTiet] = useState(false)
-    const [dangMoFile, setDangMoFile] = useState(false)
+    const [items, setItems] = useState([])
+    const [isLoading, setLoading] = useState(true)
+    const [keyword, setKeyword] = useState('')
+    const [isDetailOpen, setDetailOpen] = useState(null)
+    const [detailData, setDetailData] = useState(null)
+    const [isLoadingDetails, setLoadingDetails] = useState(false)
+    const [isOpeningFile, setOpeningFile] = useState(false)
 
-    const taiDuLieu = async () => {
-        setDangTai(true)
+    const loadData = async () => {
+        setLoading(true)
         try {
-            const { data } = await documentApi.layTaiLieuDuocChiaSe()
-            setDanhSach(data.data || [])
+            const { data } = await documentApi.getSharedDocuments()
+            setItems(data.data || [])
         } catch (error) {
             toast.error(error.response?.data?.message || 'Không thể tải danh sách tài liệu được chia sẻ')
         } finally {
-            setDangTai(false)
+            setLoading(false)
         }
     }
 
-    useEffect(() => { taiDuLieu() }, [])
+    useEffect(() => { loadData() }, [])
 
-    const danhSachLoc = useMemo(() => {
-        const keyword = tuKhoa.trim().toLowerCase()
-        if (!keyword) return danhSach
-        return danhSach.filter(item => {
+    const filteredItems = useMemo(() => {
+        const normalizedKeyword = keyword.trim().toLowerCase()
+        if (!normalizedKeyword) return items
+        return items.filter(item => {
             const name = item.documentName?.toLowerCase() || ''
             const ownerEmail = item.ownerEmail?.toLowerCase() || ''
             const ownerName = item.ownerFullName?.toLowerCase() || ''
-            return name.includes(keyword) || ownerEmail.includes(keyword) || ownerName.includes(keyword)
+            return name.includes(normalizedKeyword) || ownerEmail.includes(normalizedKeyword) || ownerName.includes(normalizedKeyword)
         })
-    }, [danhSach, tuKhoa])
+    }, [items, keyword])
 
-    const moChiTiet = async (item) => {
-        setChiTietMo(item)
-        setChiTietDuLieu(null)
-        setDangTaiChiTiet(true)
+    const openDetails = async (item) => {
+        setDetailOpen(item)
+        setDetailData(null)
+        setLoadingDetails(true)
         try {
-            const { data } = await documentApi.layTheoId(item.documentId)
-            setChiTietDuLieu(data.data)
+            const { data } = await documentApi.getById(item.documentId)
+            setDetailData(data.data)
         } catch (error) {
             toast.error(error.response?.data?.message || 'Không thể tải chi tiết tài liệu')
-            setChiTietMo(null)
+            setDetailOpen(null)
         } finally {
-            setDangTaiChiTiet(false)
+            setLoadingDetails(false)
         }
     }
 
-    const dongChiTiet = () => { setChiTietMo(null); setChiTietDuLieu(null) }
+    const closeDetails = () => { setDetailOpen(null); setDetailData(null) }
 
-    const xemFileGoc = async (documentId, fallbackName) => {
-        setDangMoFile(true)
+    const viewOriginalFile = async (documentId, fallbackName) => {
+        setOpeningFile(true)
         try {
-            const { data } = await documentApi.layFile(documentId)
+            const { data } = await documentApi.getFile(documentId)
             const url = URL.createObjectURL(data)
             window.open(url, '_blank')
             setTimeout(() => URL.revokeObjectURL(url), 60000)
         } catch (error) {
             toast.error(error.response?.data?.message || `Không thể mở file${fallbackName ? ` "${fallbackName}"` : ''}`)
         } finally {
-            setDangMoFile(false)
+            setOpeningFile(false)
         }
     }
 
     return (
         <div style={styles.page}>
             <div style={styles.inner}>
-                <div style={styles.header}>
-                    <div>
-                        <h2 style={styles.title}>
-                            <IconFolderShare size={20} />
-                            Tài liệu được chia sẻ với tôi
-                        </h2>
-                        <p style={styles.subtitle}>
-                            Những tài liệu người khác đã chia sẻ cho bạn. Nhấn vào để xem tóm tắt và nội dung.
-                        </p>
-                    </div>
-                    <button className="btn-ghost" onClick={taiDuLieu} style={{ fontSize: 12 }}>
-                        Làm mới
-                    </button>
-                </div>
+                <PageHeader
+                    icon={IconFolderShare}
+                    title="Tài liệu được chia sẻ với tôi"
+                    description="Những tài liệu người khác đã chia sẻ cho bạn. Nhấn vào để xem tóm tắt và nội dung."
+                    action={<button className="btn-ghost" onClick={loadData} style={{ fontSize: 12 }}>Làm mới</button>}
+                />
 
-                <div style={styles.searchBox}>
-                    <IconSearch size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                    <input
-                        value={tuKhoa}
-                        onChange={e => setTuKhoa(e.target.value)}
-                        placeholder="Tìm theo tên tài liệu, email hoặc tên người chia sẻ..."
-                        style={styles.searchInput}
-                    />
-                </div>
+                <SearchField
+                    value={keyword}
+                    onChange={setKeyword}
+                    placeholder="Tìm theo tên tài liệu, email hoặc tên người chia sẻ..."
+                />
 
-                {dangTai ? (
-                    <div style={styles.loadingBox}><Spinner size={24} /></div>
-                ) : danhSachLoc.length === 0 ? (
-                    <div style={styles.emptyBox}>
-                        <EmptyState
-                            icon={IconFolderShare}
-                            title="Chưa có tài liệu được chia sẻ"
-                            desc="Khi người khác chia sẻ tài liệu cho bạn, danh sách sẽ hiển thị ở đây."
-                        />
-                    </div>
-                ) : (
+                <AsyncContent
+                    loading={isLoading}
+                    empty={filteredItems.length === 0}
+                    emptyState={{
+                        icon: IconFolderShare,
+                        title: 'Chưa có tài liệu được chia sẻ',
+                        desc: 'Khi người khác chia sẻ tài liệu cho bạn, danh sách sẽ hiển thị ở đây.',
+                    }}
+                >
                     <div style={styles.grid}>
-                        {danhSachLoc.map(item => {
-                            const info = permissionInfo(item.permission)
-                            const PermissionIcon = info.icon
+                        {filteredItems.map(item => {
                             const FileIcon = fileIconOf(item.documentFileType)
                             return (
-                                <div key={item.id} style={styles.card} onClick={() => moChiTiet(item)}>
+                                <div key={item.id} style={styles.card} onClick={() => openDetails(item)}>
                                     <div style={styles.cardTop}>
                                         <div style={styles.docIcon}><FileIcon size={17} /></div>
-                                        <span className={`tag ${info.className}`} style={styles.permissionTag}>
-                                            <PermissionIcon size={11} />{info.label}
-                                        </span>
+                                        <PermissionBadge permission={item.permission} />
                                     </div>
 
                                     <div style={styles.docTitle}>
                                         {item.documentName || 'Tài liệu không có tên'}
                                     </div>
 
-                                    <div style={styles.ownerBox}>
-                                        <div style={styles.ownerAvatar}>
-                                            {item.ownerFullName?.[0]?.toUpperCase() || item.ownerEmail?.[0]?.toUpperCase() || 'U'}
-                                        </div>
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={styles.ownerName}>{item.ownerFullName || 'Người dùng'}</div>
-                                            <div style={styles.ownerEmail}>{item.ownerEmail}</div>
-                                        </div>
-                                    </div>
+                                    <OwnerSummary name={item.ownerFullName} email={item.ownerEmail} />
 
                                     <div style={styles.metaRow}>
-                                        <span style={styles.metaItem}><IconUser size={12} />{formatBytes(item.fileSize)}</span>
-                                        <span style={styles.metaItem}><IconClock size={12} />{formatNgay(item.createdAt)}</span>
+                                        <span style={styles.metaItem}><IconUser size={12} />{formatFileSize(item.fileSize)}</span>
+                                        <span style={styles.metaItem}><IconClock size={12} />{formatLocalDate(item.createdAt)}</span>
                                     </div>
 
                                     <button
@@ -195,66 +148,66 @@ export default function SharedDocuments() {
                             )
                         })}
                     </div>
-                )}
+                </AsyncContent>
             </div>
 
-            {chiTietMo && (
-                <div style={styles.modalOverlay} onClick={dongChiTiet}>
+            {isDetailOpen && (
+                <div style={styles.modalOverlay} onClick={closeDetails}>
                     <div style={styles.modal} onClick={e => e.stopPropagation()}>
                         <div style={styles.modalHeader}>
-                            <span style={styles.modalTitle}>{chiTietMo.documentName || 'Tài liệu'}</span>
-                            <button className="btn-icon" onClick={dongChiTiet}><IconX size={18} /></button>
+                            <span style={styles.modalTitle}>{isDetailOpen.documentName || 'Tài liệu'}</span>
+                            <button className="btn-icon" onClick={closeDetails}><IconX size={18} /></button>
                         </div>
 
-                        {dangTaiChiTiet ? (
+                        {isLoadingDetails ? (
                             <div style={styles.loadingBox}><Spinner size={22} /></div>
-                        ) : chiTietDuLieu ? (
+                        ) : detailData ? (
                             <div style={styles.modalBody}>
                                 <div style={styles.modalMetaGrid}>
                                     <div>
                                         <div style={styles.metaLabel}>Loại file</div>
-                                        <div style={styles.metaValue}>{chiTietDuLieu.fileType}</div>
+                                        <div style={styles.metaValue}>{detailData.fileType}</div>
                                     </div>
                                     <div>
                                         <div style={styles.metaLabel}>Kích thước</div>
-                                        <div style={styles.metaValue}>{formatBytes(chiTietDuLieu.fileSize)}</div>
+                                        <div style={styles.metaValue}>{formatFileSize(detailData.fileSize)}</div>
                                     </div>
                                     <div>
                                         <div style={styles.metaLabel}>Trạng thái</div>
-                                        <div style={styles.metaValue}>{chiTietDuLieu.status}</div>
+                                        <div style={styles.metaValue}>{detailData.status}</div>
                                     </div>
                                     <div>
                                         <div style={styles.metaLabel}>Ngày tải lên</div>
-                                        <div style={styles.metaValue}>{formatNgay(chiTietDuLieu.uploadedAt)}</div>
+                                        <div style={styles.metaValue}>{formatLocalDate(detailData.uploadedAt)}</div>
                                     </div>
                                 </div>
 
                                 <div style={styles.section}>
                                     <button
                                         className="btn-primary"
-                                        onClick={() => xemFileGoc(chiTietDuLieu.id, chiTietMo.documentName)}
-                                        disabled={dangMoFile}
+                                        onClick={() => viewOriginalFile(detailData.id, isDetailOpen.documentName)}
+                                        disabled={isOpeningFile}
                                         style={{ justifyContent: 'center', width: '100%' }}
                                     >
-                                        {dangMoFile ? 'Đang mở file...' : 'Xem / tải file gốc'}
+                                        {isOpeningFile ? 'Đang mở file...' : 'Xem / tải file gốc'}
                                     </button>
                                 </div>
 
-                                {chiTietDuLieu.aiSummary && (
+                                {detailData.aiSummary && (
                                     <div style={styles.section}>
                                         <div style={styles.sectionTitle}>Tóm tắt AI</div>
-                                        <div style={styles.sectionText}>{chiTietDuLieu.aiSummary}</div>
+                                        <div style={styles.sectionText}>{detailData.aiSummary}</div>
                                     </div>
                                 )}
 
-                                {chiTietDuLieu.audioTranscript && (
+                                {detailData.audioTranscript && (
                                     <div style={styles.section}>
                                         <div style={styles.sectionTitle}>Transcript âm thanh</div>
-                                        <div style={styles.sectionText}>{chiTietDuLieu.audioTranscript}</div>
+                                        <div style={styles.sectionText}>{detailData.audioTranscript}</div>
                                     </div>
                                 )}
 
-                                {!chiTietDuLieu.aiSummary && !chiTietDuLieu.audioTranscript && (
+                                {!detailData.aiSummary && !detailData.audioTranscript && (
                                     <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>
                                         Tài liệu này chưa có tóm tắt hoặc transcript AI — nhưng bạn vẫn có thể xem file gốc ở trên.
                                     </div>

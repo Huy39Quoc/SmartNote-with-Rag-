@@ -17,7 +17,7 @@ public class LmStudioResponse {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Choice {
         private Message message;
-        /** LM Studio trả về "finish_reason" (snake_case) */
+
         @JsonProperty("finish_reason")
         private String finishReason;
         private int index;

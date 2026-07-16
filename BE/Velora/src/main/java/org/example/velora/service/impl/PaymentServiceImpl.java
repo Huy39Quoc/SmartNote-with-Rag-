@@ -43,10 +43,6 @@ public class PaymentServiceImpl implements PaymentService {
     @Value("${vnpay.return-url:http://localhost:5173/service-packages}") private String returnUrl;
     @Value("${vnpay.callback-url:http://localhost:8080/api/packages/vnpay-callback}") private String callbackUrl;
 
-    // =========================================================
-    // PUBLIC API
-    // =========================================================
-
     @Override
     @Transactional
     public ApiResponse<?> checkout(UUID packageId, String billingType, HttpServletRequest request) {
@@ -58,7 +54,6 @@ public class PaymentServiceImpl implements PaymentService {
         String normalizedType = normalizeBillingType(billingType);
         BigDecimal price = resolvePrice(pkg, normalizedType);
 
-        // Gói Free / giá 0 → kích hoạt luôn, không qua VNPay
         if (price.compareTo(BigDecimal.ZERO) <= 0) {
             activateFreePackage(user, pkg);
             Map<String, Object> data = Map.of(
@@ -69,7 +64,6 @@ public class PaymentServiceImpl implements PaymentService {
             return ApiResponse.ok(data);
         }
 
-        // Tạo transaction pending
         String txnRef = "VELORA" + System.currentTimeMillis();
         packageTransactionRepository.save(
                 PackageTransaction.builder()
@@ -78,10 +72,10 @@ public class PaymentServiceImpl implements PaymentService {
                         .packageService(pkg)
                         .amount(price)
                         .status("PENDING")
+                        .billingType(normalizedType)
                         .build()
         );
 
-        // Build VNPay payment URL
         String paymentUrl = buildPaymentUrl(txnRef, price, request);
 
         Map<String, Object> data = Map.of(
@@ -120,11 +114,14 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         PackageTransaction tx = txOpt.get();
+        tx.setResponseCode(responseCode);
+        tx.setBankCode(params.get("vnp_BankCode"));
 
         if ("PENDING".equals(tx.getStatus())) {
             if ("00".equals(responseCode)) {
                 tx.setStatus("SUCCESS");
                 tx.setVnpayTranNo(params.get("vnp_TransactionNo"));
+                tx.setPayDate(parseVnpDate(params.get("vnp_PayDate")));
                 activatePaidPackage(tx);
             } else {
                 tx.setStatus("FAILED");
@@ -139,10 +136,6 @@ public class PaymentServiceImpl implements PaymentService {
 
 return returnUrl + "?status=" + tx.getStatus().toLowerCase();
     }
-
-    // =========================================================
-    // PRIVATE HELPERS
-    // =========================================================
 
     private User currentUser() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -171,10 +164,17 @@ return returnUrl + "?status=" + tx.getStatus().toLowerCase();
                 ? null
                 : BigDecimal.valueOf(pkg.getPriceYearly());
 
-        boolean isYearly = yearlyPrice != null && tx.getAmount().compareTo(yearlyPrice) == 0;
+        boolean isYearly = "yearly".equalsIgnoreCase(tx.getBillingType())
+                || (tx.getBillingType() == null && yearlyPrice != null && tx.getAmount().compareTo(yearlyPrice) == 0);
         user.setPackageExpiryDate(isYearly ? base.plusYears(1) : base.plusMonths(1));
 
         userRepository.save(user);
+    }
+
+    private LocalDateTime parseVnpDate(String value) {
+        if (value == null || value.isBlank()) return null;
+        try { return LocalDateTime.parse(value, DateTimeFormatter.ofPattern("yyyyMMddHHmmss")); }
+        catch (Exception ignored) { return null; }
     }
 
     private BigDecimal resolvePrice(PackageService pkg, String billingType) {

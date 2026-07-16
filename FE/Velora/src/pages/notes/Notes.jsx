@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
     IconBookmark,
@@ -34,63 +34,64 @@ import toast from 'react-hot-toast'
 import useAuthStore from '../../service/authStore'
 import { hasFeature, getUpgradeMessage } from '../../utils/packageFeatures'
 import { hasRichTextContent, richTextToPlainText } from '../../utils/richText'
+import { DEFAULT_NOTE_TITLE } from '../../constants/noteConstants'
 
 export default function Notes() {
     const { id: idParam } = useParams()
     const navigate = useNavigate()
-    const { nguoiDung } = useAuthStore()
+    const { user } = useAuthStore()
 
-    const coTinhNang = (featureCode) => hasFeature(nguoiDung, featureCode)
+    const hasPackageFeature = (featureCode) => hasFeature(user, featureCode)
 
-    const [danhSach, setDanhSach] = useState([])
-    const [ghiChuHienTai, setGhiChuHienTai] = useState(null)
+    const [items, setItems] = useState([])
+    const [currentNote, setCurrentNote] = useState(null)
 
-    const accessMode = ghiChuHienTai?.accessMode || 'OWNER'
-    const laChuSoHuu = accessMode === 'OWNER'
-    const coTheChinhSua = accessMode === 'OWNER' || accessMode === 'EDIT'
+    const accessMode = currentNote?.accessMode || 'OWNER'
+    const isOwner = accessMode === 'OWNER'
+    const canEdit = accessMode === 'OWNER' || accessMode === 'EDIT'
 
     const [tags, setTags] = useState([])
-    const [timKiem, setTimKiem] = useState('')
-    const [dangTai, setDangTai] = useState(true)
-    const [dangLuu, setDangLuu] = useState(false)
+    const [search, setSearch] = useState('')
+    const [isLoading, setLoading] = useState(true)
+    const [isSaving, setSaving] = useState(false)
 
-    const [hienAi, setHienAi] = useState(false)
-    const [hienSoDo, setHienSoDo] = useState(false)
-    const [hienTag, setHienTag] = useState(false)
-    const [hienShare, setHienShare] = useState(false)
-    const [hienLichSu, setHienLichSu] = useState(false)
-    const [hienLichGoiY, setHienLichGoiY] = useState(false)
+    const [showAi, setShowAi] = useState(false)
+    const [showDiagram, setShowDiagram] = useState(false)
+    const [showTag, setShowTag] = useState(false)
+    const [showShare, setShowShare] = useState(false)
+    const [showHistory, setShowHistory] = useState(false)
+    const [showSuggestedSchedule, setShowSuggestedSchedule] = useState(false)
 
-    const [dangTrichLich, setDangTrichLich] = useState(false)
-    const [locTag, setLocTag] = useState(null)
-    const [locNhanh, setLocNhanh] = useState('ALL')
+    const [isExtractingSchedule, setExtractingSchedule] = useState(false)
+    const [tagFilter, setTagFilter] = useState(null)
+    const [quickFilter, setQuickFilter] = useState('ALL')
 
-    const [tenTagMoi, setTenTagMoi] = useState('')
-    const [mauTagMoi, setMauTagMoi] = useState('#3B82F6')
-    const [noteDaTaoLichIds, setNoteDaTaoLichIds] = useState(new Set())
+    const [newTagName, setNewTagName] = useState('')
+    const [newTagColor, setNewTagColor] = useState('#3B82F6')
+    const [scheduledNoteIds, setScheduledNoteIds] = useState(new Set())
 
-    const [dangTaoFlashcard, setDangTaoFlashcard] = useState(false)
+    const [isCreatingFlashcards, setCreatingFlashcards] = useState(false)
 
-    const [hienChecklistModal, setHienChecklistModal] = useState(false)
+    const [showChecklistModal, setShowChecklistModal] = useState(false)
     const [checklistItems, setChecklistItems] = useState([])
     const [checklistDeadline, setChecklistDeadline] = useState('')
     const [checklistPriority, setChecklistPriority] = useState('MEDIUM')
-    const [dangTaoChecklistTask, setDangTaoChecklistTask] = useState(false)
+    const [isCreatingChecklistTask, setCreatingChecklistTask] = useState(false)
 
     const [shareEmail, setShareEmail] = useState('')
     const [sharePermission, setSharePermission] = useState('VIEW')
     const [shareList, setShareList] = useState([])
-    const [dangShare, setDangShare] = useState(false)
-    const [dangDoiQuyenShareId, setDangDoiQuyenShareId] = useState(null)
-    const [lichSuPhienBan, setLichSuPhienBan] = useState([])
-    const [dangTaiLichSu, setDangTaiLichSu] = useState(false)
-    const [dangKhoiPhucVersionId, setDangKhoiPhucVersionId] = useState(null)
+    const [isSharing, setSharing] = useState(false)
+    const [changingSharePermissionId, setChangingSharePermissionId] = useState(null)
+    const [versionHistory, setVersionHistory] = useState([])
+    const [isLoadingHistory, setLoadingHistory] = useState(false)
+    const [restoringVersionId, setRestoringVersionId] = useState(null)
 
-    const banDaLuuRef = useRef('')
+    const savedVersionRef = useRef('')
     const idParamRef = useRef(idParam)
-    const ghiChuHienTaiRef = useRef(ghiChuHienTai)
+    const currentNoteRef = useRef(currentNote)
     const richTextEditorRef = useRef(null)
-    const autoTitleXuLyRef = useRef(new Set())
+    const processedAutoTitleIdsRef = useRef(new Set())
     const editorSessionIdRef = useRef(
         window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`
     )
@@ -100,10 +101,10 @@ export default function Notes() {
     }, [idParam])
 
     useEffect(() => {
-        ghiChuHienTaiRef.current = ghiChuHienTai
-    }, [ghiChuHienTai])
+        currentNoteRef.current = currentNote
+    }, [currentNote])
 
-    const taoDauMocGhiChu = useCallback((note) => {
+    const createNoteMilestone = useCallback((note) => {
         if (!note) return ''
 
         const tagIds = (note.tags || [])
@@ -119,7 +120,7 @@ export default function Notes() {
         })
     }, [])
 
-    const layPlainText = (html) => {
+    const getPlainText = (html) => {
         try {
             return richTextToPlainText(html || '')
         } catch {
@@ -127,13 +128,25 @@ export default function Notes() {
         }
     }
 
-    const layPreview = (note) => {
-        const text = layPlainText(note?.content || '').trim()
-        if (!text) return 'Chưa có nội dung'
-        return text.length > 110 ? `${text.slice(0, 110)}...` : text
+    const getPreview = (note) => {
+        const previewFromApi = String(note?.contentPreview || '').trim()
+
+        if (previewFromApi) {
+            return previewFromApi.length > 110
+                ? `${previewFromApi.slice(0, 110)}...`
+                : previewFromApi
+        }
+
+        const text = getPlainText(note?.content || '').trim()
+
+        if (text) {
+            return text.length > 110 ? `${text.slice(0, 110)}...` : text
+        }
+
+        return 'Chưa có nội dung'
     }
 
-    const parseNgayTuApi = (raw) => {
+    const parseApiDate = (raw) => {
         if (!raw) return null
 
         if (raw instanceof Date) return raw
@@ -146,12 +159,12 @@ export default function Notes() {
         return Number.isNaN(date.getTime()) ? null : date
     }
 
-    const layNgayCapNhat = (note) => {
+    const getUpdatedDate = (note) => {
         const raw = note?.updatedAt || note?.createdAt
 
         if (!raw) return 'Vừa xong'
 
-        const date = parseNgayTuApi(raw)
+        const date = parseApiDate(raw)
 
         if (!date) return 'Vừa xong'
 
@@ -168,118 +181,118 @@ export default function Notes() {
         return date.toLocaleDateString('vi-VN')
     }
 
-    const demTu = (html) => {
-        const text = layPlainText(html || '').trim()
+    const wordCount = (html) => {
+        const text = getPlainText(html || '').trim()
         if (!text) return 0
         return text.split(/\s+/).filter(Boolean).length
     }
 
-    const capNhatTruongGhiChu = (field, value) => {
-        if (!coTheChinhSua) return
+    const updateNoteField = (field, value) => {
+        if (!canEdit) return
 
-        setGhiChuHienTai(p => ({
+        setCurrentNote(p => ({
             ...p,
             [field]: value,
         }))
     }
 
-    const taiDanhSach = useCallback(async () => {
-        setDangTai(true)
+    const loadItems = useCallback(async () => {
+        setLoading(true)
 
         try {
             const params = { page: 0, size: 50 }
 
-            if (timKiem) params.keyword = timKiem
-            if (locTag) params.tagIds = locTag
+            if (search) params.keyword = search
+            if (tagFilter) params.tagIds = tagFilter
 
-            const { data } = await noteApi.layTatCa(params)
+            const { data } = await noteApi.getAll(params)
             const list = data.data?.content || []
 
-            setDanhSach(list)
+            setItems(list)
 
-            if (!idParamRef.current && !ghiChuHienTaiRef.current && list.length > 0) {
-                setGhiChuHienTai(list[0])
-                banDaLuuRef.current = taoDauMocGhiChu(list[0])
+            if (!idParamRef.current && !currentNoteRef.current && list.length > 0) {
+                setCurrentNote(list[0])
+                savedVersionRef.current = createNoteMilestone(list[0])
                 navigate(`/notes/${list[0].id}`, { replace: true })
             }
         } catch {
             toast.error('Không tải được ghi chú')
         } finally {
-            setDangTai(false)
+            setLoading(false)
         }
-    }, [timKiem, locTag, navigate, taoDauMocGhiChu])
+    }, [search, tagFilter, navigate, createNoteMilestone])
 
     useEffect(() => {
-        taiDanhSach()
-    }, [taiDanhSach])
+        loadItems()
+    }, [loadItems])
 
     useEffect(() => {
-        tagApi.layTatCa()
+        tagApi.getAll()
             .then(r => setTags(r.data.data || []))
             .catch(() => { })
     }, [])
 
     useEffect(() => {
         if (!idParam) return
-        if (ghiChuHienTai?.id === idParam) return
+        if (currentNote?.id === idParam) return
 
-        chonGhiChu(idParam)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [idParam, ghiChuHienTai?.id])
+        selectNote(idParam)
 
-    const chonGhiChu = async (id) => {
+    }, [idParam, currentNote?.id])
+
+    const selectNote = async (id) => {
         try {
-            const { data } = await noteApi.layTheoId(id)
+            const { data } = await noteApi.getById(id)
 
-            banDaLuuRef.current = taoDauMocGhiChu(data.data)
-            setGhiChuHienTai(data.data)
-            setKetQuaDongPanel()
+            savedVersionRef.current = createNoteMilestone(data.data)
+            setCurrentNote(data.data)
+            setResultOnPanelClose()
             navigate(`/notes/${id}`, { replace: true })
         } catch {
             toast.error('Không thể mở ghi chú')
         }
     }
 
-    const setKetQuaDongPanel = () => {
-        setHienAi(false)
-        setHienSoDo(false)
-        setHienTag(false)
-        setHienShare(false)
-        setHienLichSu(false)
+    const setResultOnPanelClose = () => {
+        setShowAi(false)
+        setShowDiagram(false)
+        setShowTag(false)
+        setShowShare(false)
+        setShowHistory(false)
         setShareEmail('')
         setSharePermission('VIEW')
         setShareList([])
-        setLichSuPhienBan([])
+        setVersionHistory([])
 
-        setHienChecklistModal(false)
+        setShowChecklistModal(false)
         setChecklistItems([])
         setChecklistDeadline('')
         setChecklistPriority('MEDIUM')
     }
 
-    const taiXuongGhiChu = async (format) => {
-        if (!coTinhNang('EXPORT_FILE')) {
+    const downloadNote = async (format) => {
+        if (!hasPackageFeature('EXPORT_FILE')) {
             toast.error(getUpgradeMessage('EXPORT_FILE'))
             navigate('/service-packages')
             return
         }
 
-        if (!ghiChuHienTai?.id) {
+        if (!currentNote?.id) {
             toast.error('Chưa chọn ghi chú để export')
             return
         }
 
         try {
             const response = format === 'pdf'
-                ? await noteApi.xuatPdf(ghiChuHienTai.id)
-                : await noteApi.xuatWord(ghiChuHienTai.id)
+                ? await noteApi.exportPdf(currentNote.id)
+                : await noteApi.exportWord(currentNote.id)
 
             const blob = new Blob([response.data], {
                 type: response.headers['content-type'] || 'application/octet-stream',
             })
 
             const contentDisposition = response.headers['content-disposition']
-            let fileName = `${ghiChuHienTai.title || 'ghi-chu'}.${format === 'pdf' ? 'pdf' : 'docx'}`
+            let fileName = `${currentNote.title || 'ghi-chu'}.${format === 'pdf' ? 'pdf' : 'docx'}`
 
             if (contentDisposition) {
                 const match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/)
@@ -306,29 +319,29 @@ export default function Notes() {
         }
     }
 
-    const handleTaoFlashcard = async () => {
-        if (!coTinhNang('AI_FLASHCARD')) {
+    const handleCreateFlashcards = async () => {
+        if (!hasPackageFeature('AI_FLASHCARD')) {
             toast.error(getUpgradeMessage('AI_FLASHCARD'))
             navigate('/service-packages')
             return
         }
 
-        if (!ghiChuHienTai || !ghiChuHienTai.id) {
+        if (!currentNote || !currentNote.id) {
             toast.error('Không tìm thấy mã định danh ghi chú hợp lệ!')
             return
         }
 
-        if (!hasRichTextContent(ghiChuHienTai.content)) {
+        if (!hasRichTextContent(currentNote.content)) {
             toast.error('Vui lòng viết thêm nội dung kiến thức vào ghi chú để AI bóc tách!')
             return
         }
 
-        setDangTaoFlashcard(true)
+        setCreatingFlashcards(true)
 
         const loadToast = toast.loading('Trợ lý AI đang phân tích dữ liệu và soạn trang ôn tập...')
 
         try {
-            const response = await flashcardApi.generate(ghiChuHienTai.id)
+            const response = await flashcardApi.generate(currentNote.id)
             const cards = response.data?.data || response.data
 
             if (cards && cards.length > 0) {
@@ -336,9 +349,9 @@ export default function Notes() {
                     id: loadToast,
                 })
 
-                navigate(`/notes/${ghiChuHienTai.id}/flashcards`)
+                navigate(`/notes/${currentNote.id}/flashcards`)
             } else {
-                toast.error('AI chưa tìm thấy đủ thông tin cốt lõi để tạo bộ câu hỏi.', {
+                toast.error('AI chưa tìm thấy đủ thông message cốt lõi để tạo bộ câu hỏi.', {
                     id: loadToast,
                 })
             }
@@ -348,37 +361,36 @@ export default function Notes() {
                 id: loadToast,
             })
         } finally {
-            setDangTaoFlashcard(false)
+            setCreatingFlashcards(false)
         }
     }
 
-    const taoMoi = async () => {
+    const create = async () => {
         try {
-            const { data } = await noteApi.taoMoi({
-                title: DEFAULT_TITLE,
+            const { data } = await noteApi.create({
+                title: DEFAULT_NOTE_TITLE,
                 content: '',
             })
 
-            const ghiChu = data.data
+            const note = data.data
 
-            banDaLuuRef.current = taoDauMocGhiChu(ghiChu)
-            setDanhSach(p => [ghiChu, ...p])
-            setGhiChuHienTai(ghiChu)
-            navigate(`/notes/${ghiChu.id}`, { replace: true })
+            savedVersionRef.current = createNoteMilestone(note)
+            setItems(p => [note, ...p])
+            setCurrentNote(note)
+            navigate(`/notes/${note.id}`, { replace: true })
             toast.success('Đã tạo ghi chú mới')
         } catch {
             toast.error('Không thể tạo ghi chú')
         }
     }
 
-    const DEFAULT_TITLE = 'Ghi chú mới'
 
-    const tuDongDeXuatTieuDe = async (noteId, currentTitle, contentHtml) => {
+    const autoSuggestTitle = async (noteId, currentTitle, contentHtml) => {
         const plainText = richTextToPlainText(contentHtml || '').trim()
         if (plainText.length < 20) return
 
         try {
-            const { data } = await noteApi.caiThienAi(noteId, {
+            const { data } = await noteApi.improveWithAi(noteId, {
                 content: plainText,
                 title: currentTitle,
                 action: 'SUGGEST_TITLE',
@@ -387,86 +399,82 @@ export default function Notes() {
             const suggestedTitle = data?.data?.suggestedTitle?.trim()
             if (!suggestedTitle) return
 
-            // Nếu người dùng đã chuyển sang ghi chú khác trong lúc chờ AI, bỏ qua
-            // để tránh ghi đè nhầm tiêu đề của ghi chú không còn đang mở.
-            if (ghiChuHienTaiRef.current?.id !== noteId) return
-            if (ghiChuHienTaiRef.current?.title?.trim() !== DEFAULT_TITLE) return
+            if (currentNoteRef.current?.id !== noteId) return
+            if (currentNoteRef.current?.title?.trim() !== DEFAULT_NOTE_TITLE) return
 
-            const { data: updated } = await noteApi.capNhat(noteId, {
+            const { data: updated } = await noteApi.update(noteId, {
                 title: suggestedTitle,
-                content: ghiChuHienTaiRef.current.content,
-                tagIds: ghiChuHienTaiRef.current.tags?.map(t => t.id),
+                content: currentNoteRef.current.content,
+                tagIds: currentNoteRef.current.tags?.map(t => t.id),
                 editorSessionId: editorSessionIdRef.current,
             })
 
-            setGhiChuHienTai(updated.data)
-            setDanhSach(p => p.map(n => (n.id === updated.data.id ? { ...n, ...updated.data } : n)))
-            banDaLuuRef.current = taoDauMocGhiChu(updated.data)
+            setCurrentNote(updated.data)
+            setItems(p => p.map(n => (n.id === updated.data.id ? { ...n, ...updated.data } : n)))
+            savedVersionRef.current = createNoteMilestone(updated.data)
 
             toast.success(`Đã tự động đặt tiêu đề: "${suggestedTitle}"`)
         } catch {
-            // Tính năng nền, không làm phiền người dùng nếu AI không phản hồi được.
+
         }
     }
 
-    const luu = async () => {
-        if (!ghiChuHienTai) return
-        if (!coTheChinhSua) return
+    const save = async () => {
+        if (!currentNote) return
+        if (!canEdit) return
 
-        const dauMocHienTai = taoDauMocGhiChu(ghiChuHienTai)
-        if (dauMocHienTai === banDaLuuRef.current) return
+        const currentMilestone = createNoteMilestone(currentNote)
+        if (currentMilestone === savedVersionRef.current) return
 
-        setDangLuu(true)
+        setSaving(true)
 
         try {
-            const { data } = await noteApi.capNhat(ghiChuHienTai.id, {
-                title: ghiChuHienTai.title,
-                content: ghiChuHienTai.content,
-                tagIds: ghiChuHienTai.tags?.map(t => t.id),
+            const { data } = await noteApi.update(currentNote.id, {
+                title: currentNote.title,
+                content: currentNote.content,
+                tagIds: currentNote.tags?.map(t => t.id),
                 editorSessionId: editorSessionIdRef.current,
             })
 
-            setGhiChuHienTai(data.data)
+            setCurrentNote(data.data)
 
-            setDanhSach(p =>
+            setItems(p =>
                 p.map(n => n.id === data.data.id ? { ...n, ...data.data } : n)
             )
 
-            banDaLuuRef.current = taoDauMocGhiChu(data.data)
+            savedVersionRef.current = createNoteMilestone(data.data)
 
-            // Ghi chú mới, chưa từng đặt tên, vừa có nội dung thật sự lần đầu
-            // -> tự động đề xuất và áp dụng tiêu đề (không cần bấm nút thủ công).
             if (
-                data.data.title?.trim() === DEFAULT_TITLE &&
-                !autoTitleXuLyRef.current.has(data.data.id)
+                data.data.title?.trim() === DEFAULT_NOTE_TITLE &&
+                !processedAutoTitleIdsRef.current.has(data.data.id)
             ) {
-                autoTitleXuLyRef.current.add(data.data.id)
-                tuDongDeXuatTieuDe(data.data.id, data.data.title, data.data.content)
+                processedAutoTitleIdsRef.current.add(data.data.id)
+                autoSuggestTitle(data.data.id, data.data.title, data.data.content)
             }
         } catch {
             toast.error('Lưu thất bại')
         } finally {
-            setDangLuu(false)
+            setSaving(false)
         }
     }
 
-    const xoa = async () => {
-        if (!ghiChuHienTai || !window.confirm('Xoá ghi chú này?')) return
+    const remove = async () => {
+        if (!currentNote || !window.confirm('Xoá ghi chú này?')) return
 
         try {
-            await noteApi.xoa(ghiChuHienTai.id)
+            await noteApi.remove(currentNote.id)
 
-            const listMoi = danhSach.filter(n => n.id !== ghiChuHienTai.id)
+            const newList = items.filter(n => n.id !== currentNote.id)
 
-            setDanhSach(listMoi)
-            banDaLuuRef.current = ''
+            setItems(newList)
+            savedVersionRef.current = ''
 
-            if (listMoi.length > 0) {
-                setGhiChuHienTai(listMoi[0])
-                banDaLuuRef.current = taoDauMocGhiChu(listMoi[0])
-                navigate(`/notes/${listMoi[0].id}`, { replace: true })
+            if (newList.length > 0) {
+                setCurrentNote(newList[0])
+                savedVersionRef.current = createNoteMilestone(newList[0])
+                navigate(`/notes/${newList[0].id}`, { replace: true })
             } else {
-                setGhiChuHienTai(null)
+                setCurrentNote(null)
                 navigate('/notes', { replace: true })
             }
 
@@ -476,14 +484,14 @@ export default function Notes() {
         }
     }
 
-    const danhDau = async () => {
-        if (!ghiChuHienTai) return
+    const mark = async () => {
+        if (!currentNote) return
 
         try {
-            const { data } = await noteApi.danhDau(ghiChuHienTai.id)
+            const { data } = await noteApi.mark(currentNote.id)
 
-            setGhiChuHienTai(data.data)
-            setDanhSach(p =>
+            setCurrentNote(data.data)
+            setItems(p =>
                 p.map(n =>
                     n.id === data.data.id
                         ? { ...n, isBookmarked: data.data.isBookmarked }
@@ -493,73 +501,70 @@ export default function Notes() {
         } catch { }
     }
 
-    const homNayIso = () => {
+    const getTodayIso = () => {
         const today = new Date()
         today.setMinutes(today.getMinutes() - today.getTimezoneOffset())
         return today.toISOString().split('T')[0]
     }
 
-    const apDungAi = async (ketQua) => {
-        if (!ketQua || !ghiChuHienTai) return
+    const applyAiResult = async (result) => {
+        if (!result || !currentNote) return
 
-        if (ketQua.checklist?.length > 0) {
-            if (!coTinhNang('CHECKLIST_BASIC')) {
+        if (result.checklist?.length > 0) {
+            if (!hasPackageFeature('CHECKLIST_BASIC')) {
                 toast.error(getUpgradeMessage('CHECKLIST_BASIC'))
                 navigate('/service-packages')
                 return
             }
 
-            const danhSachTask = ketQua.checklist
+            const tasks = result.checklist
                 .map(item => typeof item === 'string' ? item.trim() : '')
                 .filter(Boolean)
 
-            if (danhSachTask.length === 0) {
+            if (tasks.length === 0) {
                 toast.error('Checklist không có nội dung hợp lệ')
                 return
             }
 
-            setChecklistItems(danhSachTask)
+            setChecklistItems(tasks)
             setChecklistDeadline('')
             setChecklistPriority('MEDIUM')
-            setHienChecklistModal(true)
+            setShowChecklistModal(true)
 
             return
         }
 
-        let noiDungMoiApDung = null
+        let newAppliedContent = null
 
-        setGhiChuHienTai(p => {
+        setCurrentNote(p => {
             if (!p) return p
 
-            let tieuDeMoi = p.title
+            let newTitle = p.title
 
-            if (ketQua.suggestedTitle) {
-                tieuDeMoi = ketQua.suggestedTitle
+            if (result.suggestedTitle) {
+                newTitle = result.suggestedTitle
             }
 
-            if (ketQua.improvedContent) {
-                noiDungMoiApDung = ketQua.improvedContent
-            } else if (ketQua.summary) {
-                noiDungMoiApDung = `${(p.content || '').trim()}\n\n---\n\n## AI Summary\n${ketQua.summary}`
+            if (result.improvedContent) {
+                newAppliedContent = result.improvedContent
+            } else if (result.summary) {
+                newAppliedContent = `${(p.content || '').trim()}\n\n---\n\n## AI Summary\n${result.summary}`
             }
 
             return {
                 ...p,
-                title: tieuDeMoi,
-                content: noiDungMoiApDung !== null ? noiDungMoiApDung : p.content,
+                title: newTitle,
+                content: newAppliedContent !== null ? newAppliedContent : p.content,
             }
         })
 
-        // Nội dung ghi chú đang được soạn thảo real-time qua Yjs, nên phải đẩy
-        // thẳng vào editor đang chạy (qua ref) thì mới thực sự đổi trên màn hình
-        // và được lưu lại — chỉ đổi state React của component cha là không đủ.
-        if (noiDungMoiApDung !== null) {
-            richTextEditorRef.current?.setContentHtml(noiDungMoiApDung)
+        if (newAppliedContent !== null) {
+            richTextEditorRef.current?.setContentHtml(newAppliedContent)
         }
     }
 
-    const xacNhanTaoTaskTuChecklist = async () => {
-        if (!ghiChuHienTai?.id) {
+    const confirmCreateTasksFromChecklist = async () => {
+        if (!currentNote?.id) {
             toast.error('Chưa chọn ghi chú')
             return
         }
@@ -569,24 +574,24 @@ export default function Notes() {
             return
         }
 
-        if (checklistDeadline && checklistDeadline < homNayIso()) {
+        if (checklistDeadline && checklistDeadline < getTodayIso()) {
             toast.error('Deadline không được nằm trong quá khứ')
             return
         }
 
-        setDangTaoChecklistTask(true)
+        setCreatingChecklistTask(true)
 
         const toastId = toast.loading('Đang tạo task từ checklist AI...')
 
         try {
             await Promise.all(
                 checklistItems.map(taskName =>
-                    scheduleApi.taoMoi({
+                    scheduleApi.create({
                         taskName,
-                        description: `Tạo từ checklist AI của ghi chú: ${ghiChuHienTai.title || 'Không có tiêu đề'}`,
+                        description: `Tạo từ checklist AI của ghi chú: ${currentNote.title || 'Không có tiêu đề'}`,
                         deadline: checklistDeadline || null,
                         priority: checklistPriority,
-                        noteId: ghiChuHienTai.id,
+                        noteId: currentNote.id,
                     })
                 )
             )
@@ -598,18 +603,18 @@ export default function Notes() {
             setChecklistItems([])
             setChecklistDeadline('')
             setChecklistPriority('MEDIUM')
-            setHienChecklistModal(false)
+            setShowChecklistModal(false)
         } catch (error) {
             toast.error(error.response?.data?.message || 'Không thể tạo task từ checklist AI', {
                 id: toastId,
             })
         } finally {
-            setDangTaoChecklistTask(false)
+            setCreatingChecklistTask(false)
         }
     }
 
-    const taoTagMoi = async () => {
-        const name = tenTagMoi.trim()
+    const createNewTag = async () => {
+        const name = newTagName.trim()
 
         if (!name) {
             toast.error('Vui lòng nhập tên tag')
@@ -617,26 +622,26 @@ export default function Notes() {
         }
 
         try {
-            const { data } = await tagApi.taoMoi({
+            const { data } = await tagApi.create({
                 name,
-                color: mauTagMoi,
+                color: newTagColor,
             })
 
-            const tagMoi = data.data
+            const newTag = data.data
 
-            setTags(p => [...p, tagMoi])
-            setTenTagMoi('')
-            setMauTagMoi('#3B82F6')
+            setTags(p => [...p, newTag])
+            setNewTagName('')
+            setNewTagColor('#3B82F6')
 
-            setGhiChuHienTai(p => {
+            setCurrentNote(p => {
                 if (!p) return p
 
                 const currentTags = p.tags || []
-                const daCo = currentTags.some(t => t.id === tagMoi.id)
+                const alreadyExists = currentTags.some(t => t.id === newTag.id)
 
                 return {
                     ...p,
-                    tags: daCo ? currentTags : [...currentTags, tagMoi],
+                    tags: alreadyExists ? currentTags : [...currentTags, newTag],
                 }
             })
 
@@ -646,27 +651,27 @@ export default function Notes() {
         }
     }
 
-    const toggleTagChoGhiChu = (tag) => {
-        if (!ghiChuHienTai) return
+    const toggleNoteTag = (tag) => {
+        if (!currentNote) return
 
-        setGhiChuHienTai(p => {
+        setCurrentNote(p => {
             const currentTags = p.tags || []
-            const daCo = currentTags.some(t => t.id === tag.id)
+            const alreadyExists = currentTags.some(t => t.id === tag.id)
 
             return {
                 ...p,
-                tags: daCo
+                tags: alreadyExists
                     ? currentTags.filter(t => t.id !== tag.id)
                     : [...currentTags, tag],
             }
         })
     }
 
-    const taiDanhSachShare = async () => {
-        if (!ghiChuHienTai?.id) return
+    const loadShares = async () => {
+        if (!currentNote?.id) return
 
         try {
-            const { data } = await noteApi.layDanhSachChiaSe(ghiChuHienTai.id)
+            const { data } = await noteApi.getShares(currentNote.id)
             setShareList(data.data || [])
         } catch {
             setShareList([])
@@ -674,99 +679,99 @@ export default function Notes() {
     }
 
     useEffect(() => {
-        if (hienShare && ghiChuHienTai?.id) {
-            taiDanhSachShare()
+        if (showShare && currentNote?.id) {
+            loadShares()
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [hienShare, ghiChuHienTai?.id])
 
-    const taiLichSuPhienBan = async () => {
-        if (!ghiChuHienTai?.id) return
+    }, [showShare, currentNote?.id])
 
-        setDangTaiLichSu(true)
+    const loadVersionHistory = async () => {
+        if (!currentNote?.id) return
+
+        setLoadingHistory(true)
 
         try {
-            const { data } = await noteApi.layPhienBan(ghiChuHienTai.id)
-            setLichSuPhienBan(data.data || [])
+            const { data } = await noteApi.getVersions(currentNote.id)
+            setVersionHistory(data.data || [])
         } catch {
             toast.error('Không tải được lịch sử phiên bản')
         } finally {
-            setDangTaiLichSu(false)
+            setLoadingHistory(false)
         }
     }
 
     useEffect(() => {
-        if (hienLichSu && ghiChuHienTai?.id) {
-            taiLichSuPhienBan()
+        if (showHistory && currentNote?.id) {
+            loadVersionHistory()
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [hienLichSu, ghiChuHienTai?.id])
+
+    }, [showHistory, currentNote?.id])
 
     useEffect(() => {
         const token = localStorage.getItem('velora_token')
 
-        if (!ghiChuHienTai?.id || !token) return undefined
+        if (!currentNote?.id || !token) return undefined
 
-        const source = new EventSource(noteApi.taoRealtimeUrl(ghiChuHienTai.id, token))
+        const source = new EventSource(noteApi.createRealtimeUrl(currentNote.id, token))
 
         source.addEventListener('note-updated', event => {
             try {
                 const payload = JSON.parse(event.data)
 
                 if (payload.editorSessionId === editorSessionIdRef.current) return
-                if (!payload.note || payload.note.id !== ghiChuHienTaiRef.current?.id) return
+                if (!payload.note || payload.note.id !== currentNoteRef.current?.id) return
 
-                const noteMoi = {
+                const newNote = {
                     ...payload.note,
-                    accessMode: ghiChuHienTaiRef.current?.accessMode || payload.note.accessMode,
+                    accessMode: currentNoteRef.current?.accessMode || payload.note.accessMode,
                 }
 
-                banDaLuuRef.current = taoDauMocGhiChu(noteMoi)
-                setGhiChuHienTai(noteMoi)
-                setDanhSach(p => p.map(n => n.id === noteMoi.id ? { ...n, ...noteMoi } : n))
+                savedVersionRef.current = createNoteMilestone(newNote)
+                setCurrentNote(newNote)
+                setItems(p => p.map(n => n.id === newNote.id ? { ...n, ...newNote } : n))
 
-                if (hienLichSu) {
-                    taiLichSuPhienBan()
+                if (showHistory) {
+                    loadVersionHistory()
                 }
             } catch {
-                // Bỏ qua event không đúng định dạng.
+
             }
         })
 
         return () => source.close()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [ghiChuHienTai?.id, hienLichSu, taoDauMocGhiChu])
 
-    const khoiPhucPhienBan = async (version) => {
-        if (!ghiChuHienTai?.id) return
+    }, [currentNote?.id, showHistory, createNoteMilestone])
+
+    const restoreVersion = async (version) => {
+        if (!currentNote?.id) return
         if (!window.confirm(`Khôi phục phiên bản #${version.versionNumber}?`)) return
 
-        setDangKhoiPhucVersionId(version.id)
+        setRestoringVersionId(version.id)
 
         try {
-            const { data } = await noteApi.khoiPhucPhienBan(ghiChuHienTai.id, version.id)
-            const noteMoi = data.data
+            const { data } = await noteApi.restoreVersion(currentNote.id, version.id)
+            const newNote = data.data
 
-            banDaLuuRef.current = taoDauMocGhiChu(noteMoi)
-            setGhiChuHienTai(noteMoi)
-            setDanhSach(p => p.map(n => n.id === noteMoi.id ? { ...n, ...noteMoi } : n))
-            await taiLichSuPhienBan()
+            savedVersionRef.current = createNoteMilestone(newNote)
+            setCurrentNote(newNote)
+            setItems(p => p.map(n => n.id === newNote.id ? { ...n, ...newNote } : n))
+            await loadVersionHistory()
             toast.success('Đã khôi phục phiên bản')
         } catch (error) {
             toast.error(error.response?.data?.message || 'Không thể khôi phục phiên bản')
         } finally {
-            setDangKhoiPhucVersionId(null)
+            setRestoringVersionId(null)
         }
     }
 
-    const chiaSeGhiChu = async () => {
-        if (!coTinhNang('TEAM_WORK')) {
+    const shareNote = async () => {
+        if (!hasPackageFeature('TEAM_WORK')) {
             toast.error(getUpgradeMessage('TEAM_WORK'))
             navigate('/service-packages')
             return
         }
 
-        if (!ghiChuHienTai?.id) {
+        if (!currentNote?.id) {
             toast.error('Chưa chọn ghi chú để chia sẻ')
             return
         }
@@ -778,10 +783,10 @@ export default function Notes() {
             return
         }
 
-        setDangShare(true)
+        setSharing(true)
 
         try {
-            await noteApi.chiaSe(ghiChuHienTai.id, {
+            await noteApi.share(currentNote.id, {
                 email,
                 permission: sharePermission,
             })
@@ -790,16 +795,16 @@ export default function Notes() {
             setShareEmail('')
             setSharePermission('VIEW')
 
-            await taiDanhSachShare()
+            await loadShares()
         } catch (error) {
             toast.error(error.response?.data?.message || 'Không thể chia sẻ ghi chú')
         } finally {
-            setDangShare(false)
+            setSharing(false)
         }
     }
 
-    const capNhatQuyenChiaSe = async (shareId, permission) => {
-        if (!coTinhNang('TEAM_WORK')) {
+    const updateSharePermission = async (shareId, permission) => {
+        if (!hasPackageFeature('TEAM_WORK')) {
             toast.error(getUpgradeMessage('TEAM_WORK'))
             navigate('/service-packages')
             return
@@ -808,57 +813,57 @@ export default function Notes() {
         const current = shareList.find(item => item.id === shareId)
         if (!current || current.permission === permission) return
 
-        setDangDoiQuyenShareId(shareId)
+        setChangingSharePermissionId(shareId)
 
         try {
-            const { data } = await noteApi.capNhatQuyenChiaSe(shareId, { permission })
-            const itemMoi = data.data
+            const { data } = await noteApi.updateSharePermission(shareId, { permission })
+            const newItem = data.data
 
-            setShareList(p => p.map(item => item.id === shareId ? itemMoi : item))
+            setShareList(p => p.map(item => item.id === shareId ? newItem : item))
             toast.success('Đã cập nhật quyền chia sẻ')
         } catch (error) {
             toast.error(error.response?.data?.message || 'Không thể cập nhật quyền chia sẻ')
         } finally {
-            setDangDoiQuyenShareId(null)
+            setChangingSharePermissionId(null)
         }
     }
 
-    const huyChiaSe = async (shareId) => {
+    const revokeShare = async (shareId) => {
         if (!window.confirm('Hủy chia sẻ người này?')) return
 
         try {
-            await noteApi.huyChiaSe(shareId)
+            await noteApi.revokeShare(shareId)
 
             toast.success('Đã hủy chia sẻ')
-            await taiDanhSachShare()
+            await loadShares()
         } catch (error) {
             toast.error(error.response?.data?.message || 'Không thể hủy chia sẻ')
         }
     }
 
-    const coTheTrichLich = (text) => {
+    const canExtractSchedule = (text) => {
         if (!text) return false
 
         return new RegExp(
             '\\b(?:' +
-            // Giờ cụ thể: 14:30, 9.00, 20 giờ
+
             '\\d{1,2}[:.][0-5]\\d' +
             '|[0-2]?\\d\\s*(?:giờ|h)\\b' +
-            // Ngày tương đối: hôm nay, ngày mai, ngày mốt/kia, hôm qua
+
             '|(?:ngày\\s*)?(?:hôm\\s*nay|hôm\\s*qua)' +
             '|ngày\\s*(?:mai|mốt|kia)' +
-            // Tuần/tháng tương đối
+
             '|tuần\\s*(?:này|sau|tới|trước)' +
             '|tháng\\s*(?:này|sau|tới|trước)' +
             '|cuối\\s*tuần' +
-            // Ngày cụ thể dạng số: ngày 20, 20/7, 20-07-2026, 20/07
+
             '|ngày\\s*\\d{1,2}' +
             '|\\d{1,2}[/\\-]\\d{1,2}(?:[/\\-]\\d{2,4})?' +
             '|tháng\\s*\\d{1,2}' +
-            // Thứ trong tuần
+
             '|thứ\\s*(?:hai|ba|tư|năm|sáu|bảy)\\b' +
             '|chủ\\s*nhật' +
-            // Từ khoá deadline/hạn chót trực tiếp
+
             '|deadline|hạn\\s*(?:chót|nộp)?|nộp\\s*(?:bài|báo\\s*cáo)' +
             ')',
             'i'
@@ -866,25 +871,25 @@ export default function Notes() {
     }
 
     useEffect(() => {
-        if (!ghiChuHienTai) return
+        if (!currentNote) return
 
-        const daTaoLich = noteDaTaoLichIds.has(ghiChuHienTai.id)
-        const duocTrichLich = coTinhNang('EXTRACT_SCHEDULE')
+        const hasCreatedSchedule = scheduledNoteIds.has(currentNote.id)
+        const wasScheduleExtracted = hasPackageFeature('EXTRACT_SCHEDULE')
 
-        setHienLichGoiY(
-            duocTrichLich &&
-            !daTaoLich &&
-            coTheTrichLich(richTextToPlainText(ghiChuHienTai.content))
+        setShowSuggestedSchedule(
+            wasScheduleExtracted &&
+            !hasCreatedSchedule &&
+            canExtractSchedule(richTextToPlainText(currentNote.content))
         )
     }, [
-        ghiChuHienTai?.id,
-        ghiChuHienTai?.content,
-        noteDaTaoLichIds,
-        nguoiDung?.packageFeatures,
+        currentNote?.id,
+        currentNote?.content,
+        scheduledNoteIds,
+        user?.packageFeatures,
     ])
 
     useEffect(() => {
-        scheduleApi.layTatCa()
+        scheduleApi.getAll()
             .then(r => {
                 const schedules = r.data.data || []
                 const ids = new Set(
@@ -893,40 +898,40 @@ export default function Notes() {
                         .map(s => s.noteId)
                 )
 
-                setNoteDaTaoLichIds(ids)
+                setScheduledNoteIds(ids)
             })
             .catch(() => { })
     }, [])
 
-    const trichXuatLich = async () => {
-        if (!coTinhNang('EXTRACT_SCHEDULE')) {
+    const extractSchedule = async () => {
+        if (!hasPackageFeature('EXTRACT_SCHEDULE')) {
             toast.error(getUpgradeMessage('EXTRACT_SCHEDULE'))
             navigate('/service-packages')
             return
         }
 
-        const plainContent = richTextToPlainText(ghiChuHienTai.content)
+        const plainContent = richTextToPlainText(currentNote.content)
 
         if (!plainContent) return
 
-        setDangTrichLich(true)
+        setExtractingSchedule(true)
 
         try {
-            const { data } = await scheduleApi.trichXuatTuGhiChu({
+            const { data } = await scheduleApi.extractFromNote({
                 content: plainContent,
-                noteId: ghiChuHienTai.id,
+                noteId: currentNote.id,
             })
 
             const total = data.data?.totalFound || 0
 
             if (total > 0) {
-                setNoteDaTaoLichIds(prev => {
+                setScheduledNoteIds(prev => {
                     const next = new Set(prev)
-                    next.add(ghiChuHienTai.id)
+                    next.add(currentNote.id)
                     return next
                 })
 
-                setHienLichGoiY(false)
+                setShowSuggestedSchedule(false)
                 toast.success(`Đã tạo ${total} công việc / lịch`)
             } else {
                 toast.error('AI chưa tìm thấy lịch/deadline hợp lệ trong ghi chú')
@@ -934,44 +939,44 @@ export default function Notes() {
         } catch (error) {
             toast.error(error.response?.data?.message || 'Không thể trích xuất lịch từ ghi chú')
         } finally {
-            setDangTrichLich(false)
+            setExtractingSchedule(false)
         }
     }
 
     useEffect(() => {
-        if (!ghiChuHienTai) return
-        if (!coTheChinhSua) return
-        if (taoDauMocGhiChu(ghiChuHienTai) === banDaLuuRef.current) return
+        if (!currentNote) return
+        if (!canEdit) return
+        if (createNoteMilestone(currentNote) === savedVersionRef.current) return
 
-        const t = setTimeout(luu, 3000)
+        const t = setTimeout(save, 3000)
 
         return () => clearTimeout(t)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+
     }, [
-        ghiChuHienTai?.content,
-        ghiChuHienTai?.title,
-        ghiChuHienTai?.tags,
-        coTheChinhSua,
-        taoDauMocGhiChu,
+        currentNote?.content,
+        currentNote?.title,
+        currentNote?.tags,
+        canEdit,
+        createNoteMilestone,
     ])
 
-    const danhSachHienThi = useMemo(() => {
-        if (locNhanh === 'BOOKMARKED') {
-            return danhSach.filter(n => n.isBookmarked)
+    const displayItems = useMemo(() => {
+        if (quickFilter === 'BOOKMARKED') {
+            return items.filter(n => n.isBookmarked)
         }
 
-        return danhSach
-    }, [danhSach, locNhanh])
+        return items
+    }, [items, quickFilter])
 
     const collaborationUrl = useMemo(() => {
         const token = localStorage.getItem('velora_token')
-        if (!ghiChuHienTai?.id || !token) return null
+        if (!currentNote?.id || !token) return null
 
-        return noteApi.taoCollabUrl(ghiChuHienTai.id, token)
-    }, [ghiChuHienTai?.id])
+        return noteApi.createCollaborationUrl(currentNote.id, token)
+    }, [currentNote?.id])
 
-    const capNhatQuyenTuCongTac = useCallback((nextAccessMode) => {
-        setGhiChuHienTai(p => {
+    const updateCollaboratorPermission = useCallback((nextAccessMode) => {
+        setCurrentNote(p => {
             if (!p) return p
 
             const nextNote = {
@@ -979,14 +984,14 @@ export default function Notes() {
                 accessMode: p.accessMode === 'OWNER' ? 'OWNER' : nextAccessMode,
             }
 
-            ghiChuHienTaiRef.current = nextNote
+            currentNoteRef.current = nextNote
             return nextNote
         })
     }, [])
 
-    const tagDangChon = tags.find(t => t.id === locTag)
-    const soTu = demTu(ghiChuHienTai?.content || '')
-    const soKyTu = layPlainText(ghiChuHienTai?.content || '').length
+    const selectedTag = tags.find(t => t.id === tagFilter)
+    const wordCountValue = wordCount(currentNote?.content || '')
+    const characterCount = getPlainText(currentNote?.content || '').length
 
     return (
         <div style={styles.wrap}>
@@ -1000,7 +1005,7 @@ export default function Notes() {
 
                         <button
                             className="btn-primary"
-                            onClick={taoMoi}
+                            onClick={create}
                             style={styles.createButton}
                             title="Tạo ghi chú mới"
                         >
@@ -1015,8 +1020,8 @@ export default function Notes() {
                             <input
                                 placeholder="Tìm kiếm ghi chú..."
                                 style={styles.searchInput}
-                                value={timKiem}
-                                onChange={e => setTimKiem(e.target.value)}
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
                             />
                         </div>
 
@@ -1031,76 +1036,78 @@ export default function Notes() {
 
                     <div style={styles.quickTabs}>
                         <button
-                            className={locNhanh === 'ALL' ? 'btn-ai' : 'btn-ghost'}
-                            onClick={() => setLocNhanh('ALL')}
+                            className={quickFilter === 'ALL' ? 'btn-ai' : 'btn-ghost'}
+                            onClick={() => setQuickFilter('ALL')}
                             style={styles.quickTab}
                         >
                             Tất cả
                         </button>
 
                         <button
-                            className={locNhanh === 'BOOKMARKED' ? 'btn-ai' : 'btn-ghost'}
-                            onClick={() => setLocNhanh('BOOKMARKED')}
+                            className={quickFilter === 'BOOKMARKED' ? 'btn-ai' : 'btn-ghost'}
+                            onClick={() => setQuickFilter('BOOKMARKED')}
                             style={styles.quickTab}
                         >
                             Đã ghim
                         </button>
 
                         <button
-                            className={locTag ? 'btn-ai' : 'btn-ghost'}
-                            onClick={() => setHienTag(p => !p)}
+                            className={tagFilter ? 'btn-ai' : 'btn-ghost'}
+                            onClick={() => setShowTag(p => !p)}
                             style={styles.quickTab}
                         >
-                            {tagDangChon?.name || 'Tag'}
+                            {selectedTag?.name || 'Tag'}
                         </button>
                     </div>
 
-                    <div style={styles.tagFilter}>
-                        <button
-                            className={locTag ? 'btn-ghost' : 'btn-ai'}
-                            onClick={() => setLocTag(null)}
-                            style={styles.tagFilterButton}
-                        >
-                            Tất cả
-                        </button>
-
-                        {tags.slice(0, 8).map(t => (
+                    {(showTag || tagFilter) && (
+                        <div style={styles.tagFilter}>
                             <button
-                                key={t.id}
-                                style={{
-                                    ...styles.tagFilterButton,
-                                    background: locTag === t.id
-                                        ? 'var(--bg-ai)'
-                                        : 'transparent',
-                                }}
-                                className={locTag === t.id ? 'btn-ai' : 'btn-ghost'}
-                                onClick={() => setLocTag(locTag === t.id ? null : t.id)}
+                                className={tagFilter ? 'btn-ghost' : 'btn-ai'}
+                                onClick={() => setTagFilter(null)}
+                                style={styles.tagFilterButton}
                             >
-                                <span
-                                    style={{
-                                        ...styles.tagDot,
-                                        background: t.color || '#3B82F6',
-                                    }}
-                                />
-                                {t.name}
+                                Tất cả tag
                             </button>
-                        ))}
-                    </div>
+
+                            {tags.slice(0, 8).map(t => (
+                                <button
+                                    key={t.id}
+                                    style={{
+                                        ...styles.tagFilterButton,
+                                        background: tagFilter === t.id
+                                            ? 'var(--bg-ai)'
+                                            : 'transparent',
+                                    }}
+                                    className={tagFilter === t.id ? 'btn-ai' : 'btn-ghost'}
+                                    onClick={() => setTagFilter(tagFilter === t.id ? null : t.id)}
+                                >
+                <span
+                    style={{
+                        ...styles.tagDot,
+                        background: t.color || '#3B82F6',
+                    }}
+                />
+                                    {t.name}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 <div style={styles.listBody}>
-                    {dangTai ? (
+                    {isLoading ? (
                         <div style={styles.loadingBox}>
                             <Spinner />
                         </div>
-                    ) : danhSachHienThi.length === 0 ? (
+                    ) : displayItems.length === 0 ? (
                         <div style={styles.emptyList}>
                             <EmptyState
                                 icon={IconSearch}
                                 title="Không tìm thấy ghi chú"
                                 desc="Thử tạo ghi chú mới hoặc đổi bộ lọc"
                                 action={
-                                    <button className="btn-primary" onClick={taoMoi}>
+                                    <button className="btn-primary" onClick={create}>
                                         <IconPlus size={13} />
                                         Ghi chú mới
                                     </button>
@@ -1108,8 +1115,8 @@ export default function Notes() {
                             />
                         </div>
                     ) : (
-                        danhSachHienThi.map(n => {
-                            const active = ghiChuHienTai?.id === n.id
+                        displayItems.map(n => {
+                            const active = currentNote?.id === n.id
                             const firstTag = n.tags?.[0]
 
                             return (
@@ -1119,7 +1126,7 @@ export default function Notes() {
                                         ...styles.noteItem,
                                         ...(active ? styles.noteItemActive : {}),
                                     }}
-                                    onClick={() => chonGhiChu(n.id)}
+                                    onClick={() => selectNote(n.id)}
                                 >
                                     <div style={styles.noteItemTop}>
                                         <div style={styles.noteIconWrap}>
@@ -1132,7 +1139,7 @@ export default function Notes() {
                                             </div>
 
                                             <div style={styles.noteTime}>
-                                                {layNgayCapNhat(n)}
+                                                {getUpdatedDate(n)}
                                             </div>
                                         </div>
 
@@ -1145,7 +1152,7 @@ export default function Notes() {
                                     </div>
 
                                     <p style={styles.notePreview}>
-                                        {layPreview(n)}
+                                        {getPreview(n)}
                                     </p>
 
                                     <div style={styles.noteMeta}>
@@ -1173,14 +1180,14 @@ export default function Notes() {
             </aside>
 
             <main style={styles.editor}>
-                {!ghiChuHienTai ? (
+                {!currentNote ? (
                     <div style={styles.emptyEditor}>
                         <EmptyState
                             icon={IconPlus}
                             title="Chọn hoặc tạo ghi chú"
                             desc="Ghi chú của bạn sẽ xuất hiện tại đây"
                             action={
-                                <button className="btn-primary" onClick={taoMoi}>
+                                <button className="btn-primary" onClick={create}>
                                     <IconPlus size={13} />
                                     Ghi chú mới
                                 </button>
@@ -1192,14 +1199,14 @@ export default function Notes() {
                         <div style={styles.toolbar}>
                             <div style={styles.titleArea}>
                                 <input
-                                    value={ghiChuHienTai.title || ''}
-                                    onChange={e => capNhatTruongGhiChu('title', e.target.value)}
-                                    readOnly={!coTheChinhSua}
+                                    value={currentNote.title || ''}
+                                    onChange={e => updateNoteField('title', e.target.value)}
+                                    readOnly={!canEdit}
                                     placeholder="Tiêu đề ghi chú..."
                                     style={{
-                                        ...styles.tieuDe,
-                                        cursor: coTheChinhSua ? 'text' : 'default',
-                                        color: coTheChinhSua ? 'var(--text-primary)' : 'var(--text-secondary)',
+                                        ...styles.title,
+                                        cursor: canEdit ? 'text' : 'default',
+                                        color: canEdit ? 'var(--text-primary)' : 'var(--text-secondary)',
                                     }}
                                 />
 
@@ -1212,13 +1219,13 @@ export default function Notes() {
                                                 : 'Chủ sở hữu'}
                                     </span>
 
-                                    <span>{soTu} từ</span>
+                                    <span>{wordCountValue} từ</span>
                                     <span>·</span>
-                                    <span>{soKyTu} ký tự</span>
+                                    <span>{characterCount} ký tự</span>
                                     <span>·</span>
-                                    <span>{layNgayCapNhat(ghiChuHienTai)}</span>
+                                    <span>{getUpdatedDate(currentNote)}</span>
 
-                                    {dangLuu ? (
+                                    {isSaving ? (
                                         <span style={styles.savingPill}>Đang lưu...</span>
                                     ) : (
                                         <span style={styles.savedPill}>
@@ -1230,14 +1237,14 @@ export default function Notes() {
                             </div>
 
                             <div style={styles.toolbarRight}>
-                                {laChuSoHuu && (
+                                {isOwner && (
                                     <button
                                         className="btn-ghost"
-                                        onClick={danhDau}
-                                        title={ghiChuHienTai.isBookmarked ? 'Bỏ đánh dấu' : 'Đánh dấu'}
+                                        onClick={mark}
+                                        title={currentNote.isBookmarked ? 'Bỏ đánh dấu' : 'Đánh dấu'}
                                         style={styles.iconButton}
                                     >
-                                        {ghiChuHienTai.isBookmarked ? (
+                                        {currentNote.isBookmarked ? (
                                             <IconBookmarkFilled
                                                 size={16}
                                                 style={{ color: 'var(--accent-amber)' }}
@@ -1248,27 +1255,27 @@ export default function Notes() {
                                     </button>
                                 )}
 
-                                {laChuSoHuu && coTinhNang('AI_FLASHCARD') && (
+                                {isOwner && hasPackageFeature('AI_FLASHCARD') && (
                                     <button
                                         className="btn-ghost"
-                                        onClick={handleTaoFlashcard}
-                                        disabled={dangTaoFlashcard}
+                                        onClick={handleCreateFlashcards}
+                                        disabled={isCreatingFlashcards}
                                         style={styles.actionButton}
                                         title="Tạo bộ câu hỏi ôn tập chuyển trang"
                                     >
                                         <IconCards
                                             size={14}
-                                            className={dangTaoFlashcard ? 'animate-spin' : ''}
+                                            className={isCreatingFlashcards ? 'animate-spin' : ''}
                                         />
                                         Flashcard
                                     </button>
                                 )}
 
-                                {laChuSoHuu && coTinhNang('EXPORT_FILE') && (
+                                {isOwner && hasPackageFeature('EXPORT_FILE') && (
                                     <>
                                         <button
                                             className="btn-ghost"
-                                            onClick={() => taiXuongGhiChu('pdf')}
+                                            onClick={() => downloadNote('pdf')}
                                             style={styles.actionButton}
                                             title="Export ghi chú ra PDF"
                                         >
@@ -1278,7 +1285,7 @@ export default function Notes() {
 
                                         <button
                                             className="btn-ghost"
-                                            onClick={() => taiXuongGhiChu('docx')}
+                                            onClick={() => downloadNote('docx')}
                                             style={styles.actionButton}
                                             title="Export ghi chú ra Word"
                                         >
@@ -1288,15 +1295,15 @@ export default function Notes() {
                                     </>
                                 )}
 
-                                {laChuSoHuu && coTinhNang('TEAM_WORK') && (
+                                {isOwner && hasPackageFeature('TEAM_WORK') && (
                                     <button
-                                        className={hienShare ? 'btn-ai' : 'btn-ghost'}
+                                        className={showShare ? 'btn-ai' : 'btn-ghost'}
                                         onClick={() => {
-                                            setHienShare(p => !p)
-                                            setHienAi(false)
-                                            setHienSoDo(false)
-                                            setHienTag(false)
-                                            setHienLichSu(false)
+                                            setShowShare(p => !p)
+                                            setShowAi(false)
+                                            setShowDiagram(false)
+                                            setShowTag(false)
+                                            setShowHistory(false)
                                         }}
                                         style={styles.actionButton}
                                         title="Chia sẻ ghi chú"
@@ -1306,15 +1313,15 @@ export default function Notes() {
                                     </button>
                                 )}
 
-                                {ghiChuHienTai?.id && (
+                                {currentNote?.id && (
                                     <button
-                                        className={hienLichSu ? 'btn-ai' : 'btn-ghost'}
+                                        className={showHistory ? 'btn-ai' : 'btn-ghost'}
                                         onClick={() => {
-                                            setHienLichSu(p => !p)
-                                            setHienAi(false)
-                                            setHienSoDo(false)
-                                            setHienTag(false)
-                                            setHienShare(false)
+                                            setShowHistory(p => !p)
+                                            setShowAi(false)
+                                            setShowDiagram(false)
+                                            setShowTag(false)
+                                            setShowShare(false)
                                         }}
                                         style={styles.actionButton}
                                         title="Lịch sử phiên bản"
@@ -1324,15 +1331,15 @@ export default function Notes() {
                                     </button>
                                 )}
 
-                                {coTheChinhSua && (
+                                {canEdit && (
                                     <button
-                                        className={hienAi ? 'btn-ai' : 'btn-ghost'}
+                                        className={showAi ? 'btn-ai' : 'btn-ghost'}
                                         onClick={() => {
-                                            setHienAi(p => !p)
-                                            setHienSoDo(false)
-                                            setHienTag(false)
-                                            setHienShare(false)
-                                            setHienLichSu(false)
+                                            setShowAi(p => !p)
+                                            setShowDiagram(false)
+                                            setShowTag(false)
+                                            setShowShare(false)
+                                            setShowHistory(false)
                                         }}
                                         style={styles.actionButton}
                                         title="Trợ lý AI"
@@ -1342,15 +1349,15 @@ export default function Notes() {
                                     </button>
                                 )}
 
-                                {ghiChuHienTai?.id && (
+                                {currentNote?.id && (
                                     <button
-                                        className={hienSoDo ? 'btn-ai' : 'btn-ghost'}
+                                        className={showDiagram ? 'btn-ai' : 'btn-ghost'}
                                         onClick={() => {
-                                            setHienSoDo(p => !p)
-                                            setHienAi(false)
-                                            setHienTag(false)
-                                            setHienShare(false)
-                                            setHienLichSu(false)
+                                            setShowDiagram(p => !p)
+                                            setShowAi(false)
+                                            setShowTag(false)
+                                            setShowShare(false)
+                                            setShowHistory(false)
                                         }}
                                         style={styles.actionButton}
                                         title="Tạo sơ đồ từ ghi chú"
@@ -1360,15 +1367,15 @@ export default function Notes() {
                                     </button>
                                 )}
 
-                                {coTheChinhSua && (
+                                {canEdit && (
                                     <button
-                                        className={hienTag ? 'btn-ai' : 'btn-ghost'}
+                                        className={showTag ? 'btn-ai' : 'btn-ghost'}
                                         onClick={() => {
-                                            setHienTag(p => !p)
-                                            setHienAi(false)
-                                            setHienSoDo(false)
-                                            setHienShare(false)
-                                            setHienLichSu(false)
+                                            setShowTag(p => !p)
+                                            setShowAi(false)
+                                            setShowDiagram(false)
+                                            setShowShare(false)
+                                            setShowHistory(false)
                                         }}
                                         style={styles.actionButton}
                                         title="Gắn tag"
@@ -1378,10 +1385,10 @@ export default function Notes() {
                                     </button>
                                 )}
 
-                                {laChuSoHuu && (
+                                {isOwner && (
                                     <button
                                         className="btn-danger btn-ghost"
-                                        onClick={xoa}
+                                        onClick={remove}
                                         title="Xoá"
                                         style={styles.iconButton}
                                     >
@@ -1389,10 +1396,10 @@ export default function Notes() {
                                     </button>
                                 )}
 
-                                {coTheChinhSua && (
+                                {canEdit && (
                                     <button
                                         className="btn-primary"
-                                        onClick={luu}
+                                        onClick={save}
                                         style={styles.saveButton}
                                     >
                                         <IconCheck size={13} /> Lưu
@@ -1404,8 +1411,8 @@ export default function Notes() {
                         <div style={styles.editorBody}>
                             <div style={styles.editorPaper}>
                                 <div style={styles.editorTagsRow}>
-                                    {(ghiChuHienTai.tags || []).length > 0 ? (
-                                        ghiChuHienTai.tags.map(tag => (
+                                    {(currentNote.tags || []).length > 0 ? (
+                                        currentNote.tags.map(tag => (
                                             <span key={tag.id} style={styles.editorTag}>
                                                 <span
                                                     style={{
@@ -1420,11 +1427,11 @@ export default function Notes() {
                                         <span style={styles.editorTagMuted}>Chưa có tag</span>
                                     )}
 
-                                    {coTheChinhSua && (
+                                    {canEdit && (
                                         <button
                                             className="btn-ghost"
                                             style={styles.addTagButton}
-                                            onClick={() => setHienTag(true)}
+                                            onClick={() => setShowTag(true)}
                                         >
                                             <IconPlus size={12} />
                                             Thêm tag
@@ -1434,19 +1441,19 @@ export default function Notes() {
 
                                 <RichTextEditor
                                     ref={richTextEditorRef}
-                                    key={ghiChuHienTai.id}
-                                    noteId={ghiChuHienTai.id}
+                                    key={currentNote.id}
+                                    noteId={currentNote.id}
                                     collaborationUrl={collaborationUrl}
-                                    currentUser={nguoiDung}
-                                    value={ghiChuHienTai.content || ''}
-                                    onChange={content => capNhatTruongGhiChu('content', content)}
-                                    onPermissionChange={capNhatQuyenTuCongTac}
-                                    readOnly={!coTheChinhSua}
-                                    placeholder={coTheChinhSua ? 'Bắt đầu ghi chú...' : 'Bạn chỉ có quyền xem ghi chú này'}
+                                    currentUser={user}
+                                    value={currentNote.content || ''}
+                                    onChange={content => updateNoteField('content', content)}
+                                    onPermissionChange={updateCollaboratorPermission}
+                                    readOnly={!canEdit}
+                                    placeholder={canEdit ? 'Bắt đầu ghi chú...' : 'Bạn chỉ có quyền xem ghi chú này'}
                                 />
                             </div>
 
-                            {hienLichGoiY && (
+                            {showSuggestedSchedule && (
                                 <div style={styles.schedulePrompt}>
                                     <div style={styles.scheduleIcon}>
                                         <IconCalendarEvent size={18} />
@@ -1454,7 +1461,7 @@ export default function Notes() {
 
                                     <div style={{ flex: 1 }}>
                                         <div style={styles.scheduleTitle}>
-                                            AI phát hiện thông tin thời gian
+                                            AI phát hiện thông message thời gian
                                         </div>
 
                                         <div style={styles.scheduleDesc}>
@@ -1464,16 +1471,16 @@ export default function Notes() {
                                         <div style={styles.scheduleActions}>
                                             <button
                                                 className="btn-primary"
-                                                onClick={trichXuatLich}
-                                                disabled={dangTrichLich}
+                                                onClick={extractSchedule}
+                                                disabled={isExtractingSchedule}
                                                 style={styles.scheduleButton}
                                             >
-                                                {dangTrichLich ? 'Đang xử lý...' : 'Có, tạo lịch'}
+                                                {isExtractingSchedule ? 'Đang xử lý...' : 'Có, tạo lịch'}
                                             </button>
 
                                             <button
                                                 className="btn-ghost"
-                                                onClick={() => setHienLichGoiY(false)}
+                                                onClick={() => setShowSuggestedSchedule(false)}
                                                 style={styles.scheduleButton}
                                             >
                                                 Để sau
@@ -1483,7 +1490,7 @@ export default function Notes() {
                                 </div>
                             )}
 
-                            {hienTag && (
+                            {showTag && (
                                 <div style={styles.tagPanel}>
                                     <div style={styles.sidePanelHeader}>
                                         <span style={styles.panelTitle}>
@@ -1493,7 +1500,7 @@ export default function Notes() {
 
                                         <button
                                             className="btn-ghost"
-                                            onClick={() => setHienTag(false)}
+                                            onClick={() => setShowTag(false)}
                                             style={styles.closeButton}
                                         >
                                             <IconX size={14} />
@@ -1505,8 +1512,8 @@ export default function Notes() {
                                             <div style={styles.miniLabel}>Tạo tag mới</div>
 
                                             <input
-                                                value={tenTagMoi}
-                                                onChange={e => setTenTagMoi(e.target.value)}
+                                                value={newTagName}
+                                                onChange={e => setNewTagName(e.target.value)}
                                                 placeholder="Tên tag mới..."
                                                 style={styles.panelInput}
                                             />
@@ -1514,14 +1521,14 @@ export default function Notes() {
                                             <div style={{ display: 'flex', gap: 8 }}>
                                                 <input
                                                     type="color"
-                                                    value={mauTagMoi}
-                                                    onChange={e => setMauTagMoi(e.target.value)}
+                                                    value={newTagColor}
+                                                    onChange={e => setNewTagColor(e.target.value)}
                                                     style={styles.colorInput}
                                                 />
 
                                                 <button
                                                     className="btn-primary"
-                                                    onClick={taoTagMoi}
+                                                    onClick={createNewTag}
                                                     style={styles.panelPrimaryButton}
                                                 >
                                                     <IconPlus size={12} /> Tạo tag
@@ -1538,13 +1545,13 @@ export default function Notes() {
                                                 </div>
                                             ) : (
                                                 tags.map(tag => {
-                                                    const selected = ghiChuHienTai.tags?.some(t => t.id === tag.id)
+                                                    const selected = currentNote.tags?.some(t => t.id === tag.id)
 
                                                     return (
                                                         <button
                                                             key={tag.id}
                                                             className={selected ? 'btn-ai' : 'btn-ghost'}
-                                                            onClick={() => toggleTagChoGhiChu(tag)}
+                                                            onClick={() => toggleNoteTag(tag)}
                                                             style={{
                                                                 ...styles.tagSelectItem,
                                                                 borderColor: selected
@@ -1570,7 +1577,7 @@ export default function Notes() {
 
                                         <button
                                             className="btn-primary"
-                                            onClick={luu}
+                                            onClick={save}
                                             style={styles.panelWideButton}
                                         >
                                             Lưu tag cho ghi chú
@@ -1579,7 +1586,7 @@ export default function Notes() {
                                 </div>
                             )}
 
-                            {hienShare && (
+                            {showShare && (
                                 <div style={styles.sharePanel}>
                                     <div style={styles.sidePanelHeader}>
                                         <span style={styles.panelTitle}>
@@ -1589,7 +1596,7 @@ export default function Notes() {
 
                                         <button
                                             className="btn-ghost"
-                                            onClick={() => setHienShare(false)}
+                                            onClick={() => setShowShare(false)}
                                             style={styles.closeButton}
                                         >
                                             <IconX size={14} />
@@ -1618,12 +1625,12 @@ export default function Notes() {
 
                                             <button
                                                 className="btn-primary"
-                                                onClick={chiaSeGhiChu}
-                                                disabled={dangShare}
+                                                onClick={shareNote}
+                                                disabled={isSharing}
                                                 style={styles.panelWideButton}
                                             >
                                                 <IconUserPlus size={12} />
-                                                {dangShare ? 'Đang chia sẻ...' : 'Chia sẻ'}
+                                                {isSharing ? 'Đang chia sẻ...' : 'Chia sẻ'}
                                             </button>
                                         </div>
 
@@ -1644,8 +1651,8 @@ export default function Notes() {
 
                                                             <select
                                                                 value={item.permission}
-                                                                onChange={e => capNhatQuyenChiaSe(item.id, e.target.value)}
-                                                                disabled={dangDoiQuyenShareId === item.id}
+                                                                onChange={e => updateSharePermission(item.id, e.target.value)}
+                                                                disabled={changingSharePermissionId === item.id}
                                                                 style={styles.sharePermissionSelect}
                                                             >
                                                                 <option value="VIEW">Chỉ xem</option>
@@ -1655,7 +1662,7 @@ export default function Notes() {
 
                                                         <button
                                                             className="btn-ghost"
-                                                            onClick={() => huyChiaSe(item.id)}
+                                                            onClick={() => revokeShare(item.id)}
                                                             style={styles.shareRemoveButton}
                                                             title="Hủy chia sẻ"
                                                         >
@@ -1669,7 +1676,7 @@ export default function Notes() {
                                 </div>
                             )}
 
-                            {hienLichSu && (
+                            {showHistory && (
                                 <div style={styles.historyPanel}>
                                     <div style={styles.sidePanelHeader}>
                                         <span style={styles.panelTitle}>
@@ -1679,7 +1686,7 @@ export default function Notes() {
 
                                         <button
                                             className="btn-ghost"
-                                            onClick={() => setHienLichSu(false)}
+                                            onClick={() => setShowHistory(false)}
                                             style={styles.closeButton}
                                         >
                                             <IconX size={14} />
@@ -1687,19 +1694,19 @@ export default function Notes() {
                                     </div>
 
                                     <div style={styles.sidePanelBody}>
-                                        {dangTaiLichSu ? (
+                                        {isLoadingHistory ? (
                                             <div style={styles.loadingBox}>
                                                 <Spinner />
                                             </div>
-                                        ) : lichSuPhienBan.length === 0 ? (
+                                        ) : versionHistory.length === 0 ? (
                                             <div style={styles.emptyPanelText}>
                                                 Chưa có phiên bản nào
                                             </div>
                                         ) : (
                                             <div style={styles.versionList}>
-                                                {lichSuPhienBan.map(version => {
-                                                    const preview = layPlainText(version.content || '').trim()
-                                                    const versionDate = parseNgayTuApi(version.createdAt)
+                                                {versionHistory.map(version => {
+                                                    const preview = getPlainText(version.content || '').trim()
+                                                    const versionDate = parseApiDate(version.createdAt)
                                                     const createdAt = versionDate
                                                         ? versionDate.toLocaleString('vi-VN')
                                                         : 'Vừa xong'
@@ -1713,8 +1720,8 @@ export default function Notes() {
 
                                                                 <button
                                                                     className="btn-ghost"
-                                                                    onClick={() => khoiPhucPhienBan(version)}
-                                                                    disabled={!coTheChinhSua || dangKhoiPhucVersionId === version.id}
+                                                                    onClick={() => restoreVersion(version)}
+                                                                    disabled={!canEdit || restoringVersionId === version.id}
                                                                     style={styles.restoreButton}
                                                                     title="Khôi phục phiên bản này"
                                                                 >
@@ -1746,29 +1753,29 @@ export default function Notes() {
                                 </div>
                             )}
 
-                            {hienAi && (
+                            {showAi && (
                                 <AiPanel
-                                    noteId={ghiChuHienTai.id}
-                                    content={richTextToPlainText(ghiChuHienTai.content)}
-                                    title={ghiChuHienTai.title}
-                                    onApply={apDungAi}
+                                    noteId={currentNote.id}
+                                    content={richTextToPlainText(currentNote.content)}
+                                    title={currentNote.title}
+                                    onApply={applyAiResult}
                                     onInsertChecklist={(html) => {
-                                        if (!coTheChinhSua) {
+                                        if (!canEdit) {
                                             toast.error('Bạn không có quyền chỉnh sửa ghi chú này')
                                             return
                                         }
                                         richTextEditorRef.current?.insertHtmlAtEnd(html)
                                     }}
-                                    onDong={() => setHienAi(false)}
+                                    onClose={() => setShowAi(false)}
                                 />
                             )}
 
-                            {hienSoDo && (
+                            {showDiagram && (
                                 <NoteDiagramGenerator
-                                    noteId={ghiChuHienTai.id}
-                                    onDong={() => setHienSoDo(false)}
-                                    onChenVaoGhiChu={(html) => {
-                                        if (!coTheChinhSua) {
+                                    noteId={currentNote.id}
+                                    onClose={() => setShowDiagram(false)}
+                                    onInsertIntoNote={(html) => {
+                                        if (!canEdit) {
                                             toast.error('Bạn không có quyền chỉnh sửa ghi chú này')
                                             return
                                         }
@@ -1782,7 +1789,7 @@ export default function Notes() {
                 )}
             </main>
 
-            {hienChecklistModal && (
+            {showChecklistModal && (
                 <div style={styles.modalBackdrop}>
                     <div style={styles.checklistModal}>
                         <div style={styles.modalHeader}>
@@ -1798,7 +1805,7 @@ export default function Notes() {
 
                             <button
                                 className="btn-ghost"
-                                onClick={() => setHienChecklistModal(false)}
+                                onClick={() => setShowChecklistModal(false)}
                                 style={styles.closeButton}
                             >
                                 <IconX size={14} />
@@ -1829,7 +1836,7 @@ export default function Notes() {
                                     <input
                                         type="date"
                                         value={checklistDeadline}
-                                        min={homNayIso()}
+                                        min={getTodayIso()}
                                         onChange={e => setChecklistDeadline(e.target.value)}
                                         style={styles.modalInput}
                                     />
@@ -1859,18 +1866,18 @@ export default function Notes() {
                         <div style={styles.modalFooter}>
                             <button
                                 className="btn-ghost"
-                                onClick={() => setHienChecklistModal(false)}
-                                disabled={dangTaoChecklistTask}
+                                onClick={() => setShowChecklistModal(false)}
+                                disabled={isCreatingChecklistTask}
                             >
                                 Hủy
                             </button>
 
                             <button
                                 className="btn-primary"
-                                onClick={xacNhanTaoTaskTuChecklist}
-                                disabled={dangTaoChecklistTask}
+                                onClick={confirmCreateTasksFromChecklist}
+                                disabled={isCreatingChecklistTask}
                             >
-                                {dangTaoChecklistTask ? 'Đang tạo...' : 'Tạo task'}
+                                {isCreatingChecklistTask ? 'Đang tạo...' : 'Tạo task'}
                             </button>
                         </div>
                     </div>
@@ -2128,7 +2135,7 @@ const styles = {
         flex: 1,
         minWidth: 0,
     },
-    tieuDe: {
+    title: {
         width: '100%',
         background: 'transparent',
         border: 'none',
