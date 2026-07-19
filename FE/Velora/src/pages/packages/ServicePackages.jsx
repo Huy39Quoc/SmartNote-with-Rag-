@@ -6,6 +6,19 @@ import useAuthStore from '../../service/authStore'
 import { PACKAGE_FEATURE_CODES, SYSTEM_PACKAGE_ORDER } from '../../constants/packageConstants'
 import { getFeatureLabel } from '../../utils/packageFeatures'
 
+const LIMIT_COMPARE_CODES = [
+    'NOTE_LIMIT',
+    'AI_FORMAT_LIMIT',
+    'STORAGE_LIMIT',
+    'DEVICE_LIMIT',
+]
+
+const LIMIT_COMPARE_LABELS = {
+    NOTE_LIMIT: 'Số ghi chú tối đa',
+    AI_FORMAT_LIMIT: 'Lượt AI Format/tháng',
+    STORAGE_LIMIT: 'Dung lượng (GB)',
+    DEVICE_LIMIT: 'Đồng bộ thiết bị',
+}
 const formatPrice = (value) => {
     const price = Number(value || 0)
 
@@ -108,6 +121,81 @@ export default function ServicePackages() {
         return currentPackageName?.toUpperCase() || 'FREE'
     }
 
+    const parsePackageFeatures = (features) => {
+        if (!features) return []
+
+        if (Array.isArray(features)) {
+            return features
+                .map(item => String(item).trim().toUpperCase())
+                .filter(Boolean)
+        }
+
+        return String(features)
+            .split(',')
+            .map(item => item.trim().toUpperCase())
+            .filter(Boolean)
+    }
+
+    const normalizeLimitValue = (value) => {
+        if (value === null || value === undefined || Number(value) < 0) {
+            return Number.POSITIVE_INFINITY
+        }
+
+        return Number(value || 0)
+    }
+
+    const getLimitScore = (value, weight) => {
+        const normalized = normalizeLimitValue(value)
+
+        if (normalized === Number.POSITIVE_INFINITY) {
+            return weight * 100000
+        }
+
+        return normalized * weight
+    }
+
+    const getPackagePowerScore = (packageItem) => {
+        if (!packageItem) return 0
+
+        const featureCount = parsePackageFeatures(packageItem.features).length
+
+        return (
+            featureCount * 1000000
+            + getLimitScore(packageItem.maxNotes, 10)
+            + getLimitScore(packageItem.maxAiFormatsPerMonth, 20)
+            + getLimitScore(packageItem.storageGb, 50)
+            + getLimitScore(packageItem.maxDevices, 30)
+        )
+    }
+
+    const packageIncludesPackage = (containerPackage, targetPackage) => {
+        if (!containerPackage || !targetPackage) return false
+
+        const containerFeatures = new Set(parsePackageFeatures(containerPackage.features))
+        const targetFeatures = parsePackageFeatures(targetPackage.features)
+
+        const hasAllFeatures = targetFeatures.every(feature => containerFeatures.has(feature))
+
+        const hasEnoughLimits =
+            normalizeLimitValue(containerPackage.maxNotes) >= normalizeLimitValue(targetPackage.maxNotes)
+            && normalizeLimitValue(containerPackage.maxAiFormatsPerMonth) >= normalizeLimitValue(targetPackage.maxAiFormatsPerMonth)
+            && normalizeLimitValue(containerPackage.storageGb) >= normalizeLimitValue(targetPackage.storageGb)
+            && normalizeLimitValue(containerPackage.maxDevices) >= normalizeLimitValue(targetPackage.maxDevices)
+
+        return hasAllFeatures && hasEnoughLimits
+    }
+
+    const getCurrentPackage = () => {
+        return packages.find(packageItem => getPackageName(packageItem) === getCurrentPackageName()) || {
+            name: getCurrentPackageName(),
+            features: user?.packageFeatures || '',
+            maxNotes,
+            maxAiFormatsPerMonth: maxAi,
+            storageGb,
+            maxDevices: user?.maxDevices,
+        }
+    }
+
     const getComparablePrice = (packageItem) => {
         const monthly = Number(packageItem?.priceMonthly || 0)
         const yearly = Number(packageItem?.priceYearly || 0)
@@ -118,20 +206,19 @@ export default function ServicePackages() {
         return 0
     }
 
-    const sortPackages = (packages) => {
-        return [...packages].sort((a, b) => {
-            const aName = getPackageName(a)
-            const bName = getPackageName(b)
+    const sortPackages = (packageList) => {
+        return [...packageList].sort((a, b) => {
+            const featureDiff = getPackageFeatureCount(a) - getPackageFeatureCount(b)
 
-            const aKnown = SYSTEM_PACKAGE_ORDER[aName]
-            const bKnown = SYSTEM_PACKAGE_ORDER[bName]
-
-            if (aKnown && bKnown) {
-                return aKnown - bKnown
+            if (featureDiff !== 0) {
+                return featureDiff
             }
 
-            if (aKnown && !bKnown) return -1
-            if (!aKnown && bKnown) return 1
+            const limitDiff = getPackageLimitScore(a) - getPackageLimitScore(b)
+
+            if (limitDiff !== 0) {
+                return limitDiff
+            }
 
             const priceDiff = getComparablePrice(a) - getComparablePrice(b)
 
@@ -139,49 +226,67 @@ export default function ServicePackages() {
                 return priceDiff
             }
 
-            return aName.localeCompare(bName)
+            return getPackageName(a).localeCompare(getPackageName(b))
         })
-    }
-
-    const getPackageRank = (packageName) => {
-        const target = packageName?.toUpperCase() || 'FREE'
-        const orderedNames = sortPackages(packages).map(getPackageName)
-        const index = orderedNames.findIndex(name => name === target)
-
-        if (index >= 0) return index
-
-        if (SYSTEM_PACKAGE_ORDER[target]) {
-            return SYSTEM_PACKAGE_ORDER[target] - 1
-        }
-
-        return orderedNames.length
     }
 
     const isCurrentPackage = (packageItem) => {
         return getCurrentPackageName() === getPackageName(packageItem)
     }
+    const getPackageFeatureCount = (packageItem) => {
+        return parsePackageFeatures(packageItem?.features).length
+    }
+    const getPackageLimitScore = (packageItem) => {
+        if (!packageItem) return 0
 
-    const isHigherPackage = (packageItem) => {
-        const currentRank = getPackageRank(getCurrentPackageName())
-        const targetRank = getPackageRank(getPackageName(packageItem))
-
-        return targetRank > currentRank
+        return (
+            normalizeLimitValue(packageItem.maxNotes) * 10
+            + normalizeLimitValue(packageItem.maxAiFormatsPerMonth) * 20
+            + normalizeLimitValue(packageItem.storageGb) * 50
+            + normalizeLimitValue(packageItem.maxDevices) * 30
+        )
     }
 
-    const isLowerPackage = (packageItem) => {
-        const currentRank = getPackageRank(getCurrentPackageName())
-        const targetRank = getPackageRank(getPackageName(packageItem))
+    const isPackageBetterThan = (candidatePackage, currentPackage) => {
+        const candidateFeatureCount = getPackageFeatureCount(candidatePackage)
+        const currentFeatureCount = getPackageFeatureCount(currentPackage)
 
-        return targetRank < currentRank
+        if (candidateFeatureCount !== currentFeatureCount) {
+            return candidateFeatureCount > currentFeatureCount
+        }
+
+        return getPackageLimitScore(candidatePackage) > getPackageLimitScore(currentPackage)
+    }
+    const isLowerPackage = (packageItem) => {
+        if (isCurrentPackage(packageItem)) return false
+
+        const currentPackage = getCurrentPackage()
+
+        return !isPackageBetterThan(packageItem, currentPackage)
+    }
+
+    const isHigherPackage = (packageItem) => {
+        if (isCurrentPackage(packageItem)) return false
+
+        const currentPackage = getCurrentPackage()
+
+        return isPackageBetterThan(packageItem, currentPackage)
+    }
+
+    const canPurchasePackage = (packageItem) => {
+        if (isCurrentPackage(packageItem)) return false
+
+        const currentPackage = getCurrentPackage()
+
+        return isPackageBetterThan(packageItem, currentPackage)
     }
 
     const getPackageActionLabel = (packageItem) => {
-        const currentRank = getPackageRank(getCurrentPackageName())
-        const targetRank = getPackageRank(getPackageName(packageItem))
+        if (isHigherPackage(packageItem)) {
+            return `Nâng cấp lên ${getPackageName(packageItem)}`
+        }
 
-        return targetRank > currentRank
-            ? `Nâng cấp lên ${getPackageName(packageItem)}`
-            : `Chọn gói ${getPackageName(packageItem)}`
+        return `Chọn gói ${getPackageName(packageItem)}`
     }
 
     const getUnavailablePackageText = (packageItem) => {
@@ -190,7 +295,7 @@ export default function ServicePackages() {
         }
 
         if (isLowerPackage(packageItem)) {
-            return `Đã bao gồm trong gói ${getCurrentPackageName()}`
+            return `Gói này không cao hơn gói ${getCurrentPackageName()}`
         }
 
         return 'Không khả dụng'
@@ -235,35 +340,26 @@ export default function ServicePackages() {
         return <span style={styles.compareText}>{value}</span>
     }
 
-    const getPackageByName = (name) => {
-        return packages.find(
-            packageItem => getPackageName(packageItem) === name.toUpperCase()
-        )
-    }
-
     const packageHasFeature = (packageItem, featureCode) => {
         if (!packageItem?.features) return false
 
-        return packageItem.features
-            .split(',')
-            .map(item => item.trim())
-            .filter(Boolean)
-            .includes(featureCode)
+        return parsePackageFeatures(packageItem.features)
+            .includes(featureCode?.trim()?.toUpperCase())
     }
 
     const renderPackageFeatureValue = (packageItem, featureCode) => {
         if (!packageItem) return false
 
-        if (featureCode === 'AI_NOTE_FORMAT') {
+        if (featureCode === 'NOTE_LIMIT') {
+            return formatLimit(packageItem.maxNotes, ' ghi chú')
+        }
+
+        if (featureCode === 'AI_FORMAT_LIMIT') {
             return formatLimit(packageItem.maxAiFormatsPerMonth, ' lần/tháng')
         }
 
-        if (featureCode === 'DOCUMENT_UPLOAD') {
+        if (featureCode === 'STORAGE_LIMIT') {
             return formatLimit(packageItem.storageGb, ' GB')
-        }
-
-        if (featureCode === 'NOTE_LIMIT') {
-            return formatLimit(packageItem.maxNotes, ' ghi chú')
         }
 
         if (featureCode === 'DEVICE_LIMIT') {
@@ -273,17 +369,31 @@ export default function ServicePackages() {
         return packageHasFeature(packageItem, featureCode)
     }
 
-    const buildDynamicCompareRows = () => {
-        const free = getPackageByName('FREE')
-        const pro = getPackageByName('PRO')
-        const plus = getPackageByName('PLUS')
+    const getAllCompareFeatureCodes = () => {
+        const dynamicCodes = packages
+            .flatMap(packageItem => parsePackageFeatures(packageItem.features))
 
-        return PACKAGE_FEATURE_CODES.map(code => ({
+        const normalFeatureCodes = PACKAGE_FEATURE_CODES.filter(code =>
+            !['NOTE_LIMIT', 'DEVICE_LIMIT'].includes(code)
+        )
+
+        return Array.from(new Set([
+            ...LIMIT_COMPARE_CODES,
+            ...normalFeatureCodes,
+            ...dynamicCodes,
+        ]))
+    }
+    const getCompareLabel = (code) => {
+        return LIMIT_COMPARE_LABELS[code] || getFeatureLabel(code)
+    }
+    const buildDynamicCompareRows = (comparePackages) => {
+        return getAllCompareFeatureCodes().map(code => ({
             id: code,
-            label: getFeatureLabel(code),
-            free: renderPackageFeatureValue(free, code),
-            pro: renderPackageFeatureValue(pro, code),
-            plus: renderPackageFeatureValue(plus, code),
+            label: getCompareLabel(code),
+            values: comparePackages.map(packageItem => ({
+                packageId: packageItem.id,
+                value: renderPackageFeatureValue(packageItem, code),
+            })),
         }))
     }
 
@@ -294,6 +404,9 @@ export default function ServicePackages() {
             </div>
         )
     }
+
+    const sortedPackages = sortPackages(packages)
+    const compareRows = buildDynamicCompareRows(sortedPackages)
 
     return (
         <div style={styles.page}>
@@ -364,7 +477,7 @@ export default function ServicePackages() {
             </div>
 
             <div style={styles.grid}>
-                {sortPackages(packages).map((packageItem) => {
+                {sortedPackages.map((packageItem) => {
                     const price = billingCycle === 'monthly'
                         ? packageItem.priceMonthly
                         : packageItem.priceYearly
@@ -372,10 +485,8 @@ export default function ServicePackages() {
                     const durationText = billingCycle === 'monthly'
                         ? '/ tháng'
                         : '/ năm'
-
                     const current = isCurrentPackage(packageItem)
-                    const canUpgrade = isHigherPackage(packageItem)
-
+                    const canPurchase = canPurchasePackage(packageItem)
                     return (
                         <div
                             key={packageItem.id}
@@ -445,7 +556,7 @@ export default function ServicePackages() {
                                 </div>
                             )}
 
-                            {canUpgrade ? (
+                            {canPurchase ? (
                                 <button
                                     className="btn-primary"
                                     style={styles.buyBtn}
@@ -474,19 +585,25 @@ export default function ServicePackages() {
                         <thead>
                             <tr>
                                 <th style={styles.compareTh}>Tính năng</th>
-                                <th style={styles.compareTh}>Free</th>
-                                <th style={styles.compareTh}>Pro</th>
-                                <th style={styles.compareTh}>Plus</th>
+
+                                {sortedPackages.map(packageItem => (
+                                    <th key={packageItem.id} style={styles.compareTh}>
+                                        {getPackageName(packageItem)}
+                                    </th>
+                                ))}
                             </tr>
                         </thead>
 
                         <tbody>
-                            {buildDynamicCompareRows().map(row => (
+                            {compareRows.map(row => (
                                 <tr key={row.id}>
                                     <td style={styles.compareTdFeature}>{row.label}</td>
-                                    <td style={styles.compareTd}>{renderCompareValue(row.free)}</td>
-                                    <td style={styles.compareTd}>{renderCompareValue(row.pro)}</td>
-                                    <td style={styles.compareTd}>{renderCompareValue(row.plus)}</td>
+
+                                    {row.values.map(cell => (
+                                        <td key={cell.packageId} style={styles.compareTd}>
+                                            {renderCompareValue(cell.value)}
+                                        </td>
+                                    ))}
                                 </tr>
                             ))}
                         </tbody>

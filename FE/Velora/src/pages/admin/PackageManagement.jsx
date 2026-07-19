@@ -37,6 +37,13 @@ export default function PackageManagement() {
             .filter(Boolean)
     }
 
+    const getErrorMessage = (err, fallback = 'Lỗi xảy ra khi xử lý yêu cầu') => {
+        return err.response?.data?.message
+            || err.response?.data?.error
+            || err.message
+            || fallback
+    }
+
     const loadPackages = async () => {
         setLoading(true)
 
@@ -104,12 +111,20 @@ export default function PackageManagement() {
                 handleCancel()
             }
         } catch (err) {
-            alert(err.response?.data?.message || 'Lỗi xảy ra khi xóa gói dịch vụ')
+            alert(getErrorMessage(
+                err,
+                'Không thể xóa gói dịch vụ. Gói này có thể đang được người dùng sử dụng hoặc có giao dịch liên quan.'
+            ))
         }
     }
 
     const validateForm = () => {
-        const name = formData.name.trim()
+        const name = formData.name.trim().toUpperCase()
+        const selectedFeatures = formData.features
+            .map(item => String(item).trim().toUpperCase())
+            .filter(Boolean)
+
+        const selectedFeatureSet = new Set(selectedFeatures)
 
         if (!name) {
             alert('Tên gói dịch vụ không được để trống')
@@ -125,6 +140,119 @@ export default function PackageManagement() {
             alert('Giá năm không được âm')
             return false
         }
+
+        if (Number(formData.storageGb) < 0) {
+            alert('Dung lượng lưu trữ không được âm')
+            return false
+        }
+
+        if (selectedFeatures.length === 0) {
+            alert('Vui lòng chọn ít nhất 1 tính năng cho gói dịch vụ')
+            return false
+        }
+
+        const duplicateName = packages.find(pkg =>
+            pkg.id !== editingId
+            && pkg.name?.toUpperCase() === name
+        )
+
+        if (duplicateName) {
+            alert(`Tên gói "${name}" đã tồn tại. Vui lòng dùng tên khác.`)
+            return false
+        }
+
+        const sameFeaturePackage = packages.find(pkg => {
+            if (pkg.id === editingId) return false
+
+            const packageFeatureSet = new Set(
+                toFeatureArray(pkg.features).map(item => item.toUpperCase())
+            )
+
+            if (packageFeatureSet.size !== selectedFeatureSet.size) return false
+
+            return [...selectedFeatureSet].every(feature => packageFeatureSet.has(feature))
+        })
+
+        if (sameFeaturePackage) {
+            alert(
+                `Gói "${sameFeaturePackage.name}" đã có cùng toàn bộ bộ tính năng.\n\n`
+                + 'Vui lòng chỉnh sửa gói hiện có hoặc thay đổi danh sách tính năng.'
+            )
+            return false
+        }
+
+        const normalizeLimitForCompare = (value) => {
+            if (value === null || value === undefined || Number(value) < 0) {
+                return Number.POSITIVE_INFINITY
+            }
+
+            return Number(value || 0)
+        }
+
+        const selectedPriceLowerThan = (pkg) => {
+            return Number(formData.priceMonthly || 0) < Number(pkg.priceMonthly || 0)
+                && Number(formData.priceYearly || 0) < Number(pkg.priceYearly || 0)
+        }
+
+        const selectedPriceHigherThan = (pkg) => {
+            return Number(formData.priceMonthly || 0) > Number(pkg.priceMonthly || 0)
+                && Number(formData.priceYearly || 0) > Number(pkg.priceYearly || 0)
+        }
+
+        const selectedLimitsLessOrEqual = (pkg) => {
+            return normalizeLimitForCompare(formData.maxNotes) <= normalizeLimitForCompare(pkg.maxNotes)
+                && normalizeLimitForCompare(formData.maxAiFormatsPerMonth) <= normalizeLimitForCompare(pkg.maxAiFormatsPerMonth)
+                && normalizeLimitForCompare(formData.storageGb) <= normalizeLimitForCompare(pkg.storageGb)
+                && normalizeLimitForCompare(formData.maxDevices) <= normalizeLimitForCompare(pkg.maxDevices)
+        }
+
+        const selectedLimitsGreaterOrEqual = (pkg) => {
+            return normalizeLimitForCompare(formData.maxNotes) >= normalizeLimitForCompare(pkg.maxNotes)
+                && normalizeLimitForCompare(formData.maxAiFormatsPerMonth) >= normalizeLimitForCompare(pkg.maxAiFormatsPerMonth)
+                && normalizeLimitForCompare(formData.storageGb) >= normalizeLimitForCompare(pkg.storageGb)
+                && normalizeLimitForCompare(formData.maxDevices) >= normalizeLimitForCompare(pkg.maxDevices)
+        }
+
+        const invalidTierPackage = packages.find(pkg => {
+            if (pkg.id === editingId) return false
+
+            const packageFeatureCount = toFeatureArray(pkg.features).length
+            const selectedFeatureCount = selectedFeatureSet.size
+
+            if (selectedFeatureCount < packageFeatureCount) {
+                return !selectedPriceLowerThan(pkg) || !selectedLimitsLessOrEqual(pkg)
+            }
+
+            if (selectedFeatureCount > packageFeatureCount) {
+                return !selectedPriceHigherThan(pkg) || !selectedLimitsGreaterOrEqual(pkg)
+            }
+
+            return false
+        })
+
+        if (invalidTierPackage) {
+            const selectedFeatureCount = selectedFeatureSet.size
+            const packageFeatureCount = toFeatureArray(invalidTierPackage.features).length
+
+            if (selectedFeatureCount < packageFeatureCount) {
+                alert(
+                    `Gói "${name}" có ${selectedFeatureCount} tính năng, ít hơn gói "${invalidTierPackage.name}" `
+                    + `có ${packageFeatureCount} tính năng.\n\n`
+                    + 'Vì vậy giá tháng/năm phải thấp hơn và 4 giới hạn sử dụng '
+                    + '(ghi chú, AI, dung lượng, thiết bị) phải nhỏ hơn hoặc bằng gói đó.'
+                )
+                return false
+            }
+
+            alert(
+                `Gói "${name}" có ${selectedFeatureCount} tính năng, nhiều hơn gói "${invalidTierPackage.name}" `
+                + `có ${packageFeatureCount} tính năng.\n\n`
+                + 'Vì vậy giá tháng/năm phải cao hơn và 4 giới hạn sử dụng '
+                + '(ghi chú, AI, dung lượng, thiết bị) phải lớn hơn hoặc bằng gói đó.'
+            )
+            return false
+        }
+
 
         return true
     }
@@ -149,16 +277,6 @@ export default function PackageManagement() {
         if (!validateForm()) return
 
         try {
-            if (!editingId) {
-                const duplicatePackage = packages.find(
-                    pkg => pkg.name?.toUpperCase() === formData.name.trim().toUpperCase()
-                )
-
-                if (duplicatePackage) {
-                    alert(`Gói dịch vụ "${formData.name}" đã tồn tại!\n\nVui lòng sử dụng tên khác hoặc chỉnh sửa gói hiện tại.`)
-                    return
-                }
-            }
 
             const payload = buildPayload()
 
@@ -172,16 +290,7 @@ export default function PackageManagement() {
             handleCancel()
             loadPackages()
         } catch (err) {
-            const errorMessage = err.response?.data?.message || 'Lỗi lưu dữ liệu lên hệ thống'
-
-            if (
-                errorMessage.includes('UNIQUE KEY constraint') ||
-                errorMessage.includes('duplicate key')
-            ) {
-                alert('Tên gói dịch vụ đã tồn tại.\nVui lòng sử dụng một tên khác.')
-            } else {
-                alert(errorMessage)
-            }
+            alert(getErrorMessage(err, 'Lỗi lưu dữ liệu lên hệ thống'))
         }
     }
 

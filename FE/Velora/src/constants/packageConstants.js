@@ -24,6 +24,10 @@ export const PACKAGE_FEATURE_CODES = [
     'TEAM_WORK',
     'SHARE_DOCUMENT',
     'AI_PROGRESS_ANALYTICS',
+    'TEAM_DASHBOARD',
+    'GOOGLE_CALENDAR',
+    'MANAGE_MEMBERS',
+    'CUSTOM_WORKSPACE',
     'PRIORITY_SUPPORT',
 ]
 
@@ -47,6 +51,10 @@ export const PACKAGE_FEATURE_LABELS = {
     TEAM_WORK: 'Chia sẻ ghi chú với người khác (VIEW/EDIT)',
     SHARE_DOCUMENT: 'Chia sẻ tài liệu với người khác (VIEW/EDIT)',
     AI_PROGRESS_ANALYTICS: 'Thống kê & điểm tiến độ học tập',
+    TEAM_DASHBOARD: 'Dashboard theo dõi nhóm',
+    GOOGLE_CALENDAR: 'Tích hợp Google Calendar',
+    MANAGE_MEMBERS: 'Admin quản lý thành viên nhóm',
+    CUSTOM_WORKSPACE: 'Custom workspace theo nhóm',
     PRIORITY_SUPPORT: 'Ưu tiên hỗ trợ khách hàng',
 }
 
@@ -58,6 +66,7 @@ export const ADMIN_PACKAGE_FEATURES = [
     { id: 'AI_SUMMARY_ADVANCED', label: 'Tóm tắt & phân tích AI nâng cao' },
     { id: 'AI_CHAT', label: 'Hỏi đáp AI với ghi chú / tài liệu' },
     { id: 'AI_ANALYZE', label: 'AI phân tích tài liệu' },
+    { id: 'AI_AUDIO', label: 'Ghi chú âm thanh (Whisper AI)' },
     { id: 'DOCUMENT_UPLOAD', label: 'Upload tài liệu' },
     { id: 'EXTRACT_SCHEDULE', label: 'AI trích xuất deadline từ ghi chú' },
     { id: 'AI_FLASHCARD', label: 'Flashcard AI tự động' },
@@ -65,6 +74,7 @@ export const ADMIN_PACKAGE_FEATURES = [
     { id: 'PRIORITY_SUGGESTION', label: 'Gợi ý ưu tiên công việc' },
     { id: 'EXPORT_FILE', label: 'Export PDF / Word' },
     { id: 'TEAM_WORK', label: 'Học nhóm & chia sẻ ghi chú theo nhóm' },
+    { id: 'SHARE_DOCUMENT', label: 'Chia sẻ tài liệu với người khác' },
     { id: 'AI_PROGRESS_ANALYTICS', label: 'AI phân tích tiến độ học tập' },
     { id: 'TEAM_DASHBOARD', label: 'Dashboard theo dõi nhóm' },
     { id: 'GOOGLE_CALENDAR', label: 'Tích hợp Google Calendar' },

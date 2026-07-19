@@ -20,4 +20,5 @@ public interface PackageTransactionRepository extends JpaRepository<PackageTrans
     @EntityGraph(attributePaths = {"user", "packageService"})
     @Query("select transaction from PackageTransaction transaction where transaction.id = :id")
     Optional<PackageTransaction> findWithDetailsById(@Param("id") UUID id);
+    long countByPackageService_Id(UUID packageId);
 }
