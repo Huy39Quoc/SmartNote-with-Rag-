@@ -5,7 +5,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 
-public class AdminTransactionRequest {
+public class TransactionRequest {
     @Data
     public static class UpdateStatus {
         @NotBlank private String status;

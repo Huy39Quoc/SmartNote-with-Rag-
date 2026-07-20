@@ -5,6 +5,7 @@ import org.example.velora.dto.response.ChatResponse;
 import org.example.velora.entity.ChatMessage;
 import org.example.velora.entity.ChatSession;
 import org.example.velora.entity.User;
+import org.example.velora.exception.BadRequestException;
 import org.example.velora.exception.ResourceNotFoundException;
 import org.example.velora.repository.ChatMessageRepository;
 import org.example.velora.repository.ChatSessionRepository;
@@ -13,10 +14,18 @@ import org.example.velora.service.AiService;
 import org.example.velora.service.ChatService;
 import org.example.velora.util.ChromaDbClient;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service @RequiredArgsConstructor @Transactional
@@ -27,6 +36,9 @@ public class ChatServiceImpl implements ChatService {
     private final UserRepository userRepository;
     private final AiService aiService;
     private final ChromaDbClient chromaDbClient;
+
+    @Value("${upload.dir}")
+    private String uploadDir;
 
     @Override
     public ChatResponse.SessionDetail createSession(UUID userId, ChatRequest.CreateSession req) {
@@ -89,6 +101,51 @@ public class ChatServiceImpl implements ChatService {
     @Override
     public void deleteSession(UUID userId, UUID sessionId) {
         sessionRepository.delete(findSession(userId, sessionId));
+    }
+
+    @Override
+    public String transcribeVoice(UUID userId, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("File ghi âm không hợp lệ");
+        }
+
+        String extension = resolveAudioExtension(file.getOriginalFilename());
+        Path userVoiceDir = Paths.get(uploadDir, "chat-voice", userId.toString());
+        Path audioPath = userVoiceDir.resolve(UUID.randomUUID() + extension);
+
+        try {
+            Files.createDirectories(userVoiceDir);
+            Files.copy(file.getInputStream(), audioPath, StandardCopyOption.REPLACE_EXISTING);
+
+            String transcript = aiService.transcribeAudioFile(audioPath.toString());
+            if (transcript == null || transcript.isBlank()) {
+                throw new BadRequestException("Không nhận dạng được nội dung giọng nói");
+            }
+
+            return transcript.trim();
+        } catch (IOException e) {
+            throw new BadRequestException("Không thể lưu file ghi âm: " + e.getMessage());
+        } finally {
+            try {
+                Files.deleteIfExists(audioPath);
+            } catch (IOException ignored) {
+            }
+        }
+    }
+
+    private String resolveAudioExtension(String originalName) {
+        if (originalName == null || originalName.isBlank()) {
+            return ".webm";
+        }
+
+        String lower = originalName.toLowerCase(Locale.ROOT);
+        for (String extension : List.of(".webm", ".ogg", ".wav", ".mp3", ".m4a", ".aac", ".flac")) {
+            if (lower.endsWith(extension)) {
+                return extension;
+            }
+        }
+
+        return ".webm";
     }
 
     private ChatSession findSession(UUID userId, UUID sessionId) {

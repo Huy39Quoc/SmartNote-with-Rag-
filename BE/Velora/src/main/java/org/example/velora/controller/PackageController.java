@@ -14,7 +14,7 @@ import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
-public class AdminPackageController {
+public class PackageController {
 
     private final AdminService adminService;
 

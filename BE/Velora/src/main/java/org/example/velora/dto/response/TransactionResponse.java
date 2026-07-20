@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-public class AdminTransactionResponse {
+public class TransactionResponse {
     @Data @Builder
     public static class Item {
         private UUID id;

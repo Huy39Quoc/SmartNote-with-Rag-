@@ -1,13 +1,13 @@
 package org.example.velora.service.impl;
 
 import lombok.RequiredArgsConstructor;
-import org.example.velora.dto.request.AdminTransactionRequest;
-import org.example.velora.dto.response.AdminTransactionResponse;
+import org.example.velora.dto.request.TransactionRequest;
+import org.example.velora.dto.response.TransactionResponse;
 import org.example.velora.entity.*;
 import org.example.velora.exception.BadRequestException;
 import org.example.velora.exception.ResourceNotFoundException;
 import org.example.velora.repository.*;
-import org.example.velora.service.AdminTransactionService;
+import org.example.velora.service.TransactionService;
 import org.example.velora.util.VNPayPaymentUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Pageable;
@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional
-public class AdminTransactionServiceImpl implements AdminTransactionService {
+public class TransactionServiceImpl implements TransactionService {
     private static final ZoneId VN_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final DateTimeFormatter VNP_DATE = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     private static final Set<String> EDITABLE_STATUSES = Set.of("PENDING", "SUCCESS", "FAILED", "CANCELLED");
@@ -43,7 +43,7 @@ public class AdminTransactionServiceImpl implements AdminTransactionService {
 
     @Override
     @Transactional(readOnly = true)
-    public AdminTransactionResponse.Page getTransactions(String status, String keyword, LocalDate from, LocalDate to, Pageable pageable) {
+    public TransactionResponse.Page getTransactions(String status, String keyword, LocalDate from, LocalDate to, Pageable pageable) {
         Specification<PackageTransaction> spec = Specification.where(null);
         if (status != null && !status.isBlank())
             spec = spec.and((root, query, cb) -> cb.equal(cb.upper(root.get("status")), status.toUpperCase()));
@@ -58,18 +58,18 @@ public class AdminTransactionServiceImpl implements AdminTransactionService {
         if (from != null) spec = spec.and((root, query, cb) -> cb.greaterThanOrEqualTo(root.get("createdAt"), from.atStartOfDay()));
         if (to != null) spec = spec.and((root, query, cb) -> cb.lessThan(root.get("createdAt"), to.plusDays(1).atStartOfDay()));
         var page = transactionRepository.findAll(spec, pageable);
-        return AdminTransactionResponse.Page.builder()
+        return TransactionResponse.Page.builder()
             .content(page.getContent().stream().map(this::toItem).toList())
             .pageNumber(page.getNumber()).pageSize(page.getSize())
             .totalElements(page.getTotalElements()).totalPages(page.getTotalPages()).build();
     }
 
     @Override @Transactional(readOnly = true)
-    public AdminTransactionResponse.Item getTransaction(UUID id) { return toItem(find(id)); }
+    public TransactionResponse.Item getTransaction(UUID id) { return toItem(find(id)); }
 
     @Override
     @Transactional(readOnly = true)
-    public AdminTransactionResponse.Revenue getRevenue(LocalDate from, LocalDate to) {
+    public TransactionResponse.Revenue getRevenue(LocalDate from, LocalDate to) {
         LocalDate start = from == null ? LocalDate.now(VN_ZONE).minusDays(29) : from;
         LocalDate end = to == null ? LocalDate.now(VN_ZONE) : to;
         Specification<PackageTransaction> spec = (root, query, cb) -> cb.and(
@@ -84,13 +84,13 @@ public class AdminTransactionServiceImpl implements AdminTransactionService {
         Map<String, BigDecimal> byDay = groupRevenue(transactions, tx -> tx.getCreatedAt().toLocalDate().toString());
         Map<String, BigDecimal> byMonth = groupRevenue(transactions, tx -> tx.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM")));
         Map<String, BigDecimal> byPackage = groupRevenue(transactions, tx -> tx.getPackageService().getName());
-        return AdminTransactionResponse.Revenue.builder().grossRevenue(gross).refundedAmount(refunded)
+        return TransactionResponse.Revenue.builder().grossRevenue(gross).refundedAmount(refunded)
             .netRevenue(gross.subtract(refunded)).successfulTransactions(transactions.size())
             .byDay(byDay).byMonth(byMonth).byPackage(byPackage).build();
     }
 
     @Override
-    public AdminTransactionResponse.VnpayResult reconcile(UUID id) {
+    public TransactionResponse.VnpayResult reconcile(UUID id) {
         PackageTransaction transaction = find(id);
         Map<String, String> response = callVnpay(buildQueryRequest(transaction));
         if ("00".equals(response.get("vnp_ResponseCode"))) {
@@ -102,7 +102,7 @@ public class AdminTransactionServiceImpl implements AdminTransactionService {
     }
 
     @Override
-    public AdminTransactionResponse.VnpayResult refund(UUID id, AdminTransactionRequest.Refund request) {
+    public TransactionResponse.VnpayResult refund(UUID id, TransactionRequest.Refund request) {
         PackageTransaction transaction = find(id);
         if (!"SUCCESS".equals(transaction.getStatus()) && !"REFUND_PENDING".equals(transaction.getStatus()))
             throw new BadRequestException("Chỉ giao dịch thành công mới có thể hoàn tiền");
@@ -124,7 +124,7 @@ public class AdminTransactionServiceImpl implements AdminTransactionService {
     }
 
     @Override
-    public AdminTransactionResponse.Item updateStatus(UUID id, AdminTransactionRequest.UpdateStatus request) {
+    public TransactionResponse.Item updateStatus(UUID id, TransactionRequest.UpdateStatus request) {
         PackageTransaction transaction = find(id);
         String status = request.getStatus().toUpperCase();
         if (!EDITABLE_STATUSES.contains(status)) throw new BadRequestException("Trạng thái không hợp lệ");
@@ -138,7 +138,7 @@ public class AdminTransactionServiceImpl implements AdminTransactionService {
     }
 
     @Override
-    public void extendSubscription(UUID userId, AdminTransactionRequest.ExtendSubscription request) {
+    public void extendSubscription(UUID userId, TransactionRequest.ExtendSubscription request) {
         User user = findUser(userId);
         if (user.getCurrentPackage() == null) throw new BadRequestException("Người dùng chưa có gói để gia hạn");
         LocalDateTime now = LocalDateTime.now();
@@ -149,7 +149,7 @@ public class AdminTransactionServiceImpl implements AdminTransactionService {
     }
 
     @Override
-    public void cancelSubscription(UUID userId, AdminTransactionRequest.CancelSubscription request) {
+    public void cancelSubscription(UUID userId, TransactionRequest.CancelSubscription request) {
         User user = findUser(userId);
         PackageService free = packageRepository.findByName("FREE").orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy gói FREE"));
         user.setCurrentPackage(free);
@@ -169,7 +169,7 @@ public class AdminTransactionServiceImpl implements AdminTransactionService {
         body.put("vnp_SecureHash", VNPayPaymentUtil.hmacSHA512(hashSecret.trim(), data)); return body;
     }
 
-    private Map<String, String> buildRefundRequest(PackageTransaction tx, AdminTransactionRequest.Refund request) {
+    private Map<String, String> buildRefundRequest(PackageTransaction tx, TransactionRequest.Refund request) {
         String requestId = requestId(); String createDate = nowString(); String transactionDate = tx.getCreatedAt().format(VNP_DATE);
         String type = request.getAmount().compareTo(tx.getAmount()) == 0 ? "02" : "03";
         String amount = request.getAmount().multiply(BigDecimal.valueOf(100)).toBigInteger().toString();
@@ -252,8 +252,8 @@ public class AdminTransactionServiceImpl implements AdminTransactionService {
     }
     private LocalDateTime parseDate(String value) { try { return value == null || value.isBlank() ? null : LocalDateTime.parse(value, VNP_DATE); } catch (Exception e) { return null; } }
     private void audit(String action, PackageTransaction tx, String detail) { activityLogRepository.save(ActivityLog.builder().action(action).entityType("PACKAGE_TRANSACTION").entityId(tx == null ? null : tx.getId()).detail(detail).build()); }
-    private AdminTransactionResponse.VnpayResult toVnpayResult(Map<String, String> value) { return AdminTransactionResponse.VnpayResult.builder().responseCode(value.get("vnp_ResponseCode")).message(value.get("vnp_Message")).transactionStatus(value.get("vnp_TransactionStatus")).transactionType(value.get("vnp_TransactionType")).raw(value).build(); }
-    private AdminTransactionResponse.Item toItem(PackageTransaction tx) { return AdminTransactionResponse.Item.builder()
+    private TransactionResponse.VnpayResult toVnpayResult(Map<String, String> value) { return TransactionResponse.VnpayResult.builder().responseCode(value.get("vnp_ResponseCode")).message(value.get("vnp_Message")).transactionStatus(value.get("vnp_TransactionStatus")).transactionType(value.get("vnp_TransactionType")).raw(value).build(); }
+    private TransactionResponse.Item toItem(PackageTransaction tx) { return TransactionResponse.Item.builder()
         .id(tx.getId()).txnRef(tx.getTxnRef()).vnpayTranNo(tx.getVnpayTranNo()).userId(tx.getUser().getId()).userEmail(tx.getUser().getEmail()).userName(tx.getUser().getFullName())
         .packageId(tx.getPackageService().getId()).packageName(tx.getPackageService().getName()).billingType(tx.getBillingType()).amount(tx.getAmount()).status(tx.getStatus())
         .responseCode(tx.getResponseCode()).bankCode(tx.getBankCode()).payDate(tx.getPayDate()).refundAmount(tx.getRefundAmount()).refundedAt(tx.getRefundedAt()).adminNote(tx.getAdminNote())
