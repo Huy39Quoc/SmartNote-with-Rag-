@@ -1879,12 +1879,14 @@ const styles = {
         display: 'grid',
         gridTemplateColumns: '320px minmax(0, 1fr)',
         flex: 1,
+        minHeight: 0,
         overflow: 'hidden',
         height: '100%',
         background: 'var(--bg-base)',
     },
     list: {
         minWidth: 0,
+        minHeight: 0,
         borderRight: '.5px solid var(--border)',
         display: 'flex',
         flexDirection: 'column',
@@ -2099,6 +2101,7 @@ const styles = {
 
     editor: {
         minWidth: 0,
+        minHeight: 0,
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
@@ -2209,6 +2212,7 @@ const styles = {
     editorPaper: {
         flex: 1,
         minWidth: 0,
+        minHeight: 0,
         background: 'var(--bg-surface)',
         border: '.5px solid var(--border)',
         borderRadius: 16,

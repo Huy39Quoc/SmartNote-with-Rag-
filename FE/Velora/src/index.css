@@ -114,12 +114,16 @@ select option { background: var(--bg-surface); }
 .rich-text-editor.ProseMirror,
 .rich-text-editor .ProseMirror {
   height: 100%;
-  min-height: 100%;
+  min-height: 0;
+  max-height: 100%;
   outline: none;
 }
 .rich-text-editor.ProseMirror,
 .rich-text-editor .ProseMirror {
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
   padding: 16px 20px;
 }
 .rich-text-editor p,

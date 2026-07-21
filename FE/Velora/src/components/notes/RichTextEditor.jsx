@@ -1338,8 +1338,10 @@ const styles = {
     wrap: {
         flex: 1,
         minWidth: 0,
+        minHeight: 0,
         display: 'flex',
         flexDirection: 'column',
+        overflow: 'hidden',
         background: 'transparent',
     },
     toolbar: {
@@ -1350,6 +1352,7 @@ const styles = {
         padding: '8px 14px',
         borderBottom: '.5px solid var(--border)',
         flexWrap: 'wrap',
+        flexShrink: 0,
     },
     toolButton: {
         width: 30,
@@ -1524,7 +1527,8 @@ const styles = {
     },
     editor: {
         height: '100%',
-        overflow: 'auto',
+        minHeight: 0,
+        overflow: 'hidden',
         fontSize: 13,
         lineHeight: 1.7,
         outline: 'none',
