@@ -56,7 +56,7 @@ export default function FlashcardsAI() {
 
     if (!duocDungFlashcard) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
+            <div className="flex h-full min-h-0 flex-col items-center justify-center overflow-y-auto bg-gray-50 p-4 dark:bg-gray-900">
                 <p className="text-gray-600 dark:text-gray-400 font-medium mb-4">
                     Tính năng Flashcard AI chỉ dành cho gói Pro hoặc Plus.
                 </p>
@@ -80,7 +80,7 @@ export default function FlashcardsAI() {
 
     if (isLoading) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+            <div className="flex h-full min-h-0 flex-col items-center justify-center overflow-y-auto bg-gray-50 dark:bg-gray-900">
                 <Spinner />
                 <p className="mt-4 text-sm text-gray-500">Đang tải bộ câu hỏi AI...</p>
             </div>
@@ -89,7 +89,7 @@ export default function FlashcardsAI() {
 
     if (!flashcards || flashcards.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
+            <div className="flex h-full min-h-0 flex-col items-center justify-center overflow-y-auto bg-gray-50 p-4 dark:bg-gray-900">
                 <p className="text-gray-600 dark:text-gray-400 font-medium mb-4">Ghi chú này chưa được tạo bộ câu hỏi trắc nghiệm.</p>
                 <button onClick={() => navigate(`/notes/${id}`)} className="btn-primary flex items-center gap-2">
                     <IconArrowLeft size={16} /> Quay lại ghi chú
@@ -115,7 +115,7 @@ export default function FlashcardsAI() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-gray-950 flex flex-col transition-colors">
+        <div className="flex h-full min-h-0 flex-col overflow-y-auto bg-slate-50 transition-colors dark:bg-gray-950">
 
             <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center shadow-sm">
                 <button
@@ -126,7 +126,7 @@ export default function FlashcardsAI() {
                 </button>
             </header>
 
-            <main className="flex-1 flex flex-col items-center justify-center px-6 py-8 max-w-5xl w-full mx-auto">
+            <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col items-center justify-start px-6 py-8">
 
                 <div className="w-full mb-8">
                     <div className="flex items-center justify-between mb-3">
@@ -160,7 +160,7 @@ export default function FlashcardsAI() {
                 </div>
 
                 <div
-                    className="w-full h-[450px] cursor-pointer relative"
+                    className="relative h-[clamp(300px,52vh,450px)] w-full cursor-pointer"
                     style={{ perspective: "2000px" }}
                     onClick={() => setIsFlipped(!isFlipped)}
                 >

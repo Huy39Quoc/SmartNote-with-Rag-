@@ -10,7 +10,6 @@ import {
     IconList,
     IconListNumbers,
     IconListCheck,
-    IconPalette,
     IconEraser,
     IconPhoto,
     IconLink,
@@ -1210,8 +1209,6 @@ const RichTextEditor = forwardRef(function RichTextEditor({
                     </button>
 
                     <span style={styles.divider} />
-
-                    <IconPalette size={15} style={{ color: 'var(--text-muted)', marginLeft: 2 }} />
 
                     <div style={styles.colors}>
                         {EDITOR_COLORS.map(color => (

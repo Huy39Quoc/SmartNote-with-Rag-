@@ -1,6 +1,7 @@
 package org.example.velora.service.impl;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.velora.exception.BadRequestException;
 import org.example.velora.util.LmStudioClient;
@@ -67,35 +68,47 @@ public class AiServiceImpl implements AiService {
 
     @Override
     public DocumentResponse.AnalysisResult analyzeDocument(String text, String instruction) {
-        String truncated = text.length() > 8000 ? text.substring(0, 8000) + "..." : text;
+        String preparedText = prepareTextForAi(text, 12000);
         String prompt = getPrompt("document.analyze");
         if (StringUtils.hasText(instruction)) {
             prompt = instruction + "\n\n" + prompt;
         }
         try {
-            String raw = lmStudioClient.complete(prompt + "\n\n" + truncated);
+            String raw = lmStudioClient.complete(prompt + "\n\nNỘI DUNG TÀI LIỆU:\n" + preparedText);
 
-            // Sửa đổi: Sử dụng TypeReference để định nghĩa chính xác kiểu dữ liệu Map<String, Object>
-            Map<String, Object> parsed = objectMapper.readValue(
-                    cleanJson(raw, '{'),
-                    new TypeReference<Map<String, Object>>() {
+            try {
+                Map<String, Object> parsed = objectMapper.readValue(
+                        cleanJson(raw, '{'),
+                        new TypeReference<Map<String, Object>>() {
+                });
+
+                String summary = asText(parsed.get("summary"));
+                if (!StringUtils.hasText(summary)) {
+                    throw new IllegalArgumentException("AI response is missing summary");
+                }
+
+                return DocumentResponse.AnalysisResult.builder()
+                        .summary(summary.trim())
+                        .keyPoints(toStringList(parsed.get("keyPoints")))
+                        .keywords(toStringList(parsed.get("keywords")))
+                        .build();
+            } catch (Exception parseError) {
+                String fallbackSummary = stripAiFormatting(raw);
+                if (StringUtils.hasText(fallbackSummary)) {
+                    log.warn("Document analysis was not JSON; returning model text: {}", parseError.getMessage());
+                    return DocumentResponse.AnalysisResult.builder()
+                            .summary(fallbackSummary)
+                            .keyPoints(List.of())
+                            .keywords(List.of())
+                            .build();
+                }
+                throw parseError;
             }
-            );
-
-            @SuppressWarnings("unchecked")
-            List<String> keyPoints = (List<String>) parsed.getOrDefault("keyPoints", List.of());
-            @SuppressWarnings("unchecked")
-            List<String> keywords = (List<String>) parsed.getOrDefault("keywords", List.of());
-
-            return DocumentResponse.AnalysisResult.builder()
-                    .summary((String) parsed.get("summary"))
-                    .keyPoints(keyPoints)
-                    .keywords(keywords)
-                    .build();
+        } catch (BadRequestException e) {
+            throw e;
         } catch (Exception e) {
-            log.error("analyzeDocument error: {}", e.getMessage());
-            return DocumentResponse.AnalysisResult.builder()
-                    .summary("Không thể phân tích tài liệu lúc này").build();
+            log.error("analyzeDocument error: {}", e.getMessage(), e);
+            throw new BadRequestException("Model AI không thể phân tích tài liệu. Vui lòng thử lại.");
         }
     }
 
@@ -149,11 +162,8 @@ public class AiServiceImpl implements AiService {
 
         String answer = lmStudioClient.chatComplete(systemPrompt, userMsg);
 
-        if (answer == null || answer.isBlank()
-                || answer.contains("Không thể kết nối AI")
-                || answer.contains("AI chưa trả về nội dung")) {
-            return "Mình đã tìm thấy nội dung liên quan trong tài liệu, nhưng model AI trả lời chưa ổn. "
-                    + "Bạn có thể xem các đoạn liên quan dưới đây:\n\n" + context;
+        if (!StringUtils.hasText(answer)) {
+            throw new BadRequestException("Model AI không tạo được câu trả lời từ ngữ cảnh tài liệu.");
         }
 
         return answer;
@@ -171,6 +181,7 @@ public class AiServiceImpl implements AiService {
                 - Không markdown.
                 - Không thêm chữ ngoài JSON.
                 - Nếu không tìm thấy lịch/deadline, trả về [].
+                - Hôm nay là %s. Chỉ trích xuất công việc có ngày hôm nay hoặc trong tương lai.
 
                 Format bắt buộc:
                 [
@@ -189,9 +200,11 @@ public class AiServiceImpl implements AiService {
                 - priority mặc định là MEDIUM.
                 - Nếu có "hạn nộp", "deadline", "thi", "kiểm tra" thì priority là HIGH.
                 - Nếu có "gấp", "khẩn", "hôm nay", "quá hạn" thì priority là URGENT.
+                - Không coi năm xuất bản, trích dẫn, phiên bản phần mềm hoặc con số thời gian không gắn với một hành động là lịch.
 
                 Nội dung ghi chú:
-                """ + "\n" + content;
+                %s
+                """.formatted(LocalDate.now(), content);
 
             String raw = lmStudioClient.complete(prompt);
 
@@ -331,6 +344,10 @@ public class AiServiceImpl implements AiService {
             String matchedDate = matcher.group(0);
             String taskName = buildTaskNameAroundDate(content, matchedDate);
 
+            if (!containsScheduleIntent(taskName)) {
+                continue;
+            }
+
             if (!StringUtils.hasText(taskName)) {
                 taskName = "Công việc ngày " + matchedDate;
             }
@@ -358,6 +375,10 @@ public class AiServiceImpl implements AiService {
             if (dateText != null && sentence.contains(dateText)) {
                 return cleanupTaskName(sentence);
             }
+        }
+
+        if (dateText != null) {
+            return null;
         }
 
         for (String sentence : sentences) {
@@ -393,6 +414,27 @@ public class AiServiceImpl implements AiService {
         }
 
         return StringUtils.hasText(cleaned) ? cleaned : "Công việc";
+    }
+
+    private boolean containsScheduleIntent(String text) {
+        if (!StringUtils.hasText(text)) {
+            return false;
+        }
+
+        String lower = text.toLowerCase(Locale.ROOT);
+        return lower.contains("deadline")
+                || lower.contains("hạn chót")
+                || lower.contains("hạn nộp")
+                || lower.contains("nộp bài")
+                || lower.contains("nộp báo cáo")
+                || lower.contains("kiểm tra")
+                || lower.contains("thi ")
+                || lower.startsWith("thi ")
+                || lower.contains("thuyết trình")
+                || lower.contains("cuộc họp")
+                || lower.contains("lịch học")
+                || lower.contains("sự kiện")
+                || lower.contains("cuộc hẹn");
     }
 
     private LocalDate parseFlexibleDate(String value) {
@@ -701,6 +743,12 @@ public class AiServiceImpl implements AiService {
     @Override
     public List<Flashcard> generateFlashcardsFromNote(Note note) {
 
+        String source = prepareTextForAi(note.getContent(), 18000);
+        if (!StringUtils.hasText(source)) {
+            throw new BadRequestException("Ghi chú không có đủ nội dung để tạo flashcard.");
+        }
+        int desiredCards = Math.min(20, Math.max(6, (int) Math.ceil(source.length() / 1000.0)));
+
         String prompt = """
         Bạn là một trợ lý học tập chuyên nghiệp chuyên bóc tách kiến thức.
         Nhiệm vụ: Dựa trên nội dung ghi chú sau đây, hãy tạo ra các cặp câu hỏi và câu trả lời rút gọn (Flashcard) để phục vụ việc ôn thi.
@@ -710,6 +758,8 @@ public class AiServiceImpl implements AiService {
         - Không kèm theo bất kỳ lời giải thích, tiêu đề, hoặc ký tự markdown định dạng nào bên ngoài.
         - Không bọc thẻ ```json ... ```.
         - Nếu ghi chú quá ngắn hoặc không có thông tin để tạo câu hỏi, hãy trả về mảng rỗng [].
+        - Hãy tạo từ %d đến %d flashcard, bao phủ đều phần đầu, giữa và cuối của ghi chú.
+        - Không tạo câu hỏi trùng ý; câu trả lời phải có đủ thông tin để tự ôn tập.
 
         Cấu trúc JSON:
         [
@@ -720,7 +770,8 @@ public class AiServiceImpl implements AiService {
         ]
 
         Nội dung ghi chú:
-        """ + "\n" + note.getContent();
+        %s
+        """.formatted(desiredCards, Math.min(24, desiredCards + 4), source);
 
         String aiRawJson = lmStudioClient.complete(prompt);
 
@@ -768,7 +819,7 @@ public class AiServiceImpl implements AiService {
             );
         }
 
-        return savedCards;
+        return savedCards.stream().limit(Math.min(24, desiredCards + 4)).toList();
     }
 
     @Override
@@ -786,7 +837,7 @@ public class AiServiceImpl implements AiService {
         }
 
         String safeTitle = StringUtils.hasText(title) ? title.trim() : "Ghi chú";
-        String truncated = content.length() > 5000 ? content.substring(0, 5000) : content;
+        String truncated = prepareTextForAi(content, 12000);
 
         String prompt = buildDiagramPrompt(safeTitle, truncated, diagramType);
 
@@ -821,7 +872,70 @@ public class AiServiceImpl implements AiService {
         }
         raw = raw.trim();
         int idx = raw.indexOf(startChar);
-        return idx >= 0 ? raw.substring(idx) : raw;
+        if (idx < 0) {
+            return raw;
+        }
+
+        char endChar = startChar == '[' ? ']' : '}';
+        int end = raw.lastIndexOf(endChar);
+        return end > idx ? raw.substring(idx, end + 1) : raw.substring(idx);
+    }
+
+    private List<String> toStringList(Object value) {
+        if (!(value instanceof Collection<?> values)) {
+            return List.of();
+        }
+
+        return values.stream()
+                .filter(Objects::nonNull)
+                .map(String::valueOf)
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .toList();
+    }
+
+    private String stripAiFormatting(String raw) {
+        if (!StringUtils.hasText(raw)) {
+            return "";
+        }
+
+        String cleaned = raw
+                .replace("```json", "")
+                .replace("```", "")
+                .trim();
+        return cleaned.length() > 6000 ? cleaned.substring(0, 6000).trim() + "..." : cleaned;
+    }
+
+    private String prepareTextForAi(String text, int maxLength) {
+        String normalized = normalizePlainText(text);
+        if (normalized.length() <= maxLength) {
+            return normalized;
+        }
+
+        int sectionLength = Math.max(500, maxLength / 3);
+        int middleStart = Math.max(0, (normalized.length() - sectionLength) / 2);
+        int endStart = Math.max(0, normalized.length() - sectionLength);
+
+        return "[PHẦN ĐẦU]\n" + normalized.substring(0, sectionLength)
+                + "\n\n[PHẦN GIỮA]\n" + normalized.substring(middleStart, middleStart + sectionLength)
+                + "\n\n[PHẦN CUỐI]\n" + normalized.substring(endStart);
+    }
+
+    private String normalizePlainText(String text) {
+        if (text == null) {
+            return "";
+        }
+
+        return text
+                .replaceAll("(?is)<script[^>]*>.*?</script>", " ")
+                .replaceAll("(?is)<style[^>]*>.*?</style>", " ")
+                .replaceAll("(?s)<[^>]+>", " ")
+                .replace("&nbsp;", " ")
+                .replace("&amp;", "&")
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
     private String buildDiagramPrompt(
@@ -940,15 +1054,18 @@ public class AiServiceImpl implements AiService {
                     {
                       "icon": "📘",
                       "heading": "Ý chính",
-                      "content": "Nội dung ngắn gọn"
+                      "content": "Nội dung ngắn gọn",
+                      "highlights": ["từ khóa"]
                     }
                   ]
                 }
 
                 Yêu cầu:
-                - 4 đến 8 blocks
-                - content ngắn gọn
-                - icon là emoji
+                - Tạo 6 đến 10 blocks, bao phủ đều phần đầu, giữa và cuối của ghi chú.
+                - heading phải mô tả rõ chủ đề, không dùng tên chung chung như "Ý 1".
+                - content gồm 1 đến 3 câu cô đọng, nêu khái niệm, quan hệ hoặc hành động quan trọng.
+                - Mỗi block có thêm "highlights": ["từ khóa 1", "từ khóa 2"].
+                - icon là emoji phù hợp với nội dung và hạn chế lặp.
 
                 Tiêu đề:
                 %s
@@ -1056,8 +1173,11 @@ public class AiServiceImpl implements AiService {
         if (start >= 0 && end > start) {
             String json = cleaned.substring(start, end + 1).trim();
             try {
-                objectMapper.readTree(json);
-                return json;
+                JsonNode root = objectMapper.readTree(json);
+                JsonNode blocks = root.path("blocks");
+                if (blocks.isArray() && blocks.size() >= 4) {
+                    return json;
+                }
             } catch (Exception ignored) {
             }
         }
@@ -1129,28 +1249,26 @@ public class AiServiceImpl implements AiService {
             return List.of("Nội dung chính");
         }
 
-        List<String> lines = new ArrayList<>();
+        String normalized = normalizePlainText(content);
+        List<String> candidates = Arrays.stream(normalized.split("(?<=[.!?])\\s+|\\n+"))
+                .map(String::trim)
+                .filter(line -> line.length() >= 20)
+                .map(line -> line.length() > 240 ? line.substring(0, 240).trim() + "..." : line)
+                .toList();
 
-        String[] rawLines = content.split("[\\n.!?]+");
-        for (String line : rawLines) {
-            String cleaned = line.trim().replaceAll("\\s+", " ");
-            if (cleaned.length() >= 3) {
-                lines.add(cleaned);
-            }
-            if (lines.size() >= 6) {
-                break;
-            }
+        if (candidates.isEmpty()) {
+            return List.of(normalized.length() > 240 ? normalized.substring(0, 240) + "..." : normalized);
+        }
+        if (candidates.size() <= 8) {
+            return candidates;
         }
 
-        if (lines.isEmpty()) {
-            String shortened = content.trim();
-            if (shortened.length() > 120) {
-                shortened = shortened.substring(0, 120);
-            }
-            lines.add(shortened);
+        List<String> selected = new ArrayList<>();
+        for (int i = 0; i < 8; i++) {
+            int index = (int) Math.round(i * (candidates.size() - 1) / 7.0);
+            selected.add(candidates.get(index));
         }
-
-        return lines;
+        return selected;
     }
 
     private String escapeMermaid(String text) {
@@ -1226,14 +1344,16 @@ public class AiServiceImpl implements AiService {
     private String buildFallbackSketchnote(String title, String content) {
         List<String> lines = extractKeyLines(content);
 
-        List<Map<String, String>> blocks = new ArrayList<>();
+        List<Map<String, Object>> blocks = new ArrayList<>();
         String[] icons = {"📘", "🧠", "📌", "✅", "💡", "📝"};
 
         for (int i = 0; i < lines.size(); i++) {
-            Map<String, String> block = new LinkedHashMap<>();
+            String line = lines.get(i);
+            Map<String, Object> block = new LinkedHashMap<>();
             block.put("icon", icons[i % icons.length]);
-            block.put("heading", "Ý " + (i + 1));
-            block.put("content", lines.get(i));
+            block.put("heading", buildSketchnoteHeading(line, i));
+            block.put("content", line);
+            block.put("highlights", extractHighlightWords(line));
             blocks.add(block);
         }
 
@@ -1257,6 +1377,26 @@ public class AiServiceImpl implements AiService {
                 }
                 """;
         }
+    }
+
+    private String buildSketchnoteHeading(String content, int index) {
+        String[] words = content.replaceAll("[^\\p{L}\\p{N} ]", " ").trim().split("\\s+");
+        if (words.length == 0 || !StringUtils.hasText(words[0])) {
+            return "Nội dung " + (index + 1);
+        }
+
+        String heading = String.join(" ", Arrays.copyOf(words, Math.min(words.length, 6)));
+        return heading.length() > 56 ? heading.substring(0, 56).trim() + "..." : heading;
+    }
+
+    private List<String> extractHighlightWords(String content) {
+        return Arrays.stream(content.replaceAll("[^\\p{L}\\p{N} ]", " ").split("\\s+"))
+                .map(String::trim)
+                .filter(word -> word.length() >= 5)
+                .map(word -> word.toLowerCase(Locale.ROOT))
+                .distinct()
+                .limit(3)
+                .toList();
     }
 
     private String sanitizeMermaid(String mermaid) {

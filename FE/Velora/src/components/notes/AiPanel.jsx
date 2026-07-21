@@ -19,7 +19,7 @@ export default function AiPanel({ noteId, content, title, onApply, onInsertCheck
     const [result, setResult] = useState(null)
     const [action, setAction] = useState('')
 
-    const selectedAction = availableActions.find(action => action.key === action)
+    const selectedAction = availableActions.some(item => item.key === action)
         ? action
         : availableActions[0]?.key || ''
 
@@ -29,7 +29,7 @@ export default function AiPanel({ noteId, content, title, onApply, onInsertCheck
             return
         }
 
-        const validAction = availableActions.some(action => action.key === action)
+        const validAction = availableActions.some(item => item.key === action)
 
         if (!validAction) {
             setAction(availableActions[0]?.key || '')
