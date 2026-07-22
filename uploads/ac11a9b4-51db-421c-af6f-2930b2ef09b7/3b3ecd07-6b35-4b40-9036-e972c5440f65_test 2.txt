@@ -1,0 +1,11 @@
+React là một thư viện JavaScript phổ biến dùng để xây dựng giao diện người dùng. Khi mới học React, sinh viên nên bắt đầu từ các khái niệm nền tảng như component, props, state, event handling và render dữ liệu. Component là một phần nhỏ của giao diện, có thể tái sử dụng ở nhiều nơi trong ứng dụng. Ví dụ, một nút bấm, một form đăng nhập, một thẻ sản phẩm hoặc một thanh điều hướng đều có thể được xây dựng thành component riêng. Cách chia nhỏ giao diện như vậy giúp code dễ đọc, dễ bảo trì và dễ mở rộng hơn.
+
+Props được dùng để truyền dữ liệu từ component cha sang component con. Ví dụ, component cha có thể truyền tên sản phẩm, giá tiền hoặc trạng thái hiển thị cho component con. Trong khi đó, state dùng để lưu dữ liệu có thể thay đổi trong quá trình người dùng tương tác với trang web. Khi state thay đổi, React sẽ tự động cập nhật lại giao diện. Đây là một trong những điểm mạnh của React so với cách thao tác DOM truyền thống.
+
+Để tạo một project React nhanh chóng, sinh viên có thể sử dụng Vite. Vite giúp khởi tạo project gọn nhẹ, tốc độ chạy nhanh và dễ cấu hình. Sau khi tạo project, sinh viên có thể cài thêm Bootstrap hoặc React Bootstrap để xây dựng giao diện đẹp hơn. Bootstrap cung cấp sẵn nhiều thành phần giao diện như Button, Form, Table, Alert, Modal và Dropdown. Điều này giúp người mới học không phải tự viết quá nhiều CSS ban đầu.
+
+Khi ứng dụng có nhiều trang, React Router DOM được dùng để tạo route và điều hướng giữa các màn hình. Ví dụ, ứng dụng có thể có trang đăng nhập, trang danh sách sản phẩm, trang thêm sản phẩm và trang chi tiết sản phẩm. Người học cần biết cách cấu hình BrowserRouter, Routes, Route và Link để di chuyển giữa các trang mà không cần tải lại toàn bộ website.
+
+Trong phần kết nối backend, Axios thường được dùng để gửi request đến API. Các thao tác phổ biến gồm GET để lấy dữ liệu, POST để thêm mới, PUT để cập nhật và DELETE để xóa. Để code gọn hơn, nên tách các hàm gọi API vào thư mục services. Ví dụ, có thể tạo file api.js chứa các hàm get, post, put và remove dùng chung cho toàn bộ project. Cách làm này giúp tránh viết lặp code Axios ở nhiều component.
+
+Bài thực hành tuần này yêu cầu sinh viên tạo một project React bằng Vite, cài Bootstrap, xây dựng form thêm sản phẩm và hiển thị danh sách sản phẩm từ API. Sinh viên cần hoàn thành bài trước ngày 18/09/2026 lúc 23:59 và nộp link GitHub cho giảng viên.

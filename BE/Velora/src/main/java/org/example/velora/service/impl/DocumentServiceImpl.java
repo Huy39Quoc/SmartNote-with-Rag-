@@ -149,8 +149,30 @@ public class DocumentServiceImpl implements DocumentService {
                 );
             } else {
                 String text = fileExtractor.extract(doc.getStoragePath(), doc.getFileType());
+
+                if (text == null || text.isBlank()) {
+                    doc.setExtractedText("");
+                    doc.setIsEmbedded(false);
+                    doc.setStatus(Document.Status.FAILED);
+                    documentRepository.save(doc);
+
+                    log.error(
+                            "Document extract failed: text is empty. docId={}, fileName={}, fileType={}, path={}",
+                            docId,
+                            doc.getOriginalName(),
+                            doc.getFileType(),
+                            doc.getStoragePath()
+                    );
+
+                    throw new BadRequestException(
+                            "Không thể đọc nội dung văn bản từ file. "
+                                    + "File có thể là PDF scan, hình ảnh, hoặc DOCX chứa nội dung trong bảng/textbox."
+                    );
+                }
+
                 doc.setExtractedText(text);
-                log.info("Text extracted length={} for doc={}", text == null ? 0 : text.length(), docId);
+                log.info("Text extracted length={} for doc={}", text.length(), docId);
+
                 embedded = chromaDbClient.embed(
                         docId.toString(),
                         text,

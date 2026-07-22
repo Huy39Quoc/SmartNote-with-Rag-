@@ -27,6 +27,11 @@ public class ChromaDbClient {
     private String collection;
 
     public boolean embed(String id, String text, String userId, String type) {
+        if (text == null || text.isBlank()) {
+            log.error("Skip Chroma embed because text is empty. id={}, userId={}, type={}", id, userId, type);
+            return false;
+        }
+
         try {
             chromaWebClient.post().uri("/embed")
                     .bodyValue(Map.of(
@@ -37,13 +42,23 @@ public class ChromaDbClient {
                             "collection", collection
                     ))
                     .retrieve()
+                    .onStatus(
+                            status -> status.is4xxClientError() || status.is5xxServerError(),
+                            response -> response.bodyToMono(String.class)
+                                    .map(body -> new RuntimeException(
+                                            "AI embed service error: status="
+                                                    + response.statusCode()
+                                                    + ", body="
+                                                    + body
+                                    ))
+                    )
                     .bodyToMono(String.class)
                     .timeout(Duration.ofSeconds(60))
                     .block();
 
             return true;
         } catch (Exception e) {
-            log.error("Chroma embed error id={}: {}", id, e.getMessage());
+            log.error("Chroma embed error id={}, textLength={}: {}", id, text.length(), e.getMessage());
             return false;
         }
     }
