@@ -62,7 +62,6 @@ def chunk_text(text: str, chunk_size: int = 1200, overlap: int = 250) -> List[st
         return []
 
     paragraphs = [p.strip() for p in text.splitlines() if p.strip()]
-
     chunks: List[str] = []
     current = ""
 
@@ -73,35 +72,35 @@ def chunk_text(text: str, chunk_size: int = 1200, overlap: int = 250) -> List[st
 
         if current:
             chunks.append(current)
+            current = ""
 
         if len(paragraph) <= chunk_size:
             current = paragraph
         else:
             start = 0
             while start < len(paragraph):
-                end = min(start + chunk_size, len(paragraph))
+                proposed_end = min(start + chunk_size, len(paragraph))
+                end = proposed_end
+
+                if proposed_end < len(paragraph):
+                    word_boundary = paragraph.rfind(" ", start + chunk_size // 2, proposed_end)
+                    if word_boundary > start:
+                        end = word_boundary
+
                 piece = paragraph[start:end].strip()
                 if piece:
                     chunks.append(piece)
                 if end >= len(paragraph):
                     break
-                start = max(0, end - overlap)
-            current = ""
+
+                overlap_start = max(start + 1, end - overlap)
+                next_boundary = paragraph.find(" ", overlap_start, end)
+                start = next_boundary + 1 if next_boundary >= 0 else end
 
     if current:
         chunks.append(current)
 
-    merged: List[str] = []
-
-    for i, chunk in enumerate(chunks):
-        if i == 0:
-            merged.append(chunk)
-            continue
-
-        prev_tail = chunks[i - 1][-overlap:].strip()
-        merged.append((prev_tail + "\n\n" + chunk).strip())
-
-    return merged
+    return chunks
 
 @app.get("/health")
 def health() -> Dict[str, Any]:

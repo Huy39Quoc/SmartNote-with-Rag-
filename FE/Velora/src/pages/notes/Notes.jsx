@@ -69,6 +69,7 @@ export default function Notes() {
     const [newTagName, setNewTagName] = useState('')
     const [newTagColor, setNewTagColor] = useState('#3B82F6')
     const [scheduledNoteIds, setScheduledNoteIds] = useState(new Set())
+    const [dismissedScheduleNoteIds, setDismissedScheduleNoteIds] = useState(new Set())
 
     const [isCreatingFlashcards, setCreatingFlashcards] = useState(false)
 
@@ -844,47 +845,30 @@ export default function Notes() {
     const canExtractSchedule = (text) => {
         if (!text) return false
 
-        return new RegExp(
-            '\\b(?:' +
+        const actionPattern = /\b(?:deadline|hạn\s*(?:chót|nộp)|nộp\s*(?:bài|báo\s*cáo)|kiểm\s*tra|thi|thuyết\s*trình|cuộc\s*họp|lịch\s*học|sự\s*kiện|cuộc\s*hẹn)\b/i
+        const dateOrTimePattern = /\b(?:\d{1,2}[:.][0-5]\d|[0-2]?\d\s*(?:giờ|h)\b|hôm\s*nay|ngày\s*(?:mai|mốt)|tuần\s*(?:này|sau|tới)|tháng\s*(?:này|sau|tới)|cuối\s*tuần|\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?|thứ\s*(?:hai|ba|tư|năm|sáu|bảy)|chủ\s*nhật)\b/i
 
-            '\\d{1,2}[:.][0-5]\\d' +
-            '|[0-2]?\\d\\s*(?:giờ|h)\\b' +
-
-            '|(?:ngày\\s*)?(?:hôm\\s*nay|hôm\\s*qua)' +
-            '|ngày\\s*(?:mai|mốt|kia)' +
-
-            '|tuần\\s*(?:này|sau|tới|trước)' +
-            '|tháng\\s*(?:này|sau|tới|trước)' +
-            '|cuối\\s*tuần' +
-
-            '|ngày\\s*\\d{1,2}' +
-            '|\\d{1,2}[/\\-]\\d{1,2}(?:[/\\-]\\d{2,4})?' +
-            '|tháng\\s*\\d{1,2}' +
-
-            '|thứ\\s*(?:hai|ba|tư|năm|sáu|bảy)\\b' +
-            '|chủ\\s*nhật' +
-
-            '|deadline|hạn\\s*(?:chót|nộp)?|nộp\\s*(?:bài|báo\\s*cáo)' +
-            ')',
-            'i'
-        ).test(text)
+        return actionPattern.test(text) && dateOrTimePattern.test(text)
     }
 
     useEffect(() => {
         if (!currentNote) return
 
         const hasCreatedSchedule = scheduledNoteIds.has(currentNote.id)
+        const wasDismissed = dismissedScheduleNoteIds.has(currentNote.id)
         const wasScheduleExtracted = hasPackageFeature('EXTRACT_SCHEDULE')
 
         setShowSuggestedSchedule(
             wasScheduleExtracted &&
             !hasCreatedSchedule &&
+            !wasDismissed &&
             canExtractSchedule(richTextToPlainText(currentNote.content))
         )
     }, [
         currentNote?.id,
         currentNote?.content,
         scheduledNoteIds,
+        dismissedScheduleNoteIds,
         user?.packageFeatures,
     ])
 
@@ -1461,7 +1445,7 @@ export default function Notes() {
 
                                     <div style={{ flex: 1 }}>
                                         <div style={styles.scheduleTitle}>
-                                            AI phát hiện thông message thời gian
+                                            Phát hiện lịch hoặc deadline
                                         </div>
 
                                         <div style={styles.scheduleDesc}>
@@ -1480,7 +1464,10 @@ export default function Notes() {
 
                                             <button
                                                 className="btn-ghost"
-                                                onClick={() => setShowSuggestedSchedule(false)}
+                                                onClick={() => {
+                                                    setDismissedScheduleNoteIds(prev => new Set(prev).add(currentNote.id))
+                                                    setShowSuggestedSchedule(false)
+                                                }}
                                                 style={styles.scheduleButton}
                                             >
                                                 Để sau
@@ -1892,12 +1879,14 @@ const styles = {
         display: 'grid',
         gridTemplateColumns: '320px minmax(0, 1fr)',
         flex: 1,
+        minHeight: 0,
         overflow: 'hidden',
         height: '100%',
         background: 'var(--bg-base)',
     },
     list: {
         minWidth: 0,
+        minHeight: 0,
         borderRight: '.5px solid var(--border)',
         display: 'flex',
         flexDirection: 'column',
@@ -2112,6 +2101,7 @@ const styles = {
 
     editor: {
         minWidth: 0,
+        minHeight: 0,
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
@@ -2222,6 +2212,7 @@ const styles = {
     editorPaper: {
         flex: 1,
         minWidth: 0,
+        minHeight: 0,
         background: 'var(--bg-surface)',
         border: '.5px solid var(--border)',
         borderRadius: 16,

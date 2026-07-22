@@ -2,6 +2,7 @@ package org.example.velora.util;
 
 import org.example.velora.dto.LmStudioRequest;
 import org.example.velora.dto.LmStudioResponse;
+import org.example.velora.exception.BadRequestException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -59,12 +60,16 @@ public class LmStudioClient {
                 String content = resp.getChoices().get(0).getMessage().getContent();
                 if (content != null && !content.isBlank()) return content.trim();
             }
+            throw new BadRequestException("Model AI không trả về nội dung.");
+        } catch (BadRequestException e) {
+            throw e;
         } catch (WebClientResponseException e) {
             log.error("LM Studio HTTP {}: {}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw new BadRequestException("Dịch vụ AI trả về lỗi HTTP " + e.getStatusCode().value() + ".");
         } catch (Exception e) {
             log.error("LM Studio error: {}", e.getMessage());
+            throw new BadRequestException("Không thể kết nối dịch vụ AI. Hãy kiểm tra LM Studio và model đang được tải.");
         }
-        return "AI chưa trả về nội dung. Hãy kiểm tra LM Studio: model có thể đang bật Reasoning hoặc phản hồi quá lâu.";
     }
 
     public String transcribeAudio(String filePath) {

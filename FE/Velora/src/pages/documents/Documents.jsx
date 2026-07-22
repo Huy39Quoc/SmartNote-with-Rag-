@@ -1277,6 +1277,7 @@ const styles = {
     },
     right: {
         flex: 1,
+        minHeight: 0,
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
@@ -1324,6 +1325,7 @@ const styles = {
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
+        minHeight: 0,
     },
     docHeader: {
         display: 'flex',
@@ -1336,7 +1338,9 @@ const styles = {
     },
     contentArea: {
         flex: 1,
+        minHeight: 0,
         overflowY: 'auto',
+        scrollbarGutter: 'stable',
         padding: 16,
     },
     aiResult: {
@@ -1446,6 +1450,10 @@ const styles = {
         display: 'flex',
         flexDirection: 'column',
         gap: 12,
+        maxHeight: 'min(52vh, 560px)',
+        overflowY: 'auto',
+        scrollbarGutter: 'stable',
+        paddingRight: 4,
     },
     chatTurn: {
         display: 'flex',

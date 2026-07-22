@@ -158,6 +158,15 @@ function SketchnoteViewer({ jsonText }) {
                         <div style={styles.sketchIcon}>{block.icon || '📝'}</div>
                         <div style={styles.sketchHeading}>{block.heading}</div>
                         <div style={styles.sketchContent}>{block.content}</div>
+                        {Array.isArray(block.highlights) && block.highlights.length > 0 && (
+                            <div style={styles.sketchHighlights}>
+                                {block.highlights.map((highlight, highlightIndex) => (
+                                    <span key={highlightIndex} style={styles.sketchHighlight}>
+                                        {highlight}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 ))}
             </div>
@@ -174,7 +183,12 @@ function buildSketchnoteHtml(jsonText, title) {
     }
 
     const blocks = (data.blocks || [])
-        .map(b => `<div><strong>${escapeHtml(b.icon || '📝')} ${escapeHtml(b.heading || '')}</strong><br>${escapeHtml(b.content || '')}</div>`)
+        .map(b => {
+            const highlights = Array.isArray(b.highlights) && b.highlights.length > 0
+                ? `<br><small>${b.highlights.map(item => `#${escapeHtml(item)}`).join(' ')}</small>`
+                : ''
+            return `<div><strong>${escapeHtml(b.icon || '📝')} ${escapeHtml(b.heading || '')}</strong><br>${escapeHtml(b.content || '')}${highlights}</div>`
+        })
         .join('<br>')
 
     return `<div><h3>${escapeHtml(data.title || title || 'Sơ đồ')}</h3><br>${blocks}</div>`
@@ -687,14 +701,15 @@ const styles = {
     },
     sketchGrid: {
         display: 'grid',
-        gridTemplateColumns: '1fr',
-        gap: 8,
+        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+        gap: 12,
     },
     sketchCard: {
         border: '1px solid #e5e7eb',
         borderRadius: 10,
-        padding: 10,
-        background: '#fff',
+        padding: 14,
+        background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+        boxShadow: '0 8px 20px rgba(15, 23, 42, .06)',
     },
     sketchIcon: {
         fontSize: 24,
@@ -708,7 +723,21 @@ const styles = {
     sketchContent: {
         fontSize: 12,
         color: '#374151',
-        lineHeight: 1.5,
+        lineHeight: 1.65,
+    },
+    sketchHighlights: {
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 5,
+        marginTop: 10,
+    },
+    sketchHighlight: {
+        padding: '3px 7px',
+        borderRadius: 999,
+        background: '#eef2ff',
+        color: '#4f46e5',
+        fontSize: 10.5,
+        fontWeight: 600,
     },
     modalBackdrop: {
         position: 'fixed',
