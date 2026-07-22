@@ -30,11 +30,27 @@ import AiPanel from '../../components/notes/AiPanel'
 import RichTextEditor from '../../components/notes/RichTextEditor'
 import Spinner from '../../components/ui/Spinner'
 import EmptyState from '../../components/ui/EmptyState'
+import Modal from '../../components/ui/Modal'
 import toast from 'react-hot-toast'
 import useAuthStore from '../../service/authStore'
 import { hasFeature, getUpgradeMessage } from '../../utils/packageFeatures'
 import { hasRichTextContent, richTextToPlainText } from '../../utils/richText'
 import { DEFAULT_NOTE_TITLE } from '../../constants/noteConstants'
+
+const normalizeNoteTitle = (value) => {
+    const normalized = String(value || '').replace(/\s+/g, ' ').trim()
+    return normalized.length > 255 ? normalized.slice(0, 255).trim() : normalized
+}
+
+const normalizeChecklistTask = (value) => {
+    const normalized = String(value || '')
+        .replace(/^\s*(?:[-*•]+|\d+[.)]|\[[ xX]\])\s*/, '')
+        .replace(/^\s*(?:công\s*việc|task)\s*:\s*/i, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+
+    return normalized.length > 255 ? normalized.slice(0, 255).trim() : normalized
+}
 
 export default function Notes() {
     const { id: idParam } = useParams()
@@ -87,6 +103,7 @@ export default function Notes() {
     const [versionHistory, setVersionHistory] = useState([])
     const [isLoadingHistory, setLoadingHistory] = useState(false)
     const [restoringVersionId, setRestoringVersionId] = useState(null)
+    const [versionToRestore, setVersionToRestore] = useState(null)
 
     const savedVersionRef = useRef('')
     const idParamRef = useRef(idParam)
@@ -397,7 +414,7 @@ export default function Notes() {
                 action: 'SUGGEST_TITLE',
             })
 
-            const suggestedTitle = data?.data?.suggestedTitle?.trim()
+            const suggestedTitle = normalizeNoteTitle(data?.data?.suggestedTitle)
             if (!suggestedTitle) return
 
             if (currentNoteRef.current?.id !== noteId) return
@@ -420,40 +437,65 @@ export default function Notes() {
         }
     }
 
-    const save = async () => {
-        if (!currentNote) return
-        if (!canEdit) return
+    const persistNote = async (note, { forceVersion = false } = {}) => {
+        const noteToSave = {
+            ...note,
+            title: normalizeNoteTitle(note.title) || DEFAULT_NOTE_TITLE,
+        }
 
-        const currentMilestone = createNoteMilestone(currentNote)
-        if (currentMilestone === savedVersionRef.current) return
+        const { data } = await noteApi.update(noteToSave.id, {
+            title: noteToSave.title,
+            content: noteToSave.content,
+            tagIds: noteToSave.tags?.map(t => t.id),
+            editorSessionId: editorSessionIdRef.current,
+            createVersion: forceVersion,
+        })
+
+        setCurrentNote(data.data)
+
+        setItems(p =>
+            p.map(n => n.id === data.data.id ? { ...n, ...data.data } : n)
+        )
+
+        savedVersionRef.current = createNoteMilestone(data.data)
+
+        if (showHistory) {
+            await loadVersionHistory(data.data.id)
+        }
+
+        if (
+            data.data.title?.trim() === DEFAULT_NOTE_TITLE &&
+            !processedAutoTitleIdsRef.current.has(data.data.id)
+        ) {
+            processedAutoTitleIdsRef.current.add(data.data.id)
+            autoSuggestTitle(data.data.id, data.data.title, data.data.content)
+        }
+
+        return data.data
+    }
+
+    const save = async ({ forceVersion = false } = {}) => {
+        if (!currentNote || !canEdit) return
+
+        const noteToSave = {
+            ...currentNote,
+            title: normalizeNoteTitle(currentNote.title) || DEFAULT_NOTE_TITLE,
+        }
+        const currentMilestone = createNoteMilestone(noteToSave)
+
+        if (currentMilestone === savedVersionRef.current && !forceVersion) {
+            if (noteToSave.title !== currentNote.title) {
+                setCurrentNote(noteToSave)
+            }
+            return
+        }
 
         setSaving(true)
 
         try {
-            const { data } = await noteApi.update(currentNote.id, {
-                title: currentNote.title,
-                content: currentNote.content,
-                tagIds: currentNote.tags?.map(t => t.id),
-                editorSessionId: editorSessionIdRef.current,
-            })
-
-            setCurrentNote(data.data)
-
-            setItems(p =>
-                p.map(n => n.id === data.data.id ? { ...n, ...data.data } : n)
-            )
-
-            savedVersionRef.current = createNoteMilestone(data.data)
-
-            if (
-                data.data.title?.trim() === DEFAULT_NOTE_TITLE &&
-                !processedAutoTitleIdsRef.current.has(data.data.id)
-            ) {
-                processedAutoTitleIdsRef.current.add(data.data.id)
-                autoSuggestTitle(data.data.id, data.data.title, data.data.content)
-            }
-        } catch {
-            toast.error('Lưu thất bại')
+            await persistNote(noteToSave, { forceVersion })
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Lưu thất bại')
         } finally {
             setSaving(false)
         }
@@ -519,7 +561,7 @@ export default function Notes() {
             }
 
             const tasks = result.checklist
-                .map(item => typeof item === 'string' ? item.trim() : '')
+                .map(normalizeChecklistTask)
                 .filter(Boolean)
 
             if (tasks.length === 0) {
@@ -535,32 +577,36 @@ export default function Notes() {
             return
         }
 
-        let newAppliedContent = null
+        let newTitle = normalizeNoteTitle(currentNote.title) || DEFAULT_NOTE_TITLE
+        let newAppliedContent = currentNote.content
 
-        setCurrentNote(p => {
-            if (!p) return p
+        if (result.suggestedTitle) {
+            newTitle = normalizeNoteTitle(result.suggestedTitle) || newTitle
+        }
 
-            let newTitle = p.title
+        if (result.improvedContent) {
+            newAppliedContent = result.improvedContent
+        } else if (result.summary) {
+            newAppliedContent = `${(currentNote.content || '').trim()}\n\n---\n\n## AI Summary\n${result.summary}`
+        }
 
-            if (result.suggestedTitle) {
-                newTitle = result.suggestedTitle
+        const noteToSave = {
+            ...currentNote,
+            title: newTitle,
+            content: newAppliedContent,
+        }
+
+        setSaving(true)
+
+        try {
+            const savedNote = await persistNote(noteToSave, { forceVersion: true })
+            if (newAppliedContent !== currentNote.content) {
+                richTextEditorRef.current?.setContentHtml(savedNote.content)
             }
-
-            if (result.improvedContent) {
-                newAppliedContent = result.improvedContent
-            } else if (result.summary) {
-                newAppliedContent = `${(p.content || '').trim()}\n\n---\n\n## AI Summary\n${result.summary}`
-            }
-
-            return {
-                ...p,
-                title: newTitle,
-                content: newAppliedContent !== null ? newAppliedContent : p.content,
-            }
-        })
-
-        if (newAppliedContent !== null) {
-            richTextEditorRef.current?.setContentHtml(newAppliedContent)
+        } catch (error) {
+            throw new Error(error.response?.data?.message || 'Không thể lưu gợi ý AI')
+        } finally {
+            setSaving(false)
         }
     }
 
@@ -570,7 +616,9 @@ export default function Notes() {
             return
         }
 
-        if (checklistItems.length === 0) {
+        const validTasks = [...new Set(checklistItems.map(normalizeChecklistTask).filter(Boolean))]
+
+        if (validTasks.length === 0) {
             toast.error('Checklist không có nội dung hợp lệ')
             return
         }
@@ -585,11 +633,11 @@ export default function Notes() {
         const toastId = toast.loading('Đang tạo task từ checklist AI...')
 
         try {
-            await Promise.all(
-                checklistItems.map(taskName =>
+            const results = await Promise.allSettled(
+                validTasks.map(taskName =>
                     scheduleApi.create({
                         taskName,
-                        description: `Tạo từ checklist AI của ghi chú: ${currentNote.title || 'Không có tiêu đề'}`,
+                        description: `Tạo từ checklist AI của ghi chú: ${normalizeNoteTitle(currentNote.title) || 'Không có tiêu đề'}`,
                         deadline: checklistDeadline || null,
                         priority: checklistPriority,
                         noteId: currentNote.id,
@@ -597,9 +645,29 @@ export default function Notes() {
                 )
             )
 
-            toast.success(`Đã tạo ${checklistItems.length} task từ checklist AI`, {
-                id: toastId,
-            })
+            const failedTasks = validTasks.filter((_, index) => results[index].status === 'rejected')
+            const createdCount = validTasks.length - failedTasks.length
+
+            if (createdCount > 0) {
+                setScheduledNoteIds(prev => new Set(prev).add(currentNote.id))
+                setShowSuggestedSchedule(false)
+            }
+
+            if (failedTasks.length > 0) {
+                const firstFailure = results.find(result => result.status === 'rejected')
+                const errorMessage = firstFailure?.reason?.response?.data?.message
+
+                setChecklistItems(failedTasks)
+                toast.error(
+                    createdCount > 0
+                        ? `Đã tạo ${createdCount}/${validTasks.length} task. ${failedTasks.length} task chưa tạo được.`
+                        : errorMessage || 'Không thể tạo task từ checklist AI',
+                    { id: toastId }
+                )
+                return
+            }
+
+            toast.success(`Đã tạo ${createdCount} task từ checklist AI`, { id: toastId })
 
             setChecklistItems([])
             setChecklistDeadline('')
@@ -686,13 +754,13 @@ export default function Notes() {
 
     }, [showShare, currentNote?.id])
 
-    const loadVersionHistory = async () => {
-        if (!currentNote?.id) return
+    const loadVersionHistory = async (noteId = currentNote?.id) => {
+        if (!noteId) return
 
         setLoadingHistory(true)
 
         try {
-            const { data } = await noteApi.getVersions(currentNote.id)
+            const { data } = await noteApi.getVersions(noteId)
             setVersionHistory(data.data || [])
         } catch {
             toast.error('Không tải được lịch sử phiên bản')
@@ -745,7 +813,6 @@ export default function Notes() {
 
     const restoreVersion = async (version) => {
         if (!currentNote?.id) return
-        if (!window.confirm(`Khôi phục phiên bản #${version.versionNumber}?`)) return
 
         setRestoringVersionId(version.id)
 
@@ -756,7 +823,9 @@ export default function Notes() {
             savedVersionRef.current = createNoteMilestone(newNote)
             setCurrentNote(newNote)
             setItems(p => p.map(n => n.id === newNote.id ? { ...n, ...newNote } : n))
-            await loadVersionHistory()
+            richTextEditorRef.current?.setContentHtml(newNote.content || '')
+            await loadVersionHistory(newNote.id)
+            setVersionToRestore(null)
             toast.success('Đã khôi phục phiên bản')
         } catch (error) {
             toast.error(error.response?.data?.message || 'Không thể khôi phục phiên bản')
@@ -1185,6 +1254,7 @@ export default function Notes() {
                                 <input
                                     value={currentNote.title || ''}
                                     onChange={e => updateNoteField('title', e.target.value)}
+                                    maxLength={255}
                                     readOnly={!canEdit}
                                     placeholder="Tiêu đề ghi chú..."
                                     style={{
@@ -1383,7 +1453,8 @@ export default function Notes() {
                                 {canEdit && (
                                     <button
                                         className="btn-primary"
-                                        onClick={save}
+                                        onClick={() => save({ forceVersion: true })}
+                                        disabled={isSaving}
                                         style={styles.saveButton}
                                     >
                                         <IconCheck size={13} /> Lưu
@@ -1564,7 +1635,7 @@ export default function Notes() {
 
                                         <button
                                             className="btn-primary"
-                                            onClick={save}
+                                            onClick={() => save()}
                                             style={styles.panelWideButton}
                                         >
                                             Lưu tag cho ghi chú
@@ -1707,7 +1778,7 @@ export default function Notes() {
 
                                                                 <button
                                                                     className="btn-ghost"
-                                                                    onClick={() => restoreVersion(version)}
+                                                                    onClick={() => setVersionToRestore(version)}
                                                                     disabled={!canEdit || restoringVersionId === version.id}
                                                                     style={styles.restoreButton}
                                                                     title="Khôi phục phiên bản này"
@@ -1869,6 +1940,46 @@ export default function Notes() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {versionToRestore && (
+                <Modal
+                    title="Xác nhận khôi phục phiên bản"
+                    width={440}
+                    onClose={() => {
+                        if (!restoringVersionId) setVersionToRestore(null)
+                    }}
+                >
+                    <p style={styles.restoreConfirmText}>
+                        Bạn có chắc muốn khôi phục ghi chú về phiên bản
+                        {' '}<strong>#{versionToRestore.versionNumber}</strong>?
+                    </p>
+
+                    <p style={styles.restoreConfirmHint}>
+                        Nội dung hiện tại sẽ được thay thế bằng nội dung của phiên bản đã chọn.
+                    </p>
+
+                    <div style={styles.restoreConfirmActions}>
+                        <button
+                            type="button"
+                            className="btn-ghost"
+                            onClick={() => setVersionToRestore(null)}
+                            disabled={Boolean(restoringVersionId)}
+                        >
+                            Hủy
+                        </button>
+
+                        <button
+                            type="button"
+                            className="btn-primary"
+                            onClick={() => restoreVersion(versionToRestore)}
+                            disabled={Boolean(restoringVersionId)}
+                        >
+                            <IconRestore size={14} />
+                            {restoringVersionId ? 'Đang khôi phục...' : 'Khôi phục'}
+                        </button>
+                    </div>
+                </Modal>
             )}
         </div>
     )
@@ -2537,6 +2648,24 @@ const styles = {
         padding: 0,
         justifyContent: 'center',
         flexShrink: 0,
+    },
+    restoreConfirmText: {
+        margin: 0,
+        color: 'var(--text-primary)',
+        fontSize: 14,
+        lineHeight: 1.6,
+    },
+    restoreConfirmHint: {
+        margin: '8px 0 0',
+        color: 'var(--text-muted)',
+        fontSize: 12,
+        lineHeight: 1.5,
+    },
+    restoreConfirmActions: {
+        display: 'flex',
+        justifyContent: 'flex-end',
+        gap: 8,
+        marginTop: 20,
     },
 
     modalBackdrop: {

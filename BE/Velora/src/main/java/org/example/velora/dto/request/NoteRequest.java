@@ -32,6 +32,8 @@ public class NoteRequest {
         private List<UUID> tagIds;
 
         private String editorSessionId;
+
+        private Boolean createVersion = false;
     }
 
     @Data

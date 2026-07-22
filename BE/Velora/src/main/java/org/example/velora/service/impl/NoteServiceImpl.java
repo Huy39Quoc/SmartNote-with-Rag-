@@ -112,8 +112,13 @@ public class NoteServiceImpl implements NoteService {
         boolean contentChanged = !Objects.equals(oldTitle, note.getTitle())
                 || !Objects.equals(oldContent, note.getContent());
 
+        boolean createVersion = Boolean.TRUE.equals(req.getCreateVersion());
+
+        if (contentChanged || createVersion) {
+            saveVersion(note, editor, createVersion);
+        }
+
         if (contentChanged) {
-            saveVersion(note, editor, false);
             scheduleNoteEmbedding(note.getId());
         }
 
@@ -291,10 +296,16 @@ public class NoteServiceImpl implements NoteService {
     }
 
     private void saveVersion(Note note, User editor, boolean force) {
-        if (!force) {
-            NoteVersion latest = noteVersionRepository.findTopByNoteIdOrderByVersionNumberDesc(note.getId())
-                    .orElse(null);
+        NoteVersion latest = noteVersionRepository.findTopByNoteIdOrderByVersionNumberDesc(note.getId())
+                .orElse(null);
 
+        if (latest != null
+                && Objects.equals(latest.getTitle(), note.getTitle())
+                && Objects.equals(latest.getContent(), note.getContent())) {
+            return;
+        }
+
+        if (!force) {
             if (latest != null
                     && latest.getCreatedAt() != null
                     && latest.getCreatedAt().isAfter(LocalDateTime.now().minusMinutes(VERSION_CHECKPOINT_MINUTES))) {

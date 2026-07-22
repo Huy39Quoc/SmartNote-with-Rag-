@@ -6,6 +6,16 @@ import useAuthStore from '../../service/authStore'
 import { hasFeature } from '../../utils/packageFeatures'
 import { AI_NOTE_ACTIONS } from '../../constants/noteConstants'
 
+const normalizeChecklistTask = (value) => {
+    const normalized = String(value || '')
+        .replace(/^\s*(?:[-*•]+|\d+[.)]|\[[ xX]\])\s*/, '')
+        .replace(/^\s*(?:công\s*việc|task)\s*:\s*/i, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+
+    return normalized.length > 255 ? normalized.slice(0, 255).trim() : normalized
+}
+
 export default function AiPanel({ noteId, content, title, onApply, onInsertChecklist, onClose }) {
     const { user } = useAuthStore()
 
@@ -83,7 +93,7 @@ export default function AiPanel({ noteId, content, title, onApply, onInsertCheck
     }
 
     const insertChecklistIntoNote = () => {
-        const items = (result?.checklist || []).map(text => String(text).trim()).filter(Boolean)
+        const items = (result?.checklist || []).map(normalizeChecklistTask).filter(Boolean)
         if (items.length === 0) return
 
         const escape = (s) => s
